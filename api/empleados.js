@@ -127,19 +127,23 @@ async function importarCsv(req, res) {
   try {
     const lineas = csvTexto.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
     const resultados = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
+    const headerRaw = lineas[0] || '';
+    const header = headerRaw.split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"').trim().toLowerCase(); });
+    const idEnPrimero = header[0] === 'id';
     for (let i = 0; i < lineas.length; i++) {
       if (i === 0) continue; // saltar cabecera
       const cols = lineas[i].split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"'); });
-      const distrito = (cols[0] || '').trim();
-      const dpto = (cols[1] || '').trim() || null;
-      const cargo = (cols[2] || '').trim();
-      const nombres = (cols[3] || '').trim();
-      const apellidos = (cols[4] || '').trim();
-      const fecha_nacimiento = (cols[5] || '').trim();
-      const telefono = (cols[6] || '').trim();
-      const correo = (cols[7] || '').trim();
-      const dui = (cols[8] || '').trim();
-      const activo = (cols[9] || 'TRUE').trim() || 'TRUE';
+      const offset = (idEnPrimero && cols[0] === '') ? 1 : 0;
+      const distrito = (cols[0 + offset] || '').trim();
+      const dpto = (cols[1 + offset] || '').trim() || null;
+      const cargo = (cols[2 + offset] || '').trim();
+      const nombres = (cols[3 + offset] || '').trim();
+      const apellidos = (cols[4 + offset] || '').trim();
+      const fecha_nacimiento = (cols[5 + offset] || '').trim();
+      const telefono = (cols[6 + offset] || '').trim();
+      const correo = (cols[7 + offset] || '').trim();
+      const dui = (cols[8 + offset] || '').trim();
+      const activo = (cols[9 + offset] || 'TRUE').trim() || 'TRUE';
       if (!nombres || !apellidos || !dui) {
         const msg = 'Fila ' + (i + 1) + ': nombres, apellidos y DUI son requeridos';
         resultados.errores.push(msg);

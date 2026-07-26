@@ -176,6 +176,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const permisosMatriz = ref([]);
 
         const importandoArchivo = ref(false);
+        const procesandoArchivo = ref(false);
         const progresoImportacion = ref(0);
         const detalleImportacion = ref([]);
         const resumenImportacion = ref(null);
@@ -472,19 +473,22 @@ document.addEventListener('DOMContentLoaded', async function() {
             const texto = await file.text();
             tipoImportacion.value = 'departamentos';
             importandoArchivo.value = true;
+            procesandoArchivo.value = true;
             progresoImportacion.value = 0;
             detalleImportacion.value = [];
             resumenImportacion.value = null;
 
             const res = await apiImportarDepartamentos(sesion.token, texto);
-            if (res && Array.isArray(res.detalle)) {
-              res.detalle.forEach(function(item) {
-                detalleImportacion.value.push(item);
-                progresoImportacion.value = Math.round(((detalleImportacion.value.length) / Math.max(res.detalle.length, 1)) * 100);
-              });
+            procesandoArchivo.value = false;
+            const detalle = (res && Array.isArray(res.detalle)) ? res.detalle : [];
+            for (let i = 0; i < detalle.length; i++) {
+              detalleImportacion.value.push(detalle[i]);
+              progresoImportacion.value = Math.round(((i + 1) / Math.max(detalle.length, 1)) * 100);
+              if (i < detalle.length - 1) await new Promise(r => setTimeout(r, 80));
             }
             resumenImportacion.value = res;
             await cargarDatosInicialesBatch();
+            await new Promise(r => setTimeout(r, 600));
             mostrarNotificacion('Importación completada.', 'exito');
           } catch (err) {
             mostrarNotificacion(err.message || 'Error al importar.', 'error');
@@ -573,19 +577,22 @@ document.addEventListener('DOMContentLoaded', async function() {
             const texto = await file.text();
             tipoImportacion.value = 'empleados';
             importandoArchivo.value = true;
+            procesandoArchivo.value = true;
             progresoImportacion.value = 0;
             detalleImportacion.value = [];
             resumenImportacion.value = null;
 
             const res = await apiImportarEmpleados(sesion.token, texto);
-            if (res && Array.isArray(res.detalle)) {
-              res.detalle.forEach(function(item) {
-                detalleImportacion.value.push(item);
-                progresoImportacion.value = Math.round(((detalleImportacion.value.length) / Math.max(res.detalle.length, 1)) * 100);
-              });
+            procesandoArchivo.value = false;
+            const detalle = (res && Array.isArray(res.detalle)) ? res.detalle : [];
+            for (let i = 0; i < detalle.length; i++) {
+              detalleImportacion.value.push(detalle[i]);
+              progresoImportacion.value = Math.round(((i + 1) / Math.max(detalle.length, 1)) * 100);
+              if (i < detalle.length - 1) await new Promise(r => setTimeout(r, 80));
             }
             resumenImportacion.value = res;
             await cargarDatosInicialesBatch();
+            await new Promise(r => setTimeout(r, 600));
             mostrarNotificacion('Importación completada.', 'exito');
           } catch (err) {
             mostrarNotificacion(err.message || 'Error al importar.', 'error');
@@ -1057,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           guardarPermisoAction, editarPermiso,
           rolSeleccionado, busquedaPermiso, guardandoPermisos, exitoPermisos,
           permisosMatriz, permisosFiltrados, cambiarRol, alternarPermiso, alternarTodo, guardarPermisosRol,
-          importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion,
+          importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion, procesandoArchivo,
           listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
           formatearDui, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,

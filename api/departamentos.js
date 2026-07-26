@@ -102,12 +102,16 @@ async function importarCsv(req, res) {
   try {
     const lineas = csvTexto.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
     const resultados = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
+    const headerRaw = lineas[0] || '';
+    const header = headerRaw.split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"').trim().toLowerCase(); });
+    const idEnPrimero = header[0] === 'id';
     for (let i = 0; i < lineas.length; i++) {
       if (i === 0) continue; // saltar cabecera
       const cols = lineas[i].split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"'); });
-      const cod_dpto = (cols[0] || '').trim();
-      const nombre_dpto = (cols[1] || '').trim();
-      const activo = (cols[2] || 'TRUE').trim() || 'TRUE';
+      const offset = (idEnPrimero && cols[0] === '') ? 1 : 0;
+      const cod_dpto = (cols[0 + offset] || '').trim();
+      const nombre_dpto = (cols[1 + offset] || '').trim();
+      const activo = (cols[2 + offset] || 'TRUE').trim() || 'TRUE';
       if (!nombre_dpto) {
         resultados.errores.push('Fila ' + (i + 1) + ': nombre_dpto vacío');
         resultados.detalle.push({ linea: i + 1, accion: 'error', mensaje: 'nombre_dpto vacío' });
