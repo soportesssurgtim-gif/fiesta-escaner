@@ -67,7 +67,7 @@
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">DUI (Con guión automático)</label>
           <input :value="formEmpleado.dui" type="text" placeholder="01234567-8" maxlength="10"
-            @input="formEmpleado.dui = formatearDui($event.target.value)"
+            @blur="formEmpleado.dui = formatearDui($event.target.value)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-extrabold tracking-wider text-slate-800" />
         </div>
         <div class="col-span-1">
@@ -112,7 +112,7 @@
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Teléfono (8 dígitos sin guiones)</label>
           <input :value="formEmpleado.telefono" type="text" inputmode="numeric" maxlength="8" placeholder="Ej. 70000000"
-            @input="formEmpleado.telefono = limpiarTildes(String($event.target.value)).replace(/[^0-9]/g, '').slice(0, 8)"
+            @blur="formEmpleado.telefono = limpiarTildes(String($event.target.value)).replace(/[^0-9]/g, '').slice(0, 8)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold tracking-wider" />
           <a v-if="formEmpleado.telefono" :href="'https://wa.me/503' + formEmpleado.telefono" target="_blank" rel="noopener"
             class="inline-flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800">
