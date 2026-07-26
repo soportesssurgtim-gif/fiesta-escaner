@@ -87,7 +87,7 @@
           <label class="block font-bold text-slate-600 mb-1">Empleados</label>
           <input v-model="busquedaEmpleadoTarjeta" type="text" placeholder="Buscar por nombre, DUI o código..." class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium mb-2" />
           <div class="max-h-60 overflow-y-auto space-y-1 pr-1 border border-slate-200 rounded-2xl p-2">
-            <div v-for="emp in empleadosFiltradosTarjeta" :key="emp.id" class="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50">
+            <div v-for="emp in (listaEmpleados || []).filter(function(e){ const q = (busquedaEmpleadoTarjeta || '').toLowerCase().trim(); return !q || String(e.nombres || '').toLowerCase().includes(q) || String(e.apellidos || '').toLowerCase().includes(q) || String(e.dui || '').includes(q) || String(e.codigo || '').toLowerCase().includes(q); })" :key="emp.id" class="flex items-center gap-2 p-2 rounded-xl hover:bg-slate-50">
               <input type="checkbox" :value="emp.id" v-model="empleadosSeleccionados" class="rounded border-slate-300 text-[#001ba0] focus:ring-[#001ba0]" />
               <span class="flex-1 font-medium text-slate-800">{{ emp.nombres }} {{ emp.apellidos }}</span>
               <span class="text-[10px] font-bold text-slate-500">DUI: {{ formatearDui(emp.dui) }}</span>
