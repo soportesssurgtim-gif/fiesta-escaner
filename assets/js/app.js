@@ -1354,6 +1354,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     try {
       app.mount('#app');
       console.log('[OK] Vue app montada exitosamente en #app');
+      if (skeleton) skeleton.style.display = 'none';
     } catch (errMount) {
       console.error('Error al montar Vue app:', errMount);
       setSkeleton(

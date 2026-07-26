@@ -48,6 +48,36 @@
       font-family: "Font Awesome 6 Free", "Font Awesome 6 Brands" !important;
     }
 
+    /* Skeleton de carga sin dependencia de Tailwind */
+    #app-skeleton {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: #f2f2f7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #app-skeleton .skeleton-inner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    #app-skeleton .skeleton-spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid #cbd5e1;
+      border-top-color: #001ba0;
+      border-radius: 50%;
+      animation: skeleton-spin 0.8s linear infinite;
+    }
+    @keyframes skeleton-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .modal-overlay {
       position: fixed;
       top: -1rem;
@@ -130,12 +160,13 @@
 <body class="h-full m-0 p-0 antialiased">
 
   <div id="app-skeleton">
-    <div class="animate-pulse text-sm font-medium flex items-center gap-2">
-      <i class="fas fa-spinner fa-spin text-lg"></i> Cargando sistema…
+    <div class="skeleton-inner">
+      <div class="skeleton-spinner"></div>
+      <span>Cargando sistema…</span>
     </div>
   </div>
 
-  <div id="app" class="hidden min-h-screen flex flex-col w-full"></div>
+  <div id="app" class="min-h-screen flex flex-col w-full"></div>
 
   <script src="assets/js/api.js"></script>
   <script src="assets/js/tarjetas.js"></script>
