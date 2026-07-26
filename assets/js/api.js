@@ -164,3 +164,49 @@ async function apiSortearGanador(token, sorteoId) {
   });
   return _parseResponse(res);
 }
+
+async function apiExportarDepartamentos(token) {
+  const res = await fetch(`${API_BASE}/departamentos?action=exportar-csv`, { headers: _headers(token) });
+  if (!res.ok) throw new Error('Error al exportar departamentos');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'departamentos.csv';
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+async function apiImportarDepartamentos(token, csvTexto) {
+  const res = await fetch(`${API_BASE}/departamentos?action=importar-csv`, {
+    method: 'POST',
+    headers: _headers(token),
+    body: JSON.stringify({ csv: csvTexto })
+  });
+  return _parseResponse(res);
+}
+
+async function apiExportarEmpleados(token) {
+  const res = await fetch(`${API_BASE}/empleados?action=exportar-csv`, { headers: _headers(token) });
+  if (!res.ok) throw new Error('Error al exportar empleados');
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'empleados.csv';
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+}
+
+async function apiImportarEmpleados(token, csvTexto) {
+  const res = await fetch(`${API_BASE}/empleados?action=importar-csv`, {
+    method: 'POST',
+    headers: _headers(token),
+    body: JSON.stringify({ csv: csvTexto })
+  });
+  return _parseResponse(res);
+}

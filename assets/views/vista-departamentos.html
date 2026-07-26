@@ -4,10 +4,21 @@
       <h2 class="text-base font-extrabold text-slate-800">Departamentos Municipales</h2>
       <p class="text-xs text-slate-500">Catálogo de unidades y áreas administrativas (Total: {{ departamentosFiltrados.length }})</p>
     </div>
-    <button @click="abrirModalDpto()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center justify-center gap-1.5 self-start sm:self-auto">
-      <i class="fas fa-building"></i>
-      <span>Nuevo Departamento</span>
-    </button>
+    <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+      <input type="file" accept=".csv" class="hidden" id="csvDptoInput" @change="importarCsvDptoAction" />
+      <button @click="document.getElementById('csvDptoInput').click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+        <i class="fas fa-file-import"></i>
+        <span class="hidden sm:inline">Importar CSV</span>
+      </button>
+      <button @click="exportarCsvDptoAction" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+        <i class="fas fa-file-export"></i>
+        <span class="hidden sm:inline">Exportar CSV</span>
+      </button>
+      <button @click="abrirModalDpto()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center justify-center gap-1.5">
+        <i class="fas fa-building"></i>
+        <span>Nuevo Departamento</span>
+      </button>
+    </div>
   </div>
   <div class="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-slate-200/60 p-5 shadow-sm space-y-4">
     <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">

@@ -450,6 +450,31 @@ document.addEventListener('DOMContentLoaded', async function() {
           }
         }
 
+        async function exportarCsvDptoAction() {
+          try {
+            await apiExportarDepartamentos(sesion.token);
+            mostrarNotificacion('Exportación iniciada.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al exportar.', 'error');
+          }
+        }
+
+        async function importarCsvDptoAction(e) {
+          const file = e.target && e.target.files && e.target.files[0];
+          if (!file) return;
+          try {
+            const texto = await file.text();
+            const res = await apiImportarDepartamentos(sesion.token, texto);
+            const msg = (res && res.insertados ? 'Insertados: ' + res.insertados + ', ' : '') + (res && res.actualizados ? 'Actualizados: ' + res.actualizados : '');
+            mostrarNotificacion(msg || 'Importación completada.', 'exito');
+            await cargarDatosInicialesBatch();
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al importar.', 'error');
+          } finally {
+            e.target.value = '';
+          }
+        }
+
         function abrirModalEmpleado(emp = null) {
           errorEmpleado.value = '';
           if (emp) {
@@ -510,6 +535,31 @@ document.addEventListener('DOMContentLoaded', async function() {
             guardandoEmpleado.value = false;
             errorEmpleado.value = err.message || 'Error al guardar el empleado.';
             mostrarNotificacion(err.message || 'Error al guardar.', 'error');
+          }
+        }
+
+        async function exportarCsvEmpleadoAction() {
+          try {
+            await apiExportarEmpleados(sesion.token);
+            mostrarNotificacion('Exportación iniciada.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al exportar.', 'error');
+          }
+        }
+
+        async function importarCsvEmpleadoAction(e) {
+          const file = e.target && e.target.files && e.target.files[0];
+          if (!file) return;
+          try {
+            const texto = await file.text();
+            const res = await apiImportarEmpleados(sesion.token, texto);
+            const msg = (res && res.insertados ? 'Insertados: ' + res.insertados + ', ' : '') + (res && res.actualizados ? 'Actualizados: ' + res.actualizados : '');
+            mostrarNotificacion(msg || 'Importación completada.', 'exito');
+            await cargarDatosInicialesBatch();
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al importar.', 'error');
+          } finally {
+            e.target.value = '';
           }
         }
 
@@ -978,8 +1028,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
           formatearDui, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
-          procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction,
-          abrirModalEmpleado, guardarEmpleadoAction, abrirModalPremio, guardarPremioAction,
+          procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
+          abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch
         };
       }

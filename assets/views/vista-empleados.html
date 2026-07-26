@@ -4,10 +4,21 @@
       <h2 class="text-base font-extrabold text-slate-800">Gestión de Empleados</h2>
       <p class="text-xs text-slate-500">Catálogo de personal municipal de San Salvador Sur</p>
     </div>
-    <button @click="abrirModalEmpleado()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
-      <i class="fas fa-user-plus"></i>
-      <span>Nuevo Empleado</span>
-    </button>
+    <div class="flex flex-wrap items-center gap-2">
+      <input type="file" accept=".csv" class="hidden" id="csvEmpInput" @change="importarCsvEmpleadoAction" />
+      <button @click="document.getElementById('csvEmpInput').click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+        <i class="fas fa-file-import"></i>
+        <span class="hidden sm:inline">Importar CSV</span>
+      </button>
+      <button @click="exportarCsvEmpleadoAction" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+        <i class="fas fa-file-export"></i>
+        <span class="hidden sm:inline">Exportar CSV</span>
+      </button>
+      <button @click="abrirModalEmpleado()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
+        <i class="fas fa-user-plus"></i>
+        <span>Nuevo Empleado</span>
+      </button>
+    </div>
   </div>
   <div class="bg-white/80 backdrop-blur-xl rounded-[2rem] border border-slate-200/60 p-5 shadow-sm space-y-4">
     <div class="relative">
