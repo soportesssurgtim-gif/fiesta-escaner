@@ -81,7 +81,7 @@
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Departamento / Unidad</label>
           <select v-model="formEmpleado.dpto" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-semibold text-slate-800">
-            <option value="" disabled>-- Selecciona un departamento --</option>
+            <option value="">-- Sin departamento (opcional) --</option>
             <option v-for="d in listaDepartamentos" :key="d.id" :value="d.id">{{ d.nombreDpto || d.nombre_dpto }}</option>
           </select>
         </div>

@@ -115,7 +115,7 @@
         <div>
           <label class="block font-bold text-slate-600 mb-1">Rol Asignado</label>
           <select v-model="formUsuario.rol" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800">
-            <option value="" disabled>-- Selecciona un rol --</option>
+            <option value="">-- Sin rol (opcional) --</option>
             <option v-for="r in listaRoles" :key="r.id" :value="r.id">{{ r.nombreRol || r.nombre_rol }}</option>
           </select>
         </div>
