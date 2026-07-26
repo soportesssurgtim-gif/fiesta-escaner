@@ -39,7 +39,7 @@
           <label class="block font-bold text-slate-600 mb-1">Zona predefinida</label>
           <select @change="onCambiarZona" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-semibold text-slate-800">
             <option value="">-- Selecciona zona --</option>
-            <option v-for="(coords, nombre) in window.TarjetasApp.zonasPredefinidas" :key="nombre" :value="nombre">{{ nombre }}</option>
+            <option v-for="(coords, nombre) in zonasPredefinidas" :key="nombre" :value="nombre">{{ nombre }}</option>
           </select>
         </div>
         <div>
