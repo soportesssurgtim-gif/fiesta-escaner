@@ -87,10 +87,17 @@
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Departamento / Unidad</label>
-          <select v-model="formEmpleado.dpto" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-semibold text-slate-800">
-            <option value="">-- Sin departamento (opcional) --</option>
-            <option v-for="d in listaDepartamentos" :key="d.id" :value="d.id">{{ d.nombreDpto || d.nombre_dpto }}</option>
-          </select>
+          <div class="relative">
+            <input v-model="busquedaDptoModal" type="text" placeholder="Buscar departamento..." class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-semibold text-slate-800" />
+            <div v-if="busquedaDptoModal" class="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto">
+              <div v-if="departamentosFiltradosModal.length === 0" class="p-3 text-xs text-slate-400">Sin resultados</div>
+              <div v-for="d in departamentosFiltradosModal" :key="d.id" @click="formEmpleado.dpto = d.id; busquedaDptoModal = ''"
+                class="p-3 text-xs font-semibold cursor-pointer hover:bg-blue-50 text-slate-800 border-b border-slate-100 last:border-none">
+                {{ d.nombreDpto || d.nombre_dpto }}
+              </div>
+            </div>
+          </div>
+          <p v-if="formEmpleado.dpto" class="text-[10px] text-slate-500 mt-1">Seleccionado: {{ departamentoSeleccionadoNombre }}</p>
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Fecha de Nacimiento</label>

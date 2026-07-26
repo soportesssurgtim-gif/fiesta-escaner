@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const modalEmpleado = ref(false);
         const errorEmpleado = ref('');
         const formEmpleado = reactive({ id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE' });
+        const busquedaDptoModal = ref('');
 
         const listaPremios = ref([]);
         const modalPremio = ref(false);
@@ -734,6 +735,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             fechaNacObj.dia = ''; fechaNacObj.mes = ''; fechaNacObj.anio = '';
           }
           modalEmpleado.value = true;
+          busquedaDptoModal.value = '';
         }
 
         async function guardarEmpleadoAction() {
@@ -1227,6 +1229,19 @@ document.addEventListener('DOMContentLoaded', async function() {
           return lista.filter(d => String(d.nombreDpto || d.nombre_dpto || '').toLowerCase().includes(q) || String(d.codDpto || d.cod_dpto || '').toLowerCase().includes(q));
         });
 
+        const departamentosFiltradosModal = computed(() => {
+          const q = String(busquedaDptoModal.value || '').toLowerCase().trim();
+          const lista = Array.isArray(listaDepartamentos.value) ? listaDepartamentos.value : [];
+          if (!q) return lista;
+          return lista.filter(d => String(d.nombreDpto || d.nombre_dpto || '').toLowerCase().includes(q));
+        });
+
+        const departamentoSeleccionadoNombre = computed(() => {
+          if (!formEmpleado.dpto) return '';
+          const d = (listaDepartamentos.value || []).find(function(x) { return x.id === formEmpleado.dpto; });
+          return d ? (d.nombreDpto || d.nombre_dpto) : '';
+        });
+
         const totalPaginasDpto = computed(() => {
           if (itemsPorPaginaDpto.value === 'Todos') return 1;
           const limite = Number(itemsPorPaginaDpto.value) || 10;
@@ -1325,7 +1340,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           cargarAsistenciasDetalladas, cargarResumen, cargandoResumen,
           busquedaEmpleadoModal, mostrarMenuEmpleadoModal, empleadosParaModalUsuario, empleadoSeleccionadoNombre, seleccionarEmpleadoModal,
           listaDepartamentos, busquedaDpto, modalDpto, formDpto, departamentosFiltrados, paginaDpto, itemsPorPaginaDpto, totalPaginasDpto, departamentosPaginados, departamentoRangoTexto,
-          listaEmpleados, busquedaEmpleado, modalEmpleado, formEmpleado, errorEmpleado, empleadosFiltrados,
+           listaEmpleados, busquedaEmpleado, modalEmpleado, formEmpleado, errorEmpleado, empleadosFiltrados,
+           busquedaDptoModal, departamentosFiltradosModal, departamentoSeleccionadoNombre,
           asistenciasDetalladas, busquedaAsistencia, asistenciasFiltradas, listaPremios, modalPremio, formPremio,
           listaUsuarios, modalUsuario, formUsuario, listaRoles, modalRol, formRol,
           listaPermisos, modalPermiso, formPermiso, tienePermiso, abrirModalPermiso,
