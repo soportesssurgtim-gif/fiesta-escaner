@@ -5,8 +5,8 @@
       <p class="text-xs text-slate-500">Catálogo de unidades y áreas administrativas (Total: {{ departamentosFiltrados.length }})</p>
     </div>
     <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-      <input type="file" accept=".csv" class="hidden" id="csvDptoInput" @change="importarCsvDptoAction" />
-      <button @click="document.getElementById('csvDptoInput').click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+      <input type="file" accept=".csv" class="hidden" ref="csvDptoInput" @change="importarCsvDptoAction" />
+      <button v-if="tienePermiso('departamentos', 'agregar')" @click="$refs.csvDptoInput.click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
         <i class="fas fa-file-import"></i>
         <span class="hidden sm:inline">Importar CSV</span>
       </button>
