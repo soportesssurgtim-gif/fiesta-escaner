@@ -41,6 +41,9 @@
           <div class="flex items-center gap-1.5 mt-1.5 text-[10px]">
             <span class="text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">{{ emp.distrito || 'Sin Distrito' }}</span>
             <span v-if="emp.telefono" class="text-slate-500"><i class="fas fa-phone text-[9px] mr-0.5"></i> {{ emp.telefono }}</span>
+            <a v-if="emp.telefono" :href="'https://wa.me/503' + emp.telefono" target="_blank" rel="noopener" class="text-emerald-700 hover:text-emerald-800" title="WhatsApp">
+              <i class="fab fa-whatsapp text-[11px]"></i>
+            </a>
           </div>
         </div>
          <button v-if="tienePermiso('empleados', 'editar')" @click="abrirModalEmpleado(emp)" class="w-9 h-9 rounded-2xl bg-blue-50 text-[#001ba0] flex items-center justify-center text-xs ios-btn shadow-sm">
@@ -63,7 +66,7 @@
         </div>
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">DUI (Con guión automático)</label>
-          <input v-model="formEmpleado.dui" type="text" placeholder="01234567-8" maxlength="10"
+          <input :value="formEmpleado.dui" type="text" placeholder="01234567-8" maxlength="10"
             @input="formEmpleado.dui = formatearDui($event.target.value)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-extrabold tracking-wider text-slate-800" />
         </div>
@@ -108,9 +111,13 @@
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Teléfono (8 dígitos sin guiones)</label>
-          <input v-model="formEmpleado.telefono" type="text" inputmode="numeric" maxlength="8" placeholder="Ej. 70000000"
+          <input :value="formEmpleado.telefono" type="text" inputmode="numeric" maxlength="8" placeholder="Ej. 70000000"
             @input="formEmpleado.telefono = limpiarTildes(String($event.target.value)).replace(/[^0-9]/g, '').slice(0, 8)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold tracking-wider" />
+          <a v-if="formEmpleado.telefono" :href="'https://wa.me/503' + formEmpleado.telefono" target="_blank" rel="noopener"
+            class="inline-flex items-center gap-1.5 mt-1.5 text-[11px] font-bold text-emerald-700 hover:text-emerald-800">
+            <i class="fab fa-whatsapp"></i> Escribir por WhatsApp
+          </a>
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Correo Electrónico</label>
