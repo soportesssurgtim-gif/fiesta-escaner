@@ -165,6 +165,29 @@ async function apiSortearGanador(token, sorteoId) {
   return _parseResponse(res);
 }
 
+async function apiListarPlantillas(token) {
+  const res = await fetch(`${API_BASE}/tarjetas?action=listar`, { headers: _headers(token) });
+  return _parseResponse(res);
+}
+
+async function apiGuardarPlantilla(token, data) {
+  const res = await fetch(`${API_BASE}/tarjetas?action=guardar`, {
+    method: 'POST',
+    headers: _headers(token),
+    body: JSON.stringify(data)
+  });
+  return _parseResponse(res);
+}
+
+async function apiEliminarPlantilla(token, id) {
+  const res = await fetch(`${API_BASE}/tarjetas?action=eliminar`, {
+    method: 'POST',
+    headers: _headers(token),
+    body: JSON.stringify({ id })
+  });
+  return _parseResponse(res);
+}
+
 async function apiExportarDepartamentos(token) {
   const res = await fetch(`${API_BASE}/departamentos?action=exportar-csv`, { headers: _headers(token) });
   if (!res.ok) throw new Error('Error al exportar departamentos');

@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const action = (req.query && req.query.action) || '';
     if (action === 'tarjetas') {
       try {
-        const { data } = await supabase.from('empleados').select('*').eq('activo', 'TRUE').order('apellidos');
+        const { data } = await supabase.from('empleados').select('id, nombres, apellidos, dui, codigo').eq('activo', 'TRUE').order('apellidos');
         return jsonResponse(res, 200, data || []);
       } catch (e) {
         return jsonResponse(res, 500, { error: 'Error al listar empleados.' });
@@ -63,6 +63,7 @@ async function guardarEmpleado(req, res) {
     telefono: body.telefono || '',
     correo: body.correo || '',
     dui: body.dui,
+    codigo: body.codigo || '',
     activo: body.activo || 'TRUE'
   };
 
@@ -102,12 +103,12 @@ function csvEscape(val) {
 
 async function exportarCsv(req, res) {
   try {
-    const { data } = await supabase.from('empleados').select('id, distrito, dpto, cargo, nombres, apellidos, fecha_nacimiento, telefono, correo, dui, activo').order('apellidos');
+    const { data } = await supabase.from('empleados').select('id, distrito, dpto, cargo, nombres, apellidos, fecha_nacimiento, telefono, correo, dui, codigo, activo').order('apellidos');
     const filas = data || [];
-    const cabecera = ['id', 'distrito', 'dpto', 'cargo', 'nombres', 'apellidos', 'fecha_nacimiento', 'telefono', 'correo', 'dui', 'activo'];
+    const cabecera = ['id', 'distrito', 'dpto', 'cargo', 'nombres', 'apellidos', 'fecha_nacimiento', 'telefono', 'correo', 'dui', 'codigo', 'activo'];
     const csv = [cabecera.join(',')];
     for (const row of filas) {
-      csv.push([row.id, row.distrito || '', row.dpto || '', row.cargo || '', row.nombres || '', row.apellidos || '', row.fecha_nacimiento || '', row.telefono || '', row.correo || '', row.dui || '', row.activo || ''].map(csvEscape).join(','));
+      csv.push([row.id, row.distrito || '', row.dpto || '', row.cargo || '', row.nombres || '', row.apellidos || '', row.fecha_nacimiento || '', row.telefono || '', row.correo || '', row.dui || '', row.codigo || '', row.activo || ''].map(csvEscape).join(','));
     }
     const contenido = csv.join('\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

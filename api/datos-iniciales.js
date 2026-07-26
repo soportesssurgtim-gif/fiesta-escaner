@@ -1,6 +1,12 @@
 import { supabase, requireAuth, getSession, jsonResponse } from './_lib/supabase.js';
 
 export default async function handler(req, res) {
+  const action = (req.query && req.query.action) || '';
+
+  if (req.method === 'GET' && action === 'salud') {
+    return jsonResponse(res, 200, { ok: true, ts: new Date().toISOString() });
+  }
+
   if (req.method !== 'GET') {
     return jsonResponse(res, 405, { error: 'Método no permitido' });
   }
@@ -17,7 +23,7 @@ export default async function handler(req, res) {
 
   try {
     const [emp, dpto, prm, rls, evts, srt, perm, usrRaw, asistenciasRaw] = await Promise.all([
-      supabase.from('empleados').select('*').order('apellidos'),
+      supabase.from('empleados').select('id, distrito, dpto, cargo, nombres, apellidos, fecha_nacimiento, telefono, correo, dui, codigo, activo').order('apellidos'),
       supabase.from('dpto').select('*').order('nombre_dpto'),
       supabase.from('premios').select('*').order('nombre'),
       supabase.from('roles').select('*').order('nombre_rol'),

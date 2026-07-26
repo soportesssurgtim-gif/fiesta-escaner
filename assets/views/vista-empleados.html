@@ -37,7 +37,7 @@
               {{ String(emp.activo).toUpperCase() === 'TRUE' ? 'ACTIVO' : 'INACTIVO' }}
             </span>
           </div>
-          <p class="text-[11px] font-medium text-slate-500 mt-0.5">DUI: <span class="font-bold text-slate-700">{{ formatearDui(emp.dui) }}</span> • {{ emp.cargo || 'Sin Cargo' }}</p>
+          <p class="text-[11px] font-medium text-slate-500 mt-0.5">DUI: <span class="font-bold text-slate-700">{{ formatearDui(emp.dui) }}</span> • Código: <span class="font-bold text-slate-700">{{ emp.codigo || 'N/A' }}</span> • {{ emp.cargo || 'Sin Cargo' }}</p>
           <div class="flex items-center gap-1.5 mt-1.5 text-[10px]">
             <span class="text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">{{ emp.distrito || 'Sin Distrito' }}</span>
             <span v-if="emp.telefono" class="text-slate-500"><i class="fas fa-phone text-[9px] mr-0.5"></i> {{ emp.telefono }}</span>
@@ -66,6 +66,10 @@
           <input v-model="formEmpleado.dui" type="text" placeholder="01234567-8" maxlength="10"
             @input="formEmpleado.dui = formatearDui($event.target.value)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-extrabold tracking-wider text-slate-800" />
+        </div>
+        <div class="col-span-1">
+          <label class="block font-bold text-slate-600 mb-1">Código Empleado</label>
+          <input v-model="formEmpleado.codigo" type="text" placeholder="Ej. EMP-001" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
         </div>
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">Cargo</label>

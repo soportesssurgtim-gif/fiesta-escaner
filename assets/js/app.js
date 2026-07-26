@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       'assets/views/vista-configuracion.html',
       'assets/views/vista-usuarios-roles.html',
       'assets/views/vista-permisos.html',
+      'assets/views/vista-tarjetas.html',
       'assets/views/layout-logueado-fin.html',
       'assets/views/modal-logout.html'
     ];
@@ -155,7 +156,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const busquedaEmpleado = ref('');
         const modalEmpleado = ref(false);
         const errorEmpleado = ref('');
-        const formEmpleado = reactive({ id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', activo: 'TRUE' });
+        const formEmpleado = reactive({ id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE' });
 
         const listaPremios = ref([]);
         const modalPremio = ref(false);
@@ -181,6 +182,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         const detalleImportacion = ref([]);
         const resumenImportacion = ref(null);
         const tipoImportacion = ref('');
+
+        const listaPlantillas = ref([]);
+        const plantillaSeleccionada = ref('');
+        const modalGenerar = ref(false);
+        const empleadosSeleccionados = ref([]);
+        const busquedaEmpleadoTarjeta = ref('');
+        const generandoTarjetas = ref(false);
+        const progresoTarjetas = ref(0);
+        const tarjetasProcesadas = ref(0);
 
         function _construirMatriz() {
           const rolId = rolSeleccionado.value;
@@ -417,6 +427,160 @@ document.addEventListener('DOMContentLoaded', async function() {
           }
         }
 
+        async function cargarPlantillas() {
+          if (!sesion.token) return;
+          try {
+            const data = await apiListarPlantillas(sesion.token);
+            listaPlantillas.value = Array.isArray(data) ? data : [];
+          } catch (e) { /* ignore */ }
+        }
+
+        async function onSeleccionarPlantilla(e) {
+          const file = e.target && e.target.files && e.target.files[0];
+          if (!file) return;
+          try {
+            await window.TarjetasApp.cargarPlantilla(file);
+            mostrarNotificacion('Plantilla cargada. Ajustá la posición del QR.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al cargar plantilla.', 'error');
+          } finally {
+            e.target.value = '';
+          }
+        }
+
+        function onCambiarZona(e) {
+          const nombre = e.target.value;
+          if (!nombre) return;
+          window.TarjetasApp.aplicarZona(nombre);
+        }
+
+        async function guardarPlantillaAction() {
+          const img = window.TarjetasApp.plantillaActual;
+          if (!img) {
+            mostrarNotificacion('Primero subí una plantilla.', 'error');
+            return;
+          }
+          try {
+            const blob = await (await fetch(img.src)).blob();
+            const file = new File([blob], 'plantilla.png', { type: 'image/png' });
+            const { data: upload, error: errUpload } = await supabase.storage.from('plantillas').upload('plantillas/' + Date.now() + '_plantilla.png', file, { contentType: 'image/png', upsert: true });
+            if (errUpload) throw errUpload;
+
+            const qr = window.TarjetasApp.qrConfig;
+            await apiGuardarPlantilla(sesion.token, {
+              nombre: 'Plantilla ' + new Date().toLocaleDateString('es-SV'),
+              imagen_url: upload.path,
+              qr_x: Math.round(qr.x),
+              qr_y: Math.round(qr.y),
+              qr_w: Math.round(qr.w),
+              qr_h: Math.round(qr.h),
+              campo_qr: document.getElementById('campoQrSelect')?.value || 'dui',
+              activo: 'TRUE'
+            });
+            await cargarPlantillas();
+            mostrarNotificacion('Plantilla guardada.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al guardar plantilla.', 'error');
+          }
+        }
+
+        function abrirModalGenerar() {
+          if (listaPlantillas.value.length === 0) {
+            mostrarNotificacion('Primero creá y guardá una plantilla.', 'error');
+            return;
+          }
+          modalGenerar.value = true;
+          empleadosSeleccionados.value = [];
+          busquedaEmpleadoTarjeta.value = '';
+          progresoTarjetas.value = 0;
+          tarjetasProcesadas.value = 0;
+        }
+
+        async function generarIndividualAction(emp) {
+          if (!plantillaSeleccionada.value) {
+            mostrarNotificacion('Selecciona una plantilla primero.', 'error');
+            return;
+          }
+          const plantilla = listaPlantillas.value.find(p => p.id === plantillaSeleccionada.value);
+          if (!plantilla) return;
+
+          try {
+            const { data: urlData } = supabase.storage.from('plantillas').getPublicUrl(plantilla.imagen_url);
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = urlData.publicUrl; });
+            plantillaImg = img;
+            window.TarjetasApp.plantillaActual = img;
+            window.TarjetasApp.qrConfig = { x: plantilla.qr_x, y: plantilla.qr_y, w: plantilla.qr_w, h: plantilla.qr_h };
+            const campo = plantilla.campo_qr || 'dui';
+            await window.TarjetasApp.descargarIndividual({ ...emp, _campo: campo }, campo);
+            mostrarNotificacion('Tarjeta generada.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al generar tarjeta.', 'error');
+          }
+        }
+
+        async function generarLoteAction() {
+          if (!plantillaSeleccionada.value) {
+            mostrarNotificacion('Selecciona una plantilla.', 'error');
+            return;
+          }
+          if (empleadosSeleccionados.value.length === 0) {
+            mostrarNotificacion('Selecciona al menos un empleado.', 'error');
+            return;
+          }
+          const plantilla = listaPlantillas.value.find(p => p.id === plantillaSeleccionada.value);
+          if (!plantilla) return;
+
+          try {
+            generandoTarjetas.value = true;
+            progresoTarjetas.value = 0;
+            tarjetasProcesadas.value = 0;
+
+            const { data: urlData } = supabase.storage.from('plantillas').getPublicUrl(plantilla.imagen_url);
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = urlData.publicUrl; });
+            plantillaImg = img;
+            window.TarjetasApp.plantillaActual = img;
+            window.TarjetasApp.qrConfig = { x: plantilla.qr_x, y: plantilla.qr_y, w: plantilla.qr_w, h: plantilla.qr_h };
+            const campo = plantilla.campo_qr || 'dui';
+            const empleados = (listaEmpleados.value || []).filter(e => empleadosSeleccionados.value.includes(e.id));
+
+            const zip = new JSZip();
+            const folder = zip.folder('tarjetas-invitacion');
+            const max = Math.min(empleados.length, 50);
+
+            for (let i = 0; i < max; i++) {
+              try {
+                const dataUrl = await window.TarjetasApp.generarTarjetaDataURL(empleados[i], campo);
+                folder.file(`tarjeta-${empleados[i].codigo || empleados[i].dui}.png`, dataUrl.split(',')[1], { base64: true });
+              } catch (e) {
+                console.error('Error en tarjeta', empleados[i], e);
+              }
+              tarjetasProcesadas.value = i + 1;
+              progresoTarjetas.value = Math.round(((i + 1) / max) * 100);
+            }
+
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tarjetas-invitacion-${Date.now()}.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            modalGenerar.value = false;
+            mostrarNotificacion('Descarga iniciada.', 'exito');
+          } catch (err) {
+            mostrarNotificacion(err.message || 'Error al generar ZIP.', 'error');
+          } finally {
+            generandoTarjetas.value = false;
+            progresoTarjetas.value = 0;
+            tarjetasProcesadas.value = 0;
+          }
+        }
+
         function solicitarLogout() { mostrarModalLogout.value = true; }
 
         async function confirmarLogout() {
@@ -525,6 +689,7 @@ document.addEventListener('DOMContentLoaded', async function() {
               telefono: emp.telefono || '',
               correo: emp.correo || '',
               dui: emp.dui || '',
+              codigo: emp.codigo || '',
               activo: String(emp.activo || 'TRUE').toUpperCase()
             });
             formEmpleado.dui = formatearDui(formEmpleado.dui);
@@ -544,7 +709,7 @@ document.addEventListener('DOMContentLoaded', async function() {
               }
             } else { fechaNacObj.dia = ''; fechaNacObj.mes = ''; fechaNacObj.anio = ''; }
           } else {
-            Object.assign(formEmpleado, { id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', activo: 'TRUE' });
+            Object.assign(formEmpleado, { id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE' });
             fechaNacObj.dia = ''; fechaNacObj.mes = ''; fechaNacObj.anio = '';
           }
           modalEmpleado.value = true;
@@ -1016,6 +1181,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         watch(busquedaDpto, () => { paginaDpto.value = 1; });
         watch(itemsPorPaginaDpto, () => { paginaDpto.value = 1; });
 
+        watch(vista, (nv) => {
+          if (nv === 'tarjetas') {
+            cargarPlantillas();
+            nextTick(() => {
+              if (window.TarjetasApp && typeof window.TarjetasApp.init === 'function') {
+                window.TarjetasApp.init();
+              }
+            });
+          }
+        });
+
         const empleadosParaModalUsuario = computed(() => {
           const q = busquedaEmpleadoModal.value.toLowerCase().trim();
           const lista = Array.isArray(listaEmpleados.value) ? listaEmpleados.value : [];
@@ -1083,7 +1259,9 @@ document.addEventListener('DOMContentLoaded', async function() {
           formatearDui, limpiarTildes, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
           procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
-          abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch
+          abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
+          cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction, seleccionarTodosEmpleados, empleadosFiltradosTarjeta,
+          generandoTarjetas, progresoTarjetas, tarjetasProcesadas
         };
       }
     });
