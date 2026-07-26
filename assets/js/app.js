@@ -1254,14 +1254,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         watch(busquedaDpto, () => { paginaDpto.value = 1; });
         watch(itemsPorPaginaDpto, () => { paginaDpto.value = 1; });
 
+        function getQrVal(key, fallback) {
+          return (window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig[key] != null) ? window.TarjetasApp.qrConfig[key] : fallback;
+        }
+
         watch(vista, (nv) => {
           if (nv === 'tarjetas') {
             cargarPlantillas();
             if (typeof window.TarjetasApp !== 'undefined') {
               zonasPredefinidas.value = window.TarjetasApp.zonasPredefinidas || {};
-              if (window.TarjetasApp.qrConfig) {
-                qrConfig.value = window.TarjetasApp.qrConfig;
-              }
               if (typeof window.TarjetasApp.init === 'function') {
                 window.TarjetasApp.init();
               }
@@ -1339,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
           cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction,
-          generandoTarjetas, progresoTarjetas, tarjetasProcesadas, zonasPredefinidas,
+          generandoTarjetas, progresoTarjetas, tarjetasProcesadas, zonasPredefinidas, getQrVal,
           estaOnline, pendientesOffline, sincronizandoOffline, cargarPendientesOffline, forzarSincronizacion
         };
       }

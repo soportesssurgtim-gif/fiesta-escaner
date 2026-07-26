@@ -53,19 +53,19 @@
         <div class="grid grid-cols-2 gap-2">
           <div>
             <label class="block font-bold text-slate-600 mb-1">X</label>
-            <input type="number" :value="Math.round((window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig.x) || 800)" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.x = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+            <input type="number" :value="Math.round(getQrVal('x', 800))" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.x = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
           </div>
           <div>
             <label class="block font-bold text-slate-600 mb-1">Y</label>
-            <input type="number" :value="Math.round((window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig.y) || 1400)" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.y = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+            <input type="number" :value="Math.round(getQrVal('y', 1400))" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.y = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
           </div>
           <div>
             <label class="block font-bold text-slate-600 mb-1">Ancho</label>
-            <input type="number" :value="Math.round((window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig.w) || 300)" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.w = Number($event.target.value), window.TarjetasApp.qrConfig.h = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+            <input type="number" :value="Math.round(getQrVal('w', 300))" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.w = Number($event.target.value), window.TarjetasApp.qrConfig.h = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
           </div>
           <div>
             <label class="block font-bold text-slate-600 mb-1">Alto</label>
-            <input type="number" :value="Math.round((window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig.h) || 300)" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.h = Number($event.target.value), window.TarjetasApp.qrConfig.w = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+            <input type="number" :value="Math.round(getQrVal('h', 300))" @input="window.TarjetasApp && window.TarjetasApp.qrConfig && (window.TarjetasApp.qrConfig.h = Number($event.target.value), window.TarjetasApp.qrConfig.w = Number($event.target.value)); renderizarPreview()" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
           </div>
         </div>
       </div>
