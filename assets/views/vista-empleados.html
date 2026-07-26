@@ -55,11 +55,11 @@
       <div class="grid grid-cols-2 gap-3 text-xs">
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">Nombres</label>
-          <input v-model="formEmpleado.nombres" type="text" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formEmpleado.nombres" type="text" @input="formEmpleado.nombres = limpiarTildes(formEmpleado.nombres)" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">Apellidos</label>
-          <input v-model="formEmpleado.apellidos" type="text" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formEmpleado.apellidos" type="text" @input="formEmpleado.apellidos = limpiarTildes(formEmpleado.apellidos)" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">DUI (Con guión automático)</label>
@@ -69,7 +69,7 @@
         </div>
         <div class="col-span-1">
           <label class="block font-bold text-slate-600 mb-1">Cargo</label>
-          <input v-model="formEmpleado.cargo" type="text" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formEmpleado.cargo" type="text" @input="formEmpleado.cargo = limpiarTildes(formEmpleado.cargo)" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Distrito Municipal</label>
@@ -105,12 +105,12 @@
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Teléfono (8 dígitos sin guiones)</label>
           <input v-model="formEmpleado.telefono" type="text" inputmode="numeric" maxlength="8" placeholder="Ej. 70000000"
-            @input="formEmpleado.telefono = String($event.target.value).replace(/[^0-9]/g, '').slice(0, 8)"
+            @input="formEmpleado.telefono = limpiarTildes(String($event.target.value)).replace(/[^0-9]/g, '').slice(0, 8)"
             class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold tracking-wider" />
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Correo Electrónico</label>
-          <input v-model="formEmpleado.correo" type="email" placeholder="correo@sansalvadorsur.gob.sv" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formEmpleado.correo" type="email" @input="formEmpleado.correo = limpiarTildes(formEmpleado.correo)" placeholder="correo@sansalvadorsur.gob.sv" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
         <div class="col-span-2">
           <label class="block font-bold text-slate-600 mb-1">Estado Empleado</label>

@@ -52,7 +52,7 @@
       <div class="space-y-3 text-xs">
         <div>
           <label class="block font-bold text-slate-600 mb-1">Nombre del Evento</label>
-          <input v-model="formEvento.nombre" type="text" placeholder="Ej. Fiesta de Empleados Julio 2026" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+          <input v-model="formEvento.nombre" type="text" @input="formEvento.nombre = limpiarTildes(formEvento.nombre)" placeholder="Ej. Fiesta de Empleados Julio 2026" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-1">Fecha del Evento</label>
@@ -60,7 +60,7 @@
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-1">Ubicación</label>
-          <input v-model="formEvento.ubicacion" type="text" placeholder="Ej. Salón Municipal" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formEvento.ubicacion" type="text" @input="formEvento.ubicacion = limpiarTildes(formEvento.ubicacion)" placeholder="Ej. Salón Municipal" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
       </div>
       <div class="flex gap-2 pt-2">

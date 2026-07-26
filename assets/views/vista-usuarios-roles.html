@@ -69,15 +69,15 @@
       <div class="space-y-3 text-xs">
         <div>
           <label class="block font-bold text-slate-600 mb-1">Nombre de Usuario</label>
-          <input v-model="formUsuario.usuario" type="text" placeholder="Ej. soporte.ti" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+          <input v-model="formUsuario.usuario" type="text" @input="formUsuario.usuario = limpiarTildes(formUsuario.usuario)" placeholder="Ej. soporte.ti" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-1">Correo Institucional</label>
-          <input v-model="formUsuario.correo" type="email" placeholder="usuario@sansalvadorsur.gob.sv" class="w-full p-3 bg-slate-100 rounded-2xl outline-none" />
+          <input v-model="formUsuario.correo" type="email" @input="formUsuario.correo = limpiarTildes(formUsuario.correo)" placeholder="usuario@sansalvadorsur.gob.sv" class="w-full p-3 bg-slate-100 rounded-2xl outline-none" />
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-1">Teléfono</label>
-          <input v-model="formUsuario.telefono" type="text" placeholder="Ej. 70000000" class="w-full p-3 bg-slate-100 rounded-2xl outline-none" />
+          <input v-model="formUsuario.telefono" type="text" @input="formUsuario.telefono = limpiarTildes(formUsuario.telefono)" placeholder="Ej. 70000000" class="w-full p-3 bg-slate-100 rounded-2xl outline-none" />
         </div>
         <div class="relative">
           <label class="block font-bold text-slate-600 mb-1">Empleado Vinculado</label>

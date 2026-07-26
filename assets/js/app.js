@@ -293,6 +293,19 @@ document.addEventListener('DOMContentLoaded', async function() {
           return nums;
         }
 
+
+        function limpiarTildes(val) {
+          if (!val) return '';
+          return String(val)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[באגדה]/g, 'a')
+            .replace(/[יטךכ]/g, 'e')
+            .replace(/[םלמן]/g, 'i')
+            .replace(/[ףעפץצ]/g, 'o')
+            .replace(/[תשûü]/g, 'u');
+        }
+
         function emitirSonido(tipo) {
           try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1067,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion, procesandoArchivo,
           listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
-          formatearDui, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
+          formatearDui, limpiarTildes, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
           procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch

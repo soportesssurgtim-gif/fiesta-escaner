@@ -87,11 +87,11 @@
       <div class="space-y-3 text-xs">
         <div>
           <label class="block font-bold text-slate-600 mb-1">Código Departamento</label>
-          <input v-model="formDpto.codDpto" type="text" placeholder="Ej. D-01" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
+          <input v-model="formDpto.codDpto" type="text" @input="formDpto.codDpto = limpiarTildes(formDpto.codDpto)" placeholder="Ej. D-01" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-bold" />
         </div>
         <div>
           <label class="block font-bold text-slate-600 mb-1">Nombre del Departamento / Unidad</label>
-          <input v-model="formDpto.nombreDpto" type="text" placeholder="Ej. Unidad de Informática" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
+          <input v-model="formDpto.nombreDpto" type="text" @input="formDpto.nombreDpto = limpiarTildes(formDpto.nombreDpto)" placeholder="Ej. Unidad de Informática" class="w-full p-3 bg-slate-100 rounded-2xl outline-none font-medium" />
         </div>
       </div>
       <div class="flex gap-2 pt-2">

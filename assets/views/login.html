@@ -36,7 +36,7 @@
           <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">CORREO INSTITUCIONAL O USUARIO</label>
           <div class="relative flex items-center">
             <span class="absolute left-4 text-slate-400 text-sm"><i class="far fa-envelope"></i></span>
-            <input v-model="loginForm.usuario" type="text" placeholder="usuario@sansalvadorsur.gob.sv" autocomplete="username"
+            <input v-model="loginForm.usuario" type="text" @input="loginForm.usuario = limpiarTildes(loginForm.usuario)" placeholder="usuario@sansalvadorsur.gob.sv" autocomplete="username"
               class="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#001ba0] focus:ring-4 focus:ring-blue-100/80 outline-none transition-all duration-200" />
           </div>
         </div>
