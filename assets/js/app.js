@@ -192,7 +192,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const progresoTarjetas = ref(0);
         const tarjetasProcesadas = ref(0);
         const zonasPredefinidas = ref({});
-        const qrConfig = ref({ x: 800, y: 1400, w: 300, h: 300 });
 
         const estaOnline = ref(navigator.onLine);
         const pendientesOffline = ref(0);
@@ -1340,7 +1339,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
           cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction,
-          generandoTarjetas, progresoTarjetas, tarjetasProcesadas, zonasPredefinidas, qrConfig,
+          generandoTarjetas, progresoTarjetas, tarjetasProcesadas, zonasPredefinidas,
           estaOnline, pendientesOffline, sincronizandoOffline, cargarPendientesOffline, forzarSincronizacion
         };
       }
