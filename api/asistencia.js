@@ -1,0 +1,183 @@
+import { supabase, requireAuth, getSession, jsonResponse, parseBody } from './_lib/supabase.js';
+
+export default async function handler(req, res) {
+  const auth = requireAuth(req);
+  if (auth.error) {
+    return jsonResponse(res, auth.status || 401, { error: auth.error });
+  }
+
+  const sesion = await getSession(auth.token);
+  if (!sesion) {
+    return jsonResponse(res, 401, { error: 'Sesión expirada, inicia sesión nuevamente.' });
+  }
+
+  const action = (req.query && req.query.action) || '';
+
+  if (req.method === 'POST' && action === 'registrar') {
+    return registrarAsistencia(req, res, sesion);
+  }
+
+  if (req.method === 'GET' && action === 'diagnostico') {
+    return diagnosticoAsistencia(req, res);
+  }
+
+  if (req.method === 'GET') {
+    return listarAsistencias(req, res);
+  }
+
+  return jsonResponse(res, 404, { error: 'Endpoint no encontrado.' });
+}
+
+async function registrarAsistencia(req, res, sesion) {
+  const body = await parseBody(req);
+  const { dui, dispositivo } = body;
+  const duiLimpio = String(dui || '').replace(/[^0-9]/g, '');
+
+  if (!duiLimpio) {
+    return jsonResponse(res, 400, { error: 'DUI o QR inválido.' });
+  }
+
+  try {
+    const { data: evento, error: errEvt } = await supabase
+      .from('eventos')
+      .select('*')
+      .eq('activo', 'TRUE')
+      .limit(1)
+      .maybeSingle();
+
+    if (errEvt || !evento) {
+      return jsonResponse(res, 400, { error: 'No hay un evento activo configurado.' });
+    }
+
+    const duiNormalizado = duiLimpio.length === 8 ? '0' + duiLimpio : duiLimpio;
+    const { data: empleadosRaw, error: errEmp } = await supabase
+      .from('empleados')
+      .select('*')
+      .eq('activo', 'TRUE');
+
+    if (errEmp) throw errEmp;
+
+    const empleado = (empleadosRaw || []).find(function (e) {
+      const d = String(e.dui || '').replace(/[^0-9]/g, '');
+      const dN = d.length === 8 ? '0' + d : d;
+      return d === duiLimpio || dN === duiLimpio || d === duiNormalizado || dN === duiNormalizado;
+    });
+
+    if (!empleado) {
+      return jsonResponse(res, 404, { error: 'No se encontró un empleado activo con el DUI: ' + dui });
+    }
+
+    const { data: existente } = await supabase
+      .from('asistencias')
+      .select('*')
+      .eq('evento', evento.id)
+      .eq('empleado', empleado.id)
+      .maybeSingle();
+
+    if (existente) {
+      return jsonResponse(res, 200, {
+        duplicado: true,
+        empleado: { nombres: empleado.nombres, apellidos: empleado.apellidos },
+        mensaje: '⚠️ Asistencia YA registrada anteriormente.'
+      });
+    }
+
+    const { data: asistencia, error: errIns } = await supabase
+      .from('asistencias')
+      .insert({
+        evento: evento.id,
+        empleado: empleado.id,
+        escaneado_por: sesion.usuarioId,
+        dispositivo: dispositivo || 'desconocido',
+        fuente: 'qr'
+      })
+      .select()
+      .maybeSingle();
+
+    if (errIns) {
+      if (String(errIns.message || '').includes('duplicate') || errIns.code === '23505') {
+        return jsonResponse(res, 200, {
+          duplicado: true,
+          empleado: { nombres: empleado.nombres, apellidos: empleado.apellidos },
+          mensaje: '⚠️ Asistencia YA registrada anteriormente.'
+        });
+      }
+      throw errIns;
+    }
+
+    return jsonResponse(res, 200, {
+      duplicado: false,
+      empleado: { nombres: empleado.nombres, apellidos: empleado.apellidos, dpto: empleado.dpto },
+      mensaje: '✅ Asistencia registrada correctamente.'
+    });
+
+  } catch (error) {
+    console.error('registrarAsistencia error:', error);
+    return jsonResponse(res, 500, { error: 'Error al registrar asistencia.' });
+  }
+}
+
+async function listarAsistencias(req, res) {
+  try {
+    const { data: asistenciasRaw } = await supabase
+      .from('asistencias')
+      .select('*, empleado!inner(nombres, apellidos, dui), eventos(nombre)')
+      .order('fecha_hora_asistencia', { ascending: false })
+      .limit(500);
+
+    const asistencias = (asistenciasRaw || []).map(a => ({
+      id: a.id,
+      fechaHora: a.fecha_hora_asistencia ? String(a.fecha_hora_asistencia) : '',
+      empleadoNombre: a.empleado ? (a.empleado.nombres + ' ' + a.empleado.apellidos) : 'Desconocido',
+      dui: a.empleado?.dui || 'N/A',
+      fuente: a.fuente || 'qr',
+      eventoNombre: a.eventos?.nombre || ''
+    }));
+
+    return jsonResponse(res, 200, { asistencias, resumen: { total: asistencias.length } });
+  } catch (e) {
+    console.error('listarAsistencias error:', e);
+    return jsonResponse(res, 500, { error: 'Error al listar asistencias.' });
+  }
+}
+
+async function diagnosticoAsistencia(req, res) {
+  const inicio = Date.now();
+  const alertas = [];
+  try {
+    const { data: eventos } = await supabase.from('eventos').select('*').eq('activo', 'TRUE').limit(1);
+    const activo = (eventos || [])[0];
+    if (!activo) alertas.push('No hay ningún evento activo configurado.');
+
+    const { count: empleadosActivos } = await supabase
+      .from('empleados')
+      .select('*', { count: 'exact', head: true })
+      .eq('activo', 'TRUE');
+
+    if (!empleadosActivos) alertas.push('No hay empleados activos en el catálogo.');
+
+    let asistentesEvento = 0;
+    if (activo) {
+      const { count: cnt } = await supabase
+        .from('asistencias')
+        .select('*', { count: 'exact', head: true })
+        .eq('evento', activo.id);
+      asistentesEvento = cnt || 0;
+    }
+
+    return jsonResponse(res, 200, {
+      ok: alertas.length === 0,
+      eventoActivo: activo ? activo.nombre : null,
+      empleadosActivos: empleadosActivos || 0,
+      asistentesRegistrados: asistentesEvento,
+      alertas,
+      latenciaMs: Date.now() - inicio
+    });
+  } catch (e) {
+    return jsonResponse(res, 200, {
+      ok: false,
+      alertas: [e.message || String(e)],
+      latenciaMs: Date.now() - inicio
+    });
+  }
+}

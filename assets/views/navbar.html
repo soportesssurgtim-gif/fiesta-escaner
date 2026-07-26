@@ -1,0 +1,21 @@
+<nav v-if="!cargando && sesion.token" class="fixed top-0 z-30 w-full bg-[#000060] text-white border-b border-blue-900/50 px-4 py-2.5 flex items-center justify-between shadow-md">
+  <div class="flex items-center gap-3">
+    <button @click="sidebarAbierto = !sidebarAbierto" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/10 md:hidden focus:outline-none">
+      <i class="fas" :class="sidebarAbierto ? 'fa-times text-lg' : 'fa-bars text-lg'"></i>
+    </button>
+    <div class="flex items-center gap-2">
+      <img src="https://sansalvadorsur.gob.sv/images/logo-blanco-vertical.png" alt="San Salvador Sur" class="h-8 object-contain" />
+      <span class="hidden sm:inline-block font-bold text-xs tracking-wide pl-2 border-l border-white/20">Control Municipal</span>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <div class="hidden sm:flex flex-col text-right">
+      <span class="text-xs font-extrabold leading-tight text-white">{{ sesion.nombreMostrar || sesion.correo || sesion.usuario }}</span>
+      <span class="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">{{ sesion.rol || 'Logística' }}</span>
+    </div>
+    <button @click="solicitarLogout" class="bg-white/10 hover:bg-white/20 text-white text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition font-bold ios-btn">
+      <i class="fas fa-sign-out-alt"></i>
+      <span class="hidden sm:inline">Salir</span>
+    </button>
+  </div>
+</nav>

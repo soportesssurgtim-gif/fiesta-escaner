@@ -1,0 +1,18 @@
+{
+  "name": "control-asistencia-fiesta",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistema de Control de Asistencia con QR para Fiesta de Empleados - Alcaldía SSSur",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod",
+    "serve": "npx serve . -l 3000"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}

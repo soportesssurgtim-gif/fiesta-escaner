@@ -1,0 +1,31 @@
+<section v-if="vista === 'rifa'" class="space-y-4">
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 text-center">
+    <div class="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl shadow-inner">
+      <i class="fas fa-gift"></i>
+    </div>
+    <h2 class="text-lg font-extrabold text-slate-800">Gran Rifa Municipal</h2>
+    <p class="text-xs text-slate-500 mb-4 max-w-xs mx-auto">Sorteo aleatorio exclusivo entre los empleados asistentes con QR escaneado.</p>
+    <div v-if="listaSorteos.length > 0" class="mb-4">
+      <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Seleccionar Sorteo</label>
+      <select v-model="formSorteo.id" class="w-full max-w-xs p-3 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-[#001ba0]">
+        <option value="" disabled>-- Selecciona un sorteo --</option>
+        <option v-for="srt in listaSorteos" :key="srt.id" :value="srt.id">
+          {{ srt.nombre }} ({{ String(srt.realizado).toUpperCase() === 'TRUE' ? 'Finalizado' : 'Pendiente' }})
+        </option>
+      </select>
+    </div>
+    <button @click="ejecutarSorteo" :disabled="!formSorteo.id || sorteando"
+      class="w-full max-xs bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3.5 px-6 rounded-2xl shadow-lg hover:shadow-xl transition disabled:opacity-50 mx-auto">
+      <span v-if="sorteando"><i class="fas fa-spinner fa-spin mr-1"></i> Seleccionando ganador…</span>
+      <span v-else><i class="fas fa-dice mr-1"></i> ¡Realizar Sorteo!</span>
+    </button>
+    <p v-if="errorRifa" class="mt-4 text-xs text-red-600 bg-red-50 p-3 rounded-xl font-medium border border-red-100">{{ errorRifa }}</p>
+    <div v-if="ganadorActual" class="mt-6 p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center animate-bounce">
+      <span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider">¡Ganador Confirmado!</span>
+      <h3 class="text-xl font-extrabold text-emerald-900 mt-2">
+        {{ ganadorActual.empleado ? ganadorActual.empleado.nombres + ' ' + ganadorActual.empleado.apellidos : '' }}
+      </h3>
+      <p v-if="ganadorActual.empleado" class="text-xs font-medium text-emerald-700 mt-1">DUI: {{ ganadorActual.empleado.dui }} • {{ ganadorActual.empleado.cargo }}</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,126 @@
+
+<aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-20 w-64 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-transform duration-300 md:translate-x-0"
+  :class="sidebarAbierto ? 'translate-x-0' : '-translate-x-full'">
+  <div class="h-full px-3 py-4 overflow-y-auto flex flex-col justify-between">
+    <div>
+      <div class="p-3.5 mb-4 bg-slate-100/70 rounded-2xl border border-slate-200/50 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-[#001ba0] text-white font-bold flex items-center justify-center text-sm shadow-md shadow-blue-900/20 flex-shrink-0">
+          {{ (sesion.nombreMostrar || sesion.usuario || 'U').charAt(0).toUpperCase() }}
+        </div>
+        <div class="truncate">
+          <p class="text-xs font-extrabold text-slate-800 truncate leading-tight">{{ sesion.nombreMostrar || sesion.correo || sesion.usuario }}</p>
+          <span class="inline-block mt-0.5 px-2 py-0.5 bg-blue-100/80 text-[#001ba0] text-[9px] font-bold rounded-full uppercase">
+            {{ sesion.rol || 'Logística' }}
+          </span>
+        </div>
+      </div>
+      <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Operación Evento</p>
+      <ul class="space-y-1">
+        <li>
+          <button @click="cambiarVista('scanner')"
+            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+            :class="vista === 'scanner' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+            <i class="fas fa-qrcode text-sm w-5 text-center"></i>
+            <span class="flex-1 text-left">Escáner QR</span>
+            <span v-if="vista !== 'scanner'" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </button>
+        </li>
+        <li>
+          <button @click="cambiarVista('asistentes')"
+            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+            :class="vista === 'asistentes' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+            <i class="fas fa-clipboard-list text-sm w-5 text-center"></i>
+            <span class="flex-1 text-left">Asistencias</span>
+            <span class="px-2 py-0.5 bg-slate-200 text-slate-700 rounded-full text-[10px] font-bold"
+              :class="vista === 'asistentes' ? 'bg-white/20 text-white' : ''">
+              {{ resumenData.total }}
+            </span>
+          </button>
+        </li>
+        <li>
+          <button @click="cambiarVista('rifa')"
+            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ios-btn"
+            :class="vista === 'rifa' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+            <i class="fas fa-gift text-sm w-5 text-center"></i>
+            <span class="flex-1 text-left">Sorteos y Rifas</span>
+          </button>
+        </li>
+        <template v-if="esAdmin">
+          <div class="pt-4 pb-1 border-t border-slate-200/60">
+            <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Administración</p>
+          </div>
+          <li>
+            <button @click="cambiarVista('departamentos')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'departamentos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-building text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Departamentos</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('empleados')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'empleados' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-id-card text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Empleados</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('eventos')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'eventos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-calendar-alt text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Eventos / Fiestas</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('sorteos')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'sorteos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-ticket-alt text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Sorteos</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('premios')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'premios' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-trophy text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Premios</span>
+            </button>
+          </li>
+          <div class="pt-4 pb-1 border-t border-slate-200/60">
+            <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Configuración y Catálogos</p>
+          </div>
+          <li>
+            <button @click="cambiarVista('configuracion')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'configuracion' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-sliders-h text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Configuración</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('usuarios')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'usuarios' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-user-shield text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Usuarios & Roles</span>
+            </button>
+          </li>
+          <li>
+            <button @click="cambiarVista('permisos')"
+              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+              :class="vista === 'permisos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+              <i class="fas fa-shield-alt text-sm w-5 text-center"></i>
+              <span class="flex-1 text-left">Permisos</span>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </div>
+    <div class="pt-3 border-t border-slate-200/60 text-center">
+      <p class="text-[10px] font-bold text-slate-400">San Salvador Sur © 2026</p>
+    </div>
+  </div>
+</aside>

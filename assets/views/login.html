@@ -1,0 +1,75 @@
+<section v-if="!cargando && !sesion.token" class="w-full min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-slate-50 m-0 p-0 overflow-hidden">
+  <div class="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-[#000050] via-[#000080] to-[#001ba0] text-white relative overflow-hidden">
+    <div class="absolute -top-24 -left-24 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div></div>
+    <div class="flex flex-col items-center text-center my-auto max-w-md mx-auto z-10">
+      <div class="w-44 h-44 bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-6 flex items-center justify-center shadow-2xl mb-8 transition-transform duration-300 hover:scale-105">
+        <img src="https://sansalvadorsur.gob.sv/images/logo-blanco-vertical.png" alt="Alcaldía San Salvador Sur" class="w-full h-full object-contain drop-shadow" />
+      </div>
+      <h1 class="text-4xl font-extrabold tracking-tight text-white mb-3">Control de Asistencia</h1>
+      <p class="text-base font-medium text-blue-100/90 leading-relaxed max-w-xs">Fiesta de Empleados Municipales</p>
+    </div>
+    <div class="text-center z-10">
+      <p class="text-[11px] font-semibold text-blue-200/70 uppercase tracking-widest">© 2026 ALCALDÍA MUNICIPAL DE SAN SALVADOR SUR</p>
+    </div>
+  </div>
+
+  <div class="flex flex-col justify-center items-center p-6 lg:p-12 min-h-screen">
+    <div class="w-full max-w-md space-y-6">
+      <div class="lg:hidden text-center pb-2">
+        <div class="w-24 h-24 bg-[#000060] rounded-2xl p-3 mx-auto mb-3 flex items-center justify-center shadow-md">
+          <img src="https://sansalvadorsur.gob.sv/images/logo-blanco-vertical.png" alt="San Salvador Sur" class="h-full object-contain" />
+        </div>
+        <h2 class="text-xl font-bold text-slate-800">Fiesta de Empleados</h2>
+        <p class="text-xs text-slate-500">San Salvador Sur</p>
+      </div>
+      <div class="hidden lg:flex w-11 h-11 bg-blue-50 text-[#001ba0] rounded-2xl items-center justify-center border border-blue-100/80 shadow-sm">
+        <i class="fas fa-shield-alt text-lg"></i>
+      </div>
+      <div class="hidden lg:block">
+        <h2 class="text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight">Bienvenido al Portal</h2>
+        <p class="text-sm font-medium text-slate-500 mt-1">Ingresa tus credenciales para acceder a tu panel.</p>
+      </div>
+      <div class="bg-white rounded-3xl p-7 lg:p-8 shadow-xl shadow-slate-200/60 border border-slate-100 space-y-5">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">CORREO INSTITUCIONAL O USUARIO</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-4 text-slate-400 text-sm"><i class="far fa-envelope"></i></span>
+            <input v-model="loginForm.usuario" type="text" placeholder="usuario@sansalvadorsur.gob.sv" autocomplete="username"
+              class="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#001ba0] focus:ring-4 focus:ring-blue-100/80 outline-none transition-all duration-200" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">CONTRASEÑA</label>
+          <div class="relative flex items-center">
+            <span class="absolute left-4 text-slate-400 text-sm"><i class="fas fa-lock"></i></span>
+            <input v-model="loginForm.password" :type="mostrarPassword ? 'text' : 'password'" placeholder="••••••••••••"
+              @keyup.enter="login" autocomplete="current-password"
+              class="w-full pl-11 pr-11 py-3.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#001ba0] focus:ring-4 focus:ring-blue-100/80 outline-none transition-all duration-200" />
+            <button type="button" @click="mostrarPassword = !mostrarPassword"
+              class="absolute right-4 text-slate-400 hover:text-slate-600 text-sm focus:outline-none transition-colors">
+              <i :class="mostrarPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+            </button>
+          </div>
+          <div class="text-right mt-2">
+            <span class="text-xs font-semibold text-[#001ba0] hover:underline cursor-pointer">¿Olvidaste tu contraseña?</span>
+          </div>
+        </div>
+        <div v-if="loginError" class="p-3.5 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700 text-xs font-semibold animate-fade-in">
+          <i class="fas fa-exclamation-circle text-red-500 text-base flex-shrink-0"></i>
+          <span>{{ loginError }}</span>
+        </div>
+        <button @click="login" :disabled="loginCargando"
+          class="w-full bg-[#000060] hover:bg-[#001ba0] text-white rounded-2xl py-4 font-bold text-sm shadow-lg shadow-blue-950/20 hover:shadow-xl transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 group">
+          <span v-if="loginCargando" class="flex items-center gap-2"><i class="fas fa-spinner fa-spin"></i> Accediendo…</span>
+          <span v-else class="flex items-center gap-2">
+            <span>Acceder al Sistema</span>
+            <i class="fas fa-arrow-right text-xs group-hover:translate-x-1 transition-transform"></i>
+          </span>
+        </button>
+      </div>
+      <p class="lg:hidden text-center text-[11px] font-semibold text-slate-400 pt-2">© 2026 ALCALDÍA MUNICIPAL DE SAN SALVADOR SUR</p>
+    </div>
+  </div>
+</section>
