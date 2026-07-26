@@ -16,6 +16,21 @@
   let arrastrando = false;
   let inicioX = 0, inicioY = 0, inicioQrX = 0, inicioQrY = 0;
 
+  // Expose early so Vue/template can read it even before init()
+  window.TarjetasApp = {
+    qrConfig,
+    zonasPredefinidas,
+    plantillaActual: null,
+    init() {},
+    cargarPlantilla() {},
+    aplicarZona() {},
+    renderizarPreview() {},
+    descargarIndividual() {},
+    descargarZIP() {},
+    getQrUrl() {},
+    generarTarjetaDataURL() {}
+  };
+
   function init() {
     canvas = document.getElementById('canvasTarjeta');
     if (!canvas) return;
@@ -239,13 +254,9 @@
     }
   }
 
-  window.TarjetasApp = {
+  // Assign real implementations to the early-exposed object
+  Object.assign(window.TarjetasApp, {
     init, cargarPlantilla, aplicarZona, renderizarPreview,
-    descargarIndividual, descargarZIP, getQrUrl, generarTarjetaDataURL,
-    zonasPredefinidas,
-    get plantillaActual() { return plantillaImg; },
-    set plantillaActual(v) { plantillaImg = v; },
-    get qrConfig() { return qrConfig; },
-    set qrConfig(v) { Object.assign(qrConfig, v); }
-  };
+    descargarIndividual, descargarZIP, getQrUrl, generarTarjetaDataURL
+  });
 })();
