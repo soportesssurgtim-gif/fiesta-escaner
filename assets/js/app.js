@@ -1333,7 +1333,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
-          cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction, seleccionarTodosEmpleados, empleadosFiltradosTarjeta,
+          cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction, empleadosFiltradosTarjeta,
           generandoTarjetas, progresoTarjetas, tarjetasProcesadas,
           estaOnline, pendientesOffline, sincronizandoOffline, cargarPendientesOffline, forzarSincronizacion
         };

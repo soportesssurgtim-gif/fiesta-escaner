@@ -96,7 +96,7 @@
             </div>
           </div>
           <div class="flex items-center gap-2 mt-2">
-            <button type="button" @click="seleccionarTodosEmpleados" class="text-[#001ba0] font-bold text-[11px] hover:underline">Seleccionar todos</button>
+            <button type="button" @click="empleadosSeleccionados = (listaEmpleados || []).map(function(e){ return e.id; })" class="text-[#001ba0] font-bold text-[11px] hover:underline">Seleccionar todos</button>
             <button type="button" @click="empleadosSeleccionados = []" class="text-red-600 font-bold text-[11px] hover:underline">Deseleccionar todos</button>
             <span class="text-[11px] font-bold text-slate-500 ml-auto">Seleccionados: {{ empleadosSeleccionados.length }}</span>
           </div>
