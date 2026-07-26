@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', async function() {
           return res.text();
         }).then(function(txt) {
           if (!txt || txt.trim().length === 0) throw new Error('Archivo vacío: ' + ruta);
-          console.log('[OK] Cargada plantilla ' + ruta + ' (' + txt.length + ' bytes)');
           return txt;
         });
       }));
@@ -66,7 +65,6 @@ document.addEventListener('DOMContentLoaded', async function() {
       const appContenedor = document.getElementById('app');
       if (!appContenedor) throw new Error('#app no existe en DOM');
       appContenedor.innerHTML = htmlFinal;
-      console.log('[OK] Plantillas inyectadas en #app. Total bytes HTML:', htmlFinal.length);
       if (skeleton) skeleton.style.display = 'none';
       appContenedor.classList.remove('hidden');
     } catch (errCarga) {
