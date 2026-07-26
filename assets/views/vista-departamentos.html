@@ -91,4 +91,27 @@
       </div>
     </div>
   </div>
+  <div v-if="importandoArchivo && tipoImportacion === 'departamentos'" class="modal-overlay flex items-center justify-center p-4">
+    <div class="bg-white rounded-[2.5rem] p-6 max-w-lg w-full shadow-2xl border border-slate-100 space-y-4">
+      <h3 class="text-base font-extrabold text-slate-800">Importando Departamentos</h3>
+      <div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+        <div class="bg-[#001ba0] h-3 rounded-full transition-all duration-300" :style="{ width: progresoImportacion + '%' }"></div>
+      </div>
+      <p class="text-xs font-bold text-slate-600">Progreso: {{ progresoImportacion }}%</p>
+      <div class="max-h-60 overflow-y-auto space-y-1 pr-1">
+        <div v-for="(item, idx) in detalleImportacion" :key="idx" class="text-[11px] font-medium flex items-center gap-2"
+          :class="item.accion === 'error' ? 'text-red-600' : item.accion === 'actualizado' ? 'text-amber-700' : 'text-emerald-700'">
+          <span class="font-bold">Fila {{ item.linea }}:</span>
+          <span class="uppercase text-[9px] font-extrabold px-1.5 py-0.5 rounded-full"
+            :class="item.accion === 'error' ? 'bg-red-100' : item.accion === 'actualizado' ? 'bg-amber-100' : 'bg-emerald-100'">
+            {{ item.accion }}
+          </span>
+          <span class="truncate">{{ item.mensaje }}</span>
+        </div>
+      </div>
+      <div v-if="resumenImportacion" class="pt-2 border-t border-slate-100 text-[11px] font-bold text-slate-600">
+        Insertados: {{ resumenImportacion.insertados || 0 }} • Actualizados: {{ resumenImportacion.actualizados || 0 }} • Errores: {{ resumenImportacion.errores ? resumenImportacion.errores.length : 0 }}
+      </div>
+    </div>
+  </div>
 </section>

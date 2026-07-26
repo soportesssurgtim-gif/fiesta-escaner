@@ -175,6 +175,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const exitoPermisos = ref('');
         const permisosMatriz = ref([]);
 
+        const importandoArchivo = ref(false);
+        const progresoImportacion = ref(0);
+        const detalleImportacion = ref([]);
+        const resumenImportacion = ref(null);
+        const tipoImportacion = ref('');
+
         function _construirMatriz() {
           const rolId = rolSeleccionado.value;
           if (!rolId) { permisosMatriz.value = []; return; }
@@ -464,14 +470,27 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (!file) return;
           try {
             const texto = await file.text();
+            tipoImportacion.value = 'departamentos';
+            importandoArchivo.value = true;
+            progresoImportacion.value = 0;
+            detalleImportacion.value = [];
+            resumenImportacion.value = null;
+
             const res = await apiImportarDepartamentos(sesion.token, texto);
-            const msg = (res && res.insertados ? 'Insertados: ' + res.insertados + ', ' : '') + (res && res.actualizados ? 'Actualizados: ' + res.actualizados : '');
-            mostrarNotificacion(msg || 'Importación completada.', 'exito');
+            if (res && Array.isArray(res.detalle)) {
+              res.detalle.forEach(function(item) {
+                detalleImportacion.value.push(item);
+                progresoImportacion.value = Math.round(((detalleImportacion.value.length) / Math.max(res.detalle.length, 1)) * 100);
+              });
+            }
+            resumenImportacion.value = res;
             await cargarDatosInicialesBatch();
+            mostrarNotificacion('Importación completada.', 'exito');
           } catch (err) {
             mostrarNotificacion(err.message || 'Error al importar.', 'error');
           } finally {
             e.target.value = '';
+            importandoArchivo.value = false;
           }
         }
 
@@ -552,14 +571,27 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (!file) return;
           try {
             const texto = await file.text();
+            tipoImportacion.value = 'empleados';
+            importandoArchivo.value = true;
+            progresoImportacion.value = 0;
+            detalleImportacion.value = [];
+            resumenImportacion.value = null;
+
             const res = await apiImportarEmpleados(sesion.token, texto);
-            const msg = (res && res.insertados ? 'Insertados: ' + res.insertados + ', ' : '') + (res && res.actualizados ? 'Actualizados: ' + res.actualizados : '');
-            mostrarNotificacion(msg || 'Importación completada.', 'exito');
+            if (res && Array.isArray(res.detalle)) {
+              res.detalle.forEach(function(item) {
+                detalleImportacion.value.push(item);
+                progresoImportacion.value = Math.round(((detalleImportacion.value.length) / Math.max(res.detalle.length, 1)) * 100);
+              });
+            }
+            resumenImportacion.value = res;
             await cargarDatosInicialesBatch();
+            mostrarNotificacion('Importación completada.', 'exito');
           } catch (err) {
             mostrarNotificacion(err.message || 'Error al importar.', 'error');
           } finally {
             e.target.value = '';
+            importandoArchivo.value = false;
           }
         }
 
@@ -1025,6 +1057,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           guardarPermisoAction, editarPermiso,
           rolSeleccionado, busquedaPermiso, guardandoPermisos, exitoPermisos,
           permisosMatriz, permisosFiltrados, cambiarRol, alternarPermiso, alternarTodo, guardarPermisosRol,
+          importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion,
           listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
           formatearDui, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,

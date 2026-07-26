@@ -101,25 +101,27 @@ async function importarCsv(req, res) {
   }
   try {
     const lineas = csvTexto.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
-    const resultados = { insertados: 0, actualizados: 0, errores: [] };
+    const resultados = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
     for (let i = 0; i < lineas.length; i++) {
       if (i === 0) continue; // saltar cabecera
       const cols = lineas[i].split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"'); });
-      // Esperado: cod_dpto,nombre_dpto,activo
       const cod_dpto = (cols[0] || '').trim();
       const nombre_dpto = (cols[1] || '').trim();
       const activo = (cols[2] || 'TRUE').trim() || 'TRUE';
       if (!nombre_dpto) {
         resultados.errores.push('Fila ' + (i + 1) + ': nombre_dpto vacío');
+        resultados.detalle.push({ linea: i + 1, accion: 'error', mensaje: 'nombre_dpto vacío' });
         continue;
       }
       const { data: existente } = await supabase.from('dpto').select('id').eq('nombre_dpto', nombre_dpto).maybeSingle();
       if (existente && existente.id) {
         await supabase.from('dpto').update({ cod_dpto: cod_dpto || null, activo }).eq('id', existente.id);
         resultados.actualizados += 1;
+        resultados.detalle.push({ linea: i + 1, accion: 'actualizado', mensaje: nombre_dpto });
       } else {
         await supabase.from('dpto').insert({ cod_dpto: cod_dpto || null, nombre_dpto, activo });
         resultados.insertados += 1;
+        resultados.detalle.push({ linea: i + 1, accion: 'insertado', mensaje: nombre_dpto });
       }
     }
     return jsonResponse(res, 200, resultados);

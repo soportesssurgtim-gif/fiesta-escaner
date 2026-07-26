@@ -126,11 +126,10 @@ async function importarCsv(req, res) {
   }
   try {
     const lineas = csvTexto.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
-    const resultados = { insertados: 0, actualizados: 0, errores: [] };
+    const resultados = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
     for (let i = 0; i < lineas.length; i++) {
       if (i === 0) continue; // saltar cabecera
       const cols = lineas[i].split(',').map(function(c) { return c.replace(/^"|"$/g, '').replace(/""/g, '"'); });
-      // Esperado: distrito,dpto,cargo,nombres,apellidos,fecha_nacimiento,telefono,correo,dui,activo
       const distrito = (cols[0] || '').trim();
       const dpto = (cols[1] || '').trim() || null;
       const cargo = (cols[2] || '').trim();
@@ -142,16 +141,20 @@ async function importarCsv(req, res) {
       const dui = (cols[8] || '').trim();
       const activo = (cols[9] || 'TRUE').trim() || 'TRUE';
       if (!nombres || !apellidos || !dui) {
-        resultados.errores.push('Fila ' + (i + 1) + ': nombres, apellidos y DUI son requeridos');
+        const msg = 'Fila ' + (i + 1) + ': nombres, apellidos y DUI son requeridos';
+        resultados.errores.push(msg);
+        resultados.detalle.push({ linea: i + 1, accion: 'error', mensaje: msg });
         continue;
       }
       const { data: existente } = await supabase.from('empleados').select('id').eq('dui', dui).maybeSingle();
       if (existente && existente.id) {
         await supabase.from('empleados').update({ distrito, dpto, cargo, nombres, apellidos, fecha_nacimiento, telefono, correo, activo }).eq('id', existente.id);
         resultados.actualizados += 1;
+        resultados.detalle.push({ linea: i + 1, accion: 'actualizado', mensaje: (nombres + ' ' + apellidos).trim() });
       } else {
         await supabase.from('empleados').insert({ distrito, dpto, cargo, nombres, apellidos, fecha_nacimiento, telefono, correo, dui, activo });
         resultados.insertados += 1;
+        resultados.detalle.push({ linea: i + 1, accion: 'insertado', mensaje: (nombres + ' ' + apellidos).trim() });
       }
     }
     return jsonResponse(res, 200, resultados);
