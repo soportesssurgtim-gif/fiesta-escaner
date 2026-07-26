@@ -1,11 +1,11 @@
-<section v-if="vista === 'tarjetas' && tienePermiso('tarjetas', 'ver')" class="space-y-4">
+<section v-if="vista === 'tarjetas'" class="space-y-4">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-xl p-5 rounded-[2rem] border border-slate-200/60 shadow-sm gap-3">
     <div>
       <h2 class="text-base font-extrabold text-slate-800">Tarjetas de Invitación</h2>
       <p class="text-xs text-slate-500">Diseña la plantilla y genera invitaciones con QR para empleados</p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <button @click="$refs.filePlantillaInput.click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+      <button v-if="tienePermiso('tarjetas', 'agregar')" @click="$refs.filePlantillaInput.click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
         <i class="fas fa-file-image"></i>
         <span class="hidden sm:inline">Subir Plantilla</span>
       </button>

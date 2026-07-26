@@ -17,6 +17,10 @@ export default async function handler(req, res) {
     return registrarAsistencia(req, res, sesion);
   }
 
+  if (req.method === 'POST' && action === 'sincronizar-pendientes') {
+    return sincronizarPendientes(req, res, sesion);
+  }
+
   if (req.method === 'GET' && action === 'diagnostico') {
     return diagnosticoAsistencia(req, res);
   }
@@ -30,7 +34,7 @@ export default async function handler(req, res) {
 
 async function registrarAsistencia(req, res, sesion) {
   const body = await parseBody(req);
-  const { dui, dispositivo } = body;
+  const { dui, dispositivo, id_cliente } = body;
   const duiLimpio = String(dui || '').replace(/[^0-9]/g, '');
 
   if (!duiLimpio) {
@@ -67,6 +71,26 @@ async function registrarAsistencia(req, res, sesion) {
       return jsonResponse(res, 404, { error: 'No se encontró un empleado activo con el DUI: ' + dui });
     }
 
+    // Si viene id_cliente, verificar duplicado por cliente
+    if (id_cliente) {
+      const { data: existenteCliente } = await supabase
+        .from('asistencias')
+        .select('*')
+        .eq('evento', evento.id)
+        .eq('empleado', empleado.id)
+        .or('id_cliente.eq.' + id_cliente + ',dispositivo.eq.' + (dispositivo || 'offline'))
+        .maybeSingle();
+
+      if (existenteCliente) {
+        return jsonResponse(res, 200, {
+          duplicado: true,
+          empleado: { nombres: empleado.nombres, apellidos: empleado.apellidos },
+          mensaje: '⚠️ Asistencia YA registrada anteriormente (sincronizada).'
+        });
+      }
+    }
+
+    // Verificar duplicado normal (empleado + evento)
     const { data: existente } = await supabase
       .from('asistencias')
       .select('*')
@@ -89,7 +113,8 @@ async function registrarAsistencia(req, res, sesion) {
         empleado: empleado.id,
         escaneado_por: sesion.usuarioId,
         dispositivo: dispositivo || 'desconocido',
-        fuente: 'qr'
+        fuente: 'qr',
+        id_cliente: id_cliente || null
       })
       .select()
       .maybeSingle();
@@ -115,6 +140,104 @@ async function registrarAsistencia(req, res, sesion) {
     console.error('registrarAsistencia error:', error);
     return jsonResponse(res, 500, { error: 'Error al registrar asistencia.' });
   }
+}
+
+async function sincronizarPendientes(req, res, sesion) {
+  const body = await parseBody(req);
+  const registros = Array.isArray(body.registros) ? body.registros : [];
+
+  if (registros.length === 0) {
+    return jsonResponse(res, 400, { error: 'No hay registros para sincronizar.' });
+  }
+
+  const resultados = { sincronizados: 0, duplicados: 0, errores: 0, detalle: [] };
+
+  for (const registro of registros) {
+    try {
+      const { dui, dispositivo, id_cliente } = registro;
+      const duiLimpio = String(dui || '').replace(/[^0-9]/g, '');
+
+      if (!duiLimpio) {
+        resultados.errores++;
+        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'DUI vacío' });
+        continue;
+      }
+
+      const { data: evento } = await supabase
+        .from('eventos')
+        .select('*')
+        .eq('activo', 'TRUE')
+        .limit(1)
+        .maybeSingle();
+
+      if (!evento) {
+        resultados.errores++;
+        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'No hay evento activo' });
+        continue;
+      }
+
+      const duiNormalizado = duiLimpio.length === 8 ? '0' + duiLimpio : duiLimpio;
+      const { data: empleadosRaw } = await supabase
+        .from('empleados')
+        .select('*')
+        .eq('activo', 'TRUE');
+
+      const empleado = (empleadosRaw || []).find(function (e) {
+        const d = String(e.dui || '').replace(/[^0-9]/g, '');
+        const dN = d.length === 8 ? '0' + d : d;
+        return d === duiLimpio || dN === duiLimpio || d === duiNormalizado || dN === duiNormalizado;
+      });
+
+      if (!empleado) {
+        resultados.errores++;
+        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'Empleado no encontrado' });
+        continue;
+      }
+
+      // Verificar duplicado
+      const { data: existente } = await supabase
+        .from('asistencias')
+        .select('*')
+        .eq('evento', evento.id)
+        .eq('empleado', empleado.id)
+        .maybeSingle();
+
+      if (existente) {
+        resultados.duplicados++;
+        resultados.detalle.push({ id_cliente, estado: 'duplicado', mensaje: 'Ya registrado' });
+        continue;
+      }
+
+      // Insertar
+      const { error: errIns } = await supabase
+        .from('asistencias')
+        .insert({
+          evento: evento.id,
+          empleado: empleado.id,
+          escaneado_por: sesion.usuarioId,
+          dispositivo: dispositivo || 'offline-sync',
+          fuente: 'qr',
+          id_cliente: id_cliente || null
+        });
+
+      if (errIns) {
+        if (String(errIns.message || '').includes('duplicate') || errIns.code === '23505') {
+          resultados.duplicados++;
+          resultados.detalle.push({ id_cliente, estado: 'duplicado', mensaje: 'Ya registrado (DB unique)' });
+        } else {
+          throw errIns;
+        }
+      } else {
+        resultados.sincronizados++;
+        resultados.detalle.push({ id_cliente, estado: 'sincronizado', mensaje: 'OK' });
+      }
+    } catch (e) {
+      resultados.errores++;
+      resultados.detalle.push({ id_cliente: registro.id_cliente, estado: 'error', mensaje: e.message || 'Error' });
+    }
+  }
+
+  return jsonResponse(res, 200, resultados);
 }
 
 async function listarAsistencias(req, res) {

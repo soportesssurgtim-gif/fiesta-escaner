@@ -192,6 +192,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const progresoTarjetas = ref(0);
         const tarjetasProcesadas = ref(0);
 
+        const estaOnline = ref(navigator.onLine);
+        const pendientesOffline = ref(0);
+        const sincronizandoOffline = ref(false);
+
         function _construirMatriz() {
           const rolId = rolSeleccionado.value;
           if (!rolId) { permisosMatriz.value = []; return; }
@@ -582,6 +586,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         function solicitarLogout() { mostrarModalLogout.value = true; }
+
+        function _setupOfflineListeners() {
+          window.addEventListener('online', async () => {
+            estaOnline.value = true;
+            mostrarNotificacion('Conexión recuperada. Sincronizando pendientes...', 'exito');
+            await cargarPendientesOffline();
+            if (pendientesOffline.value > 0) {
+              await forzarSincronizacion();
+            }
+          });
+          window.addEventListener('offline', () => {
+            estaOnline.value = false;
+            mostrarNotificacion('Sin conexión. Los registros se guardarán localmente.', 'error');
+          });
+          cargarPendientesOffline();
+        }
 
         async function confirmarLogout() {
           mostrarModalLogout.value = false;
@@ -1100,6 +1120,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function _enviarAsistencia(dui, intento) {
           procesandoAsistencia.value = true;
           try {
+            if (!estaOnline.value) {
+              await _guardarAsistenciaOffline(dui);
+              return;
+            }
             const res = await apiRegistrarAsistencia(sesion.token, dui, 'app-web');
             procesandoAsistencia.value = false;
             ultimoResultado.value = res; emitirSonido(res.duplicado ? 'error' : 'exito');
@@ -1117,13 +1141,61 @@ document.addEventListener('DOMContentLoaded', async function() {
           } catch (err) {
             procesandoAsistencia.value = false;
             var msg = (err && err.message) ? err.message : String(err);
-            if (intento < 3) {
+            if (intento < 2 && estaOnline.value) {
               setTimeout(() => _enviarAsistencia(dui, intento + 1), 800 * (intento + 1));
             } else {
-              ultimoResultado.value = { error: true, mensaje: msg || 'Error al registrar asistencia.' };
-              emitirSonido('error');
+              await _guardarAsistenciaOffline(dui);
               _procesarSiguienteEnCola();
             }
+          }
+        }
+
+        async function _guardarAsistenciaOffline(dui) {
+          try {
+            const empleado = (listaEmpleados.value || []).find(function(e) {
+              const d = String(e.dui || '').replace(/[^0-9]/g, '');
+              return d === String(dui || '').replace(/[^0-9]/g, '');
+            });
+            const registro = await window.OfflineApp.guardarAsistenciaOffline(
+              empleado ? empleado.id : null,
+              dui,
+              empleado ? empleado.nombres : 'Desconocido',
+              empleado ? empleado.apellidos : '',
+              'qr'
+            );
+            pendientesOffline.value = await window.OfflineApp.contarPendientes();
+            ultimoResultado.value = {
+              error: false,
+              offline: true,
+              mensaje: '?? Sin conexión. Asistencia guardada localmente. Pendientes: ' + pendientesOffline.value
+            };
+            emitirSonido('exito');
+          } catch (e) {
+            ultimoResultado.value = { error: true, mensaje: 'Error al guardar offline: ' + (e.message || String(e)) };
+            emitirSonido('error');
+          }
+        }
+
+        async function cargarPendientesOffline() {
+          if (!sesion.token) return;
+          try {
+            const count = await window.OfflineApp.contarPendientes();
+            pendientesOffline.value = count;
+          } catch (e) { /* ignore */ }
+        }
+
+        async function forzarSincronizacion() {
+          if (!sesion.token || !window.OfflineApp) return;
+          sincronizandoOffline.value = true;
+          try {
+            const resultado = await window.OfflineApp.sincronizarPendientes(sesion.token);
+            pendientesOffline.value = await window.OfflineApp.contarPendientes();
+            const msg = 'Sincronización: ' + resultado.sincronizados + ' OK, ' + resultado.duplicados + ' duplicados, ' + resultado.errores + ' errores';
+            mostrarNotificacion(msg, resultado.errores > 0 ? 'error' : 'exito');
+          } catch (e) {
+            mostrarNotificacion('Error en sincronización: ' + (e.message || String(e)), 'error');
+          } finally {
+            sincronizandoOffline.value = false;
           }
         }
 
@@ -1232,6 +1304,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         onMounted(() => {
           cargarSesionLocal();
           cargando.value = false;
+          _setupOfflineListeners();
         });
 
         onBeforeUnmount(() => {
@@ -1261,7 +1334,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
           abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
           cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction, seleccionarTodosEmpleados, empleadosFiltradosTarjeta,
-          generandoTarjetas, progresoTarjetas, tarjetasProcesadas
+          generandoTarjetas, progresoTarjetas, tarjetasProcesadas,
+          estaOnline, pendientesOffline, sincronizandoOffline, cargarPendientesOffline, forzarSincronizacion
         };
       }
     });
@@ -1287,5 +1361,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         'No se pudo inicializar la app: ' + ((errMount && errMount.message) || String(errMount)) +
         '</div><div><button style="background:#001ba0;color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer" onclick="location.reload()">Recargar</button></div></div>'
       );
+    }
+
+    // Service Worker update listener
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New version available, show toast and reload
+                if (confirm('Hay una nueva versión disponible. ¿Recargar ahora?')) {
+                  window.location.reload();
+                }
+              }
+            });
+          }
+        });
+      });
     }
   });
