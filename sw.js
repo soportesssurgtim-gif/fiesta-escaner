@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.0.2';
 const CACHE_NAME = `fiesta-escaner-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
