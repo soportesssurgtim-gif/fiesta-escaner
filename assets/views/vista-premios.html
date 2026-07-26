@@ -1,10 +1,10 @@
-<section v-if="vista === 'premios' && esAdmin" class="space-y-4">
+<section v-if="vista === 'premios' && tienePermiso('premios', 'ver')" class="space-y-4">
   <div class="flex items-center justify-between bg-white/80 backdrop-blur-xl p-5 rounded-[2rem] border border-slate-200/60 shadow-sm">
     <div>
       <h2 class="text-base font-extrabold text-slate-800">Catálogo de Premios</h2>
       <p class="text-xs text-slate-500">Premios para la rifa municipal</p>
     </div>
-    <button @click="abrirModalPremio()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
+    <button v-if="tienePermiso('premios', 'agregar')" @click="abrirModalPremio()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
       <i class="fas fa-trophy"></i>
       <span>Nuevo Premio</span>
     </button>
@@ -25,7 +25,7 @@
       <h3 class="text-sm font-extrabold text-slate-800">{{ prm.nombre }}</h3>
       <p class="text-xs text-slate-500 line-clamp-2">{{ prm.descripcion || 'Sin descripción' }}</p>
       <div class="pt-2 flex justify-end">
-        <button @click="abrirModalPremio(prm)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl text-xs font-bold"><i class="fas fa-pen"></i></button>
+        <button v-if="tienePermiso('premios', 'editar')" @click="abrirModalPremio(prm)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl text-xs font-bold"><i class="fas fa-pen"></i></button>
       </div>
     </div>
   </div>

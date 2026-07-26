@@ -1,4 +1,4 @@
-<section v-if="vista === 'empleados' && esAdmin" class="space-y-4">
+<section v-if="vista === 'empleados' && tienePermiso('empleados', 'ver')" class="space-y-4">
   <div class="flex items-center justify-between bg-white/80 backdrop-blur-xl p-5 rounded-[2rem] border border-slate-200/60 shadow-sm">
     <div>
       <h2 class="text-base font-extrabold text-slate-800">Gestión de Empleados</h2>
@@ -6,7 +6,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <input type="file" accept=".csv" class="hidden" id="csvEmpInput" @change="importarCsvEmpleadoAction" />
-      <button @click="document.getElementById('csvEmpInput').click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
+      <button v-if="tienePermiso('empleados', 'agregar')" @click="document.getElementById('csvEmpInput').click()" class="bg-white text-[#001ba0] border border-[#001ba0] px-3 py-2.5 rounded-2xl text-xs font-bold shadow-sm ios-btn flex items-center gap-1.5">
         <i class="fas fa-file-import"></i>
         <span class="hidden sm:inline">Importar CSV</span>
       </button>
@@ -14,7 +14,7 @@
         <i class="fas fa-file-export"></i>
         <span class="hidden sm:inline">Exportar CSV</span>
       </button>
-      <button @click="abrirModalEmpleado()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
+      <button v-if="tienePermiso('empleados', 'agregar')" @click="abrirModalEmpleado()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
         <i class="fas fa-user-plus"></i>
         <span>Nuevo Empleado</span>
       </button>
@@ -43,7 +43,7 @@
             <span v-if="emp.telefono" class="text-slate-500"><i class="fas fa-phone text-[9px] mr-0.5"></i> {{ emp.telefono }}</span>
           </div>
         </div>
-        <button @click="abrirModalEmpleado(emp)" class="w-9 h-9 rounded-2xl bg-blue-50 text-[#001ba0] flex items-center justify-center text-xs ios-btn shadow-sm">
+         <button v-if="tienePermiso('empleados', 'editar')" @click="abrirModalEmpleado(emp)" class="w-9 h-9 rounded-2xl bg-blue-50 text-[#001ba0] flex items-center justify-center text-xs ios-btn shadow-sm">
           <i class="fas fa-pen"></i>
         </button>
       </div>

@@ -1,4 +1,4 @@
-<section v-if="vista === 'departamentos' && esAdmin" class="space-y-4">
+<section v-if="vista === 'departamentos' && tienePermiso('departamentos', 'ver')" class="space-y-4">
   <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white/80 backdrop-blur-xl p-5 rounded-[2rem] border border-slate-200/60 shadow-sm gap-3">
     <div>
       <h2 class="text-base font-extrabold text-slate-800">Departamentos Municipales</h2>
@@ -14,7 +14,7 @@
         <i class="fas fa-file-export"></i>
         <span class="hidden sm:inline">Exportar CSV</span>
       </button>
-      <button @click="abrirModalDpto()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center justify-center gap-1.5">
+      <button v-if="tienePermiso('departamentos', 'agregar')" @click="abrirModalDpto()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center justify-center gap-1.5">
         <i class="fas fa-building"></i>
         <span>Nuevo Departamento</span>
       </button>
@@ -50,7 +50,7 @@
             <p class="text-[10px] text-slate-500 font-medium">Código: <span class="font-bold text-slate-700">{{ d.codDpto || d.cod_dpto || 'N/A' }}</span></p>
           </div>
         </div>
-        <button @click="abrirModalDpto(d)" class="w-8 h-8 rounded-xl bg-blue-50 text-[#001ba0] flex items-center justify-center text-xs ios-btn flex-shrink-0">
+        <button v-if="tienePermiso('departamentos', 'editar')" @click="abrirModalDpto(d)" class="w-8 h-8 rounded-xl bg-blue-50 text-[#001ba0] flex items-center justify-center text-xs ios-btn flex-shrink-0">
           <i class="fas fa-pen"></i>
         </button>
       </div>

@@ -1,4 +1,4 @@
-<section v-if="vista === 'usuarios' && esAdmin" class="space-y-4">
+<section v-if="vista === 'usuarios' && tienePermiso('usuarios', 'ver')" class="space-y-4">
   <div class="ios-segmented flex p-1 bg-slate-200/70 rounded-2xl">
     <button @click="subtabUsuario = 'usuarios'" class="flex-1 py-2.5 text-xs font-extrabold rounded-xl transition-all"
       :class="subtabUsuario === 'usuarios' ? 'bg-white text-[#001ba0] shadow-sm' : 'text-slate-600'">
@@ -15,7 +15,7 @@
         <h2 class="text-base font-extrabold text-slate-800">Usuarios del Sistema</h2>
         <p class="text-xs text-slate-500">Cuentas con acceso a la app de logística</p>
       </div>
-      <button @click="abrirModalUsuario()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
+      <button v-if="tienePermiso('usuarios', 'agregar')" @click="abrirModalUsuario()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
         <i class="fas fa-user-plus"></i>
         <span>Nuevo Usuario</span>
       </button>
@@ -35,7 +35,7 @@
         </div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-1 bg-blue-50 text-[#001ba0] rounded-full text-[10px] font-extrabold uppercase">{{ u.rolNombre }}</span>
-          <button @click="abrirModalUsuario(u)" class="w-8 h-8 rounded-xl bg-slate-200/70 text-slate-700 flex items-center justify-center text-xs ios-btn"><i class="fas fa-pen"></i></button>
+          <button v-if="tienePermiso('usuarios', 'editar')" @click="abrirModalUsuario(u)" class="w-8 h-8 rounded-xl bg-slate-200/70 text-slate-700 flex items-center justify-center text-xs ios-btn"><i class="fas fa-pen"></i></button>
         </div>
       </div>
     </div>
@@ -46,7 +46,7 @@
         <h2 class="text-base font-extrabold text-slate-800">Catálogo de Roles</h2>
         <p class="text-xs text-slate-500">Definición de roles y niveles de acceso</p>
       </div>
-      <button @click="abrirModalRol()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
+      <button v-if="tienePermiso('roles', 'agregar')" @click="abrirModalRol()" class="bg-[#001ba0] text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow ios-btn flex items-center gap-1.5">
         <i class="fas fa-plus"></i>
         <span>Nuevo Rol</span>
       </button>
@@ -59,7 +59,7 @@
             {{ String(r.activo).toUpperCase() === 'TRUE' ? 'ACTIVO' : 'INACTIVO' }}
           </span>
         </div>
-        <button @click="abrirModalRol(r)" class="w-8 h-8 rounded-xl bg-slate-200/70 text-slate-700 flex items-center justify-center text-xs ios-btn"><i class="fas fa-pen"></i></button>
+         <button v-if="tienePermiso('roles', 'editar')" @click="abrirModalRol(r)" class="w-8 h-8 rounded-xl bg-slate-200/70 text-slate-700 flex items-center justify-center text-xs ios-btn"><i class="fas fa-pen"></i></button>
       </div>
     </div>
   </div>
