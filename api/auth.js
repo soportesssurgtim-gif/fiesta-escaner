@@ -1,12 +1,22 @@
 import bcrypt from 'bcryptjs';
-import { supabase, sha256, createSession, jsonResponse, parseBody } from './_lib/supabase.js';
+import { supabase, sha256, createSession, deleteSession, requireAuth, jsonResponse, parseBody } from './_lib/supabase.js';
 
 export default async function handler(req, res) {
+  const body = await parseBody(req);
+  const tieneCredenciales = body.usuario && body.password;
+
+  if (tieneCredenciales) {
+    return await procesarLogin(req, res, body);
+  }
+
+  return await procesarLogout(req, res, body);
+}
+
+async function procesarLogin(req, res, body) {
   if (req.method !== 'POST') {
     return jsonResponse(res, 405, { error: 'Método no permitido' });
   }
 
-  const body = await parseBody(req);
   const { usuario, password } = body;
 
   if (!usuario || !password) {
@@ -72,6 +82,21 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Login error:', error);
     return jsonResponse(res, 500, { error: 'Error al iniciar sesión.' });
+  }
+}
+
+async function procesarLogout(req, res, body) {
+  const auth = requireAuth(req);
+  if (auth.error) {
+    return jsonResponse(res, auth.status || 401, { error: auth.error });
+  }
+
+  try {
+    await deleteSession(auth.token);
+    return jsonResponse(res, 200, { ok: true });
+  } catch (e) {
+    console.error('Logout error:', e);
+    return jsonResponse(res, 200, { ok: true });
   }
 }
 

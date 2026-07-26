@@ -33,7 +33,7 @@ async function _parseResponse(res) {
 }
 
 async function apiLogin(usuario, password) {
-  const res = await fetch(`${API_BASE}/login`, {
+  const res = await fetch(`${API_BASE}/auth`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ usuario, password })
@@ -43,7 +43,7 @@ async function apiLogin(usuario, password) {
 
 async function apiLogout(token) {
   try {
-    const res = await fetch(`${API_BASE}/logout`, {
+    const res = await fetch(`${API_BASE}/auth`, {
       method: 'POST',
       headers: _headers(token)
     });
