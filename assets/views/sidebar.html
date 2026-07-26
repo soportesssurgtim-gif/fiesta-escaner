@@ -45,14 +45,14 @@
             <span class="flex-1 text-left">Sorteos y Rifas</span>
           </button>
         </li>
-          <li v-if="tienePermiso('tarjetas', 'ver')">
-            <button @click="cambiarVista('tarjetas')"
-              class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
-              :class="vista === 'tarjetas' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
-              <i class="fas fa-id-card text-sm w-5 text-center"></i>
-              <span class="flex-1 text-left">Tarjetas</span>
-            </button>
-          </li>
+        <li v-if="tienePermiso('tarjetas', 'ver')">
+          <button @click="cambiarVista('tarjetas')"
+            class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn"
+            :class="vista === 'tarjetas' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
+            <i class="fas fa-id-card text-sm w-5 text-center"></i>
+            <span class="flex-1 text-left">Tarjetas</span>
+          </button>
+        </li>
         <template v-if="tienePermiso('departamentos', 'ver') || tienePermiso('empleados', 'ver') || tienePermiso('eventos', 'ver') || tienePermiso('sorteos', 'ver') || tienePermiso('premios', 'ver') || tienePermiso('configuracion', 'ver') || tienePermiso('usuarios', 'ver') || tienePermiso('permisos', 'ver')">
           <div class="pt-4 pb-1 border-t border-slate-200/60">
             <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Administración</p>
