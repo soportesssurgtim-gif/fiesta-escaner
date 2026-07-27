@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1.0.15';
+﻿const CACHE_VERSION = 'v1.0.16';
 const CACHE_NAME = `fiesta-escaner-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
@@ -128,3 +128,4 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
