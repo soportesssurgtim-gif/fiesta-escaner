@@ -2,8 +2,13 @@ import bcrypt from 'bcryptjs';
 import { supabase, sha256, createSession, deleteSession, requireAuth, jsonResponse, parseBody } from './_lib/supabase.js';
 
 export default async function handler(req, res) {
+  const action = (req.query && req.query.action) || '';
   const body = await parseBody(req);
   const tieneCredenciales = body.usuario && body.password;
+
+  if (req.method === 'GET' && action === 'datos-iniciales') {
+    return await procesarDatosIniciales(req, res);
+  }
 
   if (tieneCredenciales) {
     return await procesarLogin(req, res, body);
@@ -165,5 +170,28 @@ async function obtenerBundleInicial() {
   } catch (e) {
     console.error('obtenerBundleInicial error:', e);
     return null;
+  }
+}
+
+async function procesarDatosIniciales(req, res) {
+  const auth = requireAuth(req);
+  if (auth.error) {
+    return jsonResponse(res, auth.status || 401, { error: auth.error });
+  }
+
+  const sesion = await getSession(auth.token);
+  if (!sesion) {
+    return jsonResponse(res, 401, { error: 'Sesión expirada, inicia sesión nuevamente.' });
+  }
+
+  try {
+    const bundle = await obtenerBundleInicial();
+    if (!bundle) {
+      return jsonResponse(res, 500, { error: 'Error al cargar datos iniciales.' });
+    }
+    return jsonResponse(res, 200, bundle);
+  } catch (e) {
+    console.error('datos-iniciales error:', e);
+    return jsonResponse(res, 500, { error: 'Error al cargar datos iniciales.' });
   }
 }

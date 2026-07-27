@@ -53,7 +53,7 @@ async function apiLogout(token) {
 }
 
 async function apiDatosIniciales(token) {
-  const res = await fetch(`${API_BASE}/datos-iniciales`, { headers: _headers(token) });
+  const res = await fetch(`${API_BASE}/auth?action=datos-iniciales`, { headers: _headers(token) });
   return _parseResponse(res);
 }
 
@@ -112,7 +112,7 @@ async function apiGuardarRol(token, data) {
 }
 
 async function apiGuardarPermiso(token, data) {
-  const res = await fetch(`${API_BASE}/permisos`, {
+  const res = await fetch(`${API_BASE}/roles?action=permiso`, {
     method: data.id ? 'PUT' : 'POST',
     headers: _headers(token),
     body: JSON.stringify(data)
@@ -121,7 +121,7 @@ async function apiGuardarPermiso(token, data) {
 }
 
 async function apiGuardarPermisosRol(token, permisosData) {
-  const res = await fetch(`${API_BASE}/permisos?action=rol`, {
+  const res = await fetch(`${API_BASE}/roles?action=rol`, {
     method: 'POST',
     headers: _headers(token),
     body: JSON.stringify(permisosData)
@@ -148,7 +148,7 @@ async function apiSetEventoActivo(token, eventoId) {
 }
 
 async function apiGuardarSorteo(token, data) {
-  const res = await fetch(`${API_BASE}/sorteos`, {
+  const res = await fetch(`${API_BASE}/premios`, {
     method: data.id ? 'PUT' : 'POST',
     headers: _headers(token),
     body: JSON.stringify(data)
@@ -157,7 +157,7 @@ async function apiGuardarSorteo(token, data) {
 }
 
 async function apiSortearGanador(token, sorteoId) {
-  const res = await fetch(`${API_BASE}/sorteos?action=sortear`, {
+  const res = await fetch(`${API_BASE}/premios?action=sortear`, {
     method: 'POST',
     headers: _headers(token),
     body: JSON.stringify({ sorteoId })
