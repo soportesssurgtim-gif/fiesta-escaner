@@ -1,4 +1,4 @@
-﻿      </main>
+      </main>
     </div>
 
 
@@ -20,8 +20,8 @@
 
       <div class="space-y-4">
         <div v-for="(paso, idx) in guiaActual.pasos" :key="idx" class="flex gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-          <div class="flex-shrink-0">
-            <lord-icon :src="'https://cdn.lordicon.com/' + paso.icono + '.json'" trigger="hover" stroke="light" colors="primary:' + guiaActual.color + ',secondary:#b4b4b4" style="width:48px;height:48px"></lord-icon>
+          <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white shadow-sm" :style="{ backgroundColor: guiaActual.color }">
+            <i class="fas text-lg" :class="'fa-' + paso.icono"></i>
           </div>
           <div>
             <h3 class="text-sm font-extrabold text-slate-800 mb-1">{{ paso.titulo }}</h3>

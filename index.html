@@ -48,6 +48,13 @@
       padding: 0;
     }
 
+    /* Sidebar layout: margen del main según estado del sidebar */
+    @media (min-width: 768px) {
+      .sidebar-main { transition: margin-left 0.3s ease; }
+      .sidebar-open  { margin-left: 16rem; } /* w-64 = 256px */
+      .sidebar-closed { margin-left: 5rem; }  /* w-20 = 80px  */
+    }
+
     .app-container {
       width: 100%;
       max-width: 100%;
@@ -244,7 +251,7 @@
     </div>
   </div>
   
-  <div class="hidden md:ml-64 md:ml-20"></div>
+
 
   <div id="app" class="min-h-screen flex flex-col w-full"></div>
 

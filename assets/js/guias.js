@@ -4,8 +4,8 @@
     icono: 'fa-qrcode',
     color: '#001ba0',
     pasos: [
-      { icono: 'lewtedlh', titulo: 'Abrir cámara', desc: 'Pulsa el botón "Abrir Cámara y Escanear QR" para activar la cámara del dispositivo.' },
-      { icono: 'nfldjhgf', titulo: 'Escanear código', desc: 'Apunta al código QR de la invitación del empleado. El sistema lo detectará automáticamente.' },
+      { icono: 'camera', titulo: 'Abrir cámara', desc: 'Pulsa el botón "Abrir Cámara y Escanear QR" para activar la cámara del dispositivo.' },
+      { icono: 'qrcode', titulo: 'Escanear código', desc: 'Apunta al código QR de la invitación del empleado. El sistema lo detectará automáticamente.' },
       { icono: 'check-circle', titulo: 'Confirmar asistencia', desc: 'Si el QR es válido, se registrará la asistencia automáticamente. Verás un mensaje de confirmación.' }
     ],
     tips: 'Puedes también escanear una foto del QR usando el botón "Escanear QR con Foto / Imagen".'
@@ -130,3 +130,4 @@
 if (typeof window !== 'undefined') {
   window.GUIAS_VISTAS = GUIAS_VISTAS;
 }
+
