@@ -1,6 +1,6 @@
 <nav v-if="!cargando && sesion.token" class="fixed top-0 z-50 w-full bg-[#000060] text-white border-b border-blue-900/50 px-4 py-2.5 flex items-center justify-between shadow-md">
   <div class="flex items-center gap-3">
-    <button @click="sidebarAbierto = !sidebarAbierto" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/10 md:hidden focus:outline-none">
+    <button @click="sidebarAbierto = !sidebarAbierto" class="p-2 text-white/80 hover:text-white rounded-lg hover:bg-white/10 focus:outline-none transition-colors">
       <i class="fas" :class="sidebarAbierto ? 'fa-times text-lg' : 'fa-bars text-lg'"></i>
     </button>
     <div class="flex items-center gap-2">

@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       setup() {
         const cargando = ref(true);
         const vista = ref('scanner');
-        const sidebarAbierto = ref(false);
+        const sidebarAbierto = ref(window.innerWidth >= 768);
         const mostrarModalLogout = ref(false);
         const subtabUsuario = ref('usuarios');
         const sesion = reactive({ token: null, usuario: null, correo: null, nombreMostrar: null, rol: null });
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           loginForm.password = ''; loginForm.usuario = ''; loginError.value = ''; mostrarPassword.value = false;
           localStorage.removeItem('sssur_sesion');
           sesion.token = null; sesion.usuario = null; sesion.correo = null; sesion.nombreMostrar = null; sesion.rol = null;
-          sidebarAbierto.value = false; vista.value = 'scanner';
+          sidebarAbierto.value = window.innerWidth >= 768; vista.value = 'scanner';
 
           setTimeout(() => { cargando.value = false; }, 450);
         }
@@ -673,7 +673,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function cambiarVista(nuevaVista) {
           generalError.value = '';
           vista.value = nuevaVista;
-          sidebarAbierto.value = false;
+          if (window.innerWidth < 768) sidebarAbierto.value = false;
         }
 
         function abrirModalDpto(dptoObj = null) {

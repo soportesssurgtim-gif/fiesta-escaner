@@ -1,9 +1,9 @@
-const CACHE_VERSION = 'v1.0.11';
+const CACHE_VERSION = 'v1.0.12';
 const CACHE_NAME = `fiesta-escaner-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  'https://cdn.tailwindcss.com',
+  // cdn.tailwindcss.com bloqueado por CORS en SW — no cachear
   'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
   'https://unpkg.com/vue@3/dist/vue.global.prod.js',

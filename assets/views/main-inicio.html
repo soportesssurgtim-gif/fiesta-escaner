@@ -1,4 +1,4 @@
-      <main v-if="!cargando && sesion.token" class="flex-1 pt-20 lg:pt-24 md:ml-20 p-4 lg:p-6 w-full transition-all duration-300 relative z-0" :class="sidebarAbierto ? 'md:ml-64' : 'md:ml-20'">
+      <main v-if="!cargando && sesion.token" class="flex-1 pt-20 lg:pt-24 p-4 lg:p-6 w-full transition-all duration-300 relative z-0" :style="sidebarAbierto && windowWidth >= 768 ? 'margin-left:16rem' : ''">
         <div v-if="generalError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-semibold text-center">
           {{ generalError }}
         </div>

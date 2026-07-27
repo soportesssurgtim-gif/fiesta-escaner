@@ -1,33 +1,28 @@
 
-<button @click="sidebarAbierto = !sidebarAbierto" class="fixed top-4 left-4 z-30 w-10 h-10 bg-white rounded-xl shadow-lg border border-slate-200 flex items-center justify-center text-slate-700 hover:bg-slate-50 transition">
-  <i class="fas fa-bars"></i>
-</button>
-<div v-if="sidebarAbierto" @click="sidebarAbierto = false" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-10 md:hidden"></div>
 <aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-40 w-64 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 overflow-y-auto overflow-x-visible"
-  :class="sidebarAbierto ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'">
+  :class="sidebarAbierto ? 'translate-x-0' : '-translate-x-full'">
   <div class="h-full px-3 py-4 overflow-y-auto flex flex-col justify-between">
     <div>
       <div class="p-3.5 mb-4 bg-slate-100/70 rounded-2xl border border-slate-200/50 flex items-center gap-3">
         <div class="w-10 h-10 rounded-2xl bg-[#001ba0] text-white font-bold flex items-center justify-center text-sm shadow-md shadow-blue-900/20 flex-shrink-0">
           {{ (sesion.nombreMostrar || sesion.usuario || 'U').charAt(0).toUpperCase() }}
         </div>
-        <div v-if="sidebarAbierto" class="truncate">
+        <div class="truncate">
           <p class="text-xs font-extrabold text-slate-800 truncate leading-tight">{{ sesion.nombreMostrar || sesion.correo || sesion.usuario }}</p>
           <span class="inline-block mt-0.5 px-2 py-0.5 bg-blue-100/80 text-[#001ba0] text-[9px] font-bold rounded-full uppercase">
             {{ sesion.rol || 'Logística' }}
           </span>
         </div>
       </div>
-      <p v-if="sidebarAbierto" class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Operación Evento</p>
+      <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Operación Evento</p>
       <ul class="space-y-1">
         <li>
           <button @click="cambiarVista('scanner')"
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
             :class="vista === 'scanner' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
             <i class="fas fa-qrcode text-sm w-5 text-center"></i>
-            <span v-if="sidebarAbierto" class="flex-1 text-left">Escáner QR</span>
+            <span class="flex-1 text-left">Escáner QR</span>
             <span v-if="vista !== 'scanner'" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Escáner QR</span>
           </button>
         </li>
         <li>
@@ -35,9 +30,8 @@
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
             :class="vista === 'asistentes' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
             <i class="fas fa-clipboard-list text-sm w-5 text-center"></i>
-            <span v-if="sidebarAbierto" class="flex-1 text-left">Asistencias</span>
+            <span class="flex-1 text-left">Asistencias</span>
             <span v-if="vista === 'asistentes'" class="px-2 py-0.5 bg-white/20 text-white rounded-full text-[10px] font-bold">{{ resumenData.total }}</span>
-            <span v-else-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Asistencias</span>
           </button>
         </li>
         <li>
@@ -45,8 +39,7 @@
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ios-btn relative group"
             :class="vista === 'rifa' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
             <i class="fas fa-gift text-sm w-5 text-center"></i>
-            <span v-if="sidebarAbierto" class="flex-1 text-left">Sorteos y Rifas</span>
-            <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Sorteos y Rifas</span>
+            <span class="flex-1 text-left">Sorteos y Rifas</span>
           </button>
         </li>
         <li v-if="tienePermiso('tarjetas', 'ver')">
@@ -54,12 +47,11 @@
             class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
             :class="vista === 'tarjetas' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
             <i class="fas fa-id-card text-sm w-5 text-center"></i>
-            <span v-if="sidebarAbierto" class="flex-1 text-left">Tarjetas</span>
-            <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Tarjetas</span>
+            <span class="flex-1 text-left">Tarjetas</span>
           </button>
         </li>
         <template v-if="tienePermiso('departamentos', 'ver') || tienePermiso('empleados', 'ver') || tienePermiso('eventos', 'ver') || tienePermiso('sorteos', 'ver') || tienePermiso('premios', 'ver') || tienePermiso('configuracion', 'ver') || tienePermiso('usuarios', 'ver') || tienePermiso('permisos', 'ver')">
-          <div v-if="sidebarAbierto" class="pt-4 pb-1 border-t border-slate-200/60">
+          <div class="pt-4 pb-1 border-t border-slate-200/60">
             <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Administración</p>
           </div>
           <li v-if="tienePermiso('departamentos', 'ver')">
@@ -67,8 +59,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'departamentos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-building text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Departamentos</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Departamentos</span>
+              <span class="flex-1 text-left">Departamentos</span>
             </button>
           </li>
           <li v-if="tienePermiso('empleados', 'ver')">
@@ -76,8 +67,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'empleados' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-id-card text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Empleados</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Empleados</span>
+              <span class="flex-1 text-left">Empleados</span>
             </button>
           </li>
           <li v-if="tienePermiso('eventos', 'ver')">
@@ -85,8 +75,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'eventos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-calendar-alt text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Eventos / Fiestas</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Eventos / Fiestas</span>
+              <span class="flex-1 text-left">Eventos / Fiestas</span>
             </button>
           </li>
           <li v-if="tienePermiso('sorteos', 'ver')">
@@ -94,8 +83,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'sorteos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-ticket-alt text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Sorteos</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Sorteos</span>
+              <span class="flex-1 text-left">Sorteos</span>
             </button>
           </li>
           <li v-if="tienePermiso('premios', 'ver')">
@@ -103,11 +91,10 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'premios' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-trophy text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Premios</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Premios</span>
+              <span class="flex-1 text-left">Premios</span>
             </button>
           </li>
-          <div v-if="sidebarAbierto" class="pt-4 pb-1 border-t border-slate-200/60">
+          <div class="pt-4 pb-1 border-t border-slate-200/60">
             <p class="px-3 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">Configuración y Catálogos</p>
           </div>
           <li v-if="tienePermiso('configuracion', 'ver')">
@@ -115,8 +102,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'configuracion' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-sliders-h text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Configuración</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Configuración</span>
+              <span class="flex-1 text-left">Configuración</span>
             </button>
           </li>
           <li v-if="tienePermiso('usuarios', 'ver')">
@@ -124,8 +110,7 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'usuarios' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-user-shield text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Usuarios & Roles</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Usuarios & Roles</span>
+              <span class="flex-1 text-left">Usuarios & Roles</span>
             </button>
           </li>
           <li v-if="tienePermiso('permisos', 'ver')">
@@ -133,15 +118,15 @@
               class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ios-btn relative group"
               :class="vista === 'permisos' ? 'bg-[#001ba0] text-white shadow-md shadow-blue-900/20' : 'text-slate-600 hover:bg-slate-100/80'">
               <i class="fas fa-shield-alt text-sm w-5 text-center"></i>
-              <span v-if="sidebarAbierto" class="flex-1 text-left">Permisos</span>
-              <span v-if="!sidebarAbierto" class="absolute left-full ml-2 px-2 py-1 bg-slate-800 text-white text-[10px] font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Permisos</span>
+              <span class="flex-1 text-left">Permisos</span>
             </button>
           </li>
         </template>
       </ul>
     </div>
-    <div v-if="sidebarAbierto" class="pt-3 border-t border-slate-200/60 text-center">
+    <div class="pt-3 border-t border-slate-200/60 text-center">
       <p class="text-[10px] font-bold text-slate-400">San Salvador Sur © 2026</p>
     </div>
   </div>
 </aside>
+
