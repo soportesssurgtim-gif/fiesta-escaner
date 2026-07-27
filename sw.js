@@ -1,4 +1,4 @@
-﻿const CACHE_VERSION = 'v1.0.16';
+﻿const CACHE_VERSION = 'v1.0.18';
 const CACHE_NAME = `fiesta-escaner-${CACHE_VERSION}`;
 const ASSETS_TO_CACHE = [
   '/',
@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
   '/assets/js/app.js',
   '/assets/js/tarjetas.js',
   '/assets/js/offline.js',
+  '/assets/js/guias.js',
   '/assets/views/overlay-cargando.html',
   '/assets/views/login.html',
   '/assets/views/layout-logueado-inicio.html',
@@ -128,4 +129,6 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+
 
