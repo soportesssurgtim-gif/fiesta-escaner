@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', async function() {
+ï»¿document.addEventListener('DOMContentLoaded', async function() {
 
     const skeleton = document.getElementById('app-skeleton');
     function setSkeleton(html) {
@@ -89,7 +89,10 @@ document.addEventListener('DOMContentLoaded', async function() {
       setup() {
         const cargando = ref(true);
         const vista = ref('scanner');
+        const windowWidth = ref(window.innerWidth);
+        const swVersion = ref('');
         const sidebarAbierto = ref(window.innerWidth >= 768);
+        const handleResize = () => { windowWidth.value = window.innerWidth; };
         const mostrarModalLogout = ref(false);
         const subtabUsuario = ref('usuarios');
         const sesion = reactive({ token: null, usuario: null, correo: null, nombreMostrar: null, rol: null });
@@ -312,7 +315,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function abrirGuiaVista() {
           const clave = String(vista.value || '').toLowerCase();
-          const data = (window.GUIAS_VISTAS && window.GUIAS_VISTAS[clave]) ? window.GUIAS_VISTAS[clave] : (window.GUIAS_VISTAS && window.GUIAS_VISTAS.scanner) || { titulo: 'Guía', icono: 'question-circle', color: '#4b5563', pasos: [], tips: '' };
+          const data = (window.GUIAS_VISTAS && window.GUIAS_VISTAS[clave]) ? window.GUIAS_VISTAS[clave] : (window.GUIAS_VISTAS && window.GUIAS_VISTAS.scanner) || { titulo: 'Guï¿½a', icono: 'question-circle', color: '#4b5563', pasos: [], tips: '' };
           guiaActual.value = data;
           mostrarGuia.value = true;
         }
@@ -333,11 +336,11 @@ document.addEventListener('DOMContentLoaded', async function() {
           return String(val)
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[áàâãä]/g, 'a')
-            .replace(/[éèêë]/g, 'e')
-            .replace(/[íìîï]/g, 'i')
-            .replace(/[óòôõö]/g, 'o')
-            .replace(/[úùûü]/g, 'u');
+            .replace(/[ï¿½ï¿½ï¿½ï¿½ï¿½]/g, 'a')
+            .replace(/[ï¿½ï¿½ï¿½ï¿½]/g, 'e')
+            .replace(/[ï¿½ï¿½ï¿½ï¿½]/g, 'i')
+            .replace(/[ï¿½ï¿½ï¿½ï¿½ï¿½]/g, 'o')
+            .replace(/[ï¿½ï¿½ï¿½ï¿½]/g, 'u');
         }
 
         function emitirSonido(tipo) {
@@ -442,7 +445,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           errorPublico.value = '';
           resultadoPublico.value = null;
           if (!duiPublico.value || !ultimos4Publico.value) {
-            errorPublico.value = 'Ingresa tu DUI y los últimos 4 dígitos.';
+            errorPublico.value = 'Ingresa tu DUI y los ï¿½ltimos 4 dï¿½gitos.';
             return;
           }
           cargandoInvitacion.value = true;
@@ -451,12 +454,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             const res = await fetch(url);
             const data = await res.json();
             if (!res.ok) {
-              errorPublico.value = data.error || 'No se pudo consultar la invitación.';
+              errorPublico.value = data.error || 'No se pudo consultar la invitaciï¿½n.';
               return;
             }
             resultadoPublico.value = data;
           } catch (err) {
-            errorPublico.value = err.message || 'Error de conexión.';
+            errorPublico.value = err.message || 'Error de conexiï¿½n.';
           } finally {
             cargandoInvitacion.value = false;
           }
@@ -494,7 +497,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (!file) return;
           try {
             await window.TarjetasApp.cargarPlantilla(file);
-            mostrarNotificacion('Plantilla cargada. Ajustá la posición del QR.', 'exito');
+            mostrarNotificacion('Plantilla cargada. Ajustï¿½ la posiciï¿½n del QR.', 'exito');
           } catch (err) {
             mostrarNotificacion(err.message || 'Error al cargar plantilla.', 'error');
           } finally {
@@ -511,7 +514,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         async function guardarPlantillaAction() {
           const img = window.TarjetasApp.plantillaActual;
           if (!img) {
-            mostrarNotificacion('Primero subí una plantilla.', 'error');
+            mostrarNotificacion('Primero subï¿½ una plantilla.', 'error');
             return;
           }
           try {
@@ -540,7 +543,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         function abrirModalGenerar() {
           if (listaPlantillas.value.length === 0) {
-            mostrarNotificacion('Primero creá y guardá una plantilla.', 'error');
+            mostrarNotificacion('Primero creï¿½ y guardï¿½ una plantilla.', 'error');
             return;
           }
           modalGenerar.value = true;
@@ -640,7 +643,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         function _setupOfflineListeners() {
           window.addEventListener('online', async () => {
             estaOnline.value = true;
-            mostrarNotificacion('Conexión recuperada. Sincronizando pendientes...', 'exito');
+            mostrarNotificacion('Conexiï¿½n recuperada. Sincronizando pendientes...', 'exito');
             await cargarPendientesOffline();
             if (pendientesOffline.value > 0) {
               await forzarSincronizacion();
@@ -648,7 +651,7 @@ document.addEventListener('DOMContentLoaded', async function() {
           });
           window.addEventListener('offline', () => {
             estaOnline.value = false;
-            mostrarNotificacion('Sin conexión. Los registros se guardarán localmente.', 'error');
+            mostrarNotificacion('Sin conexiï¿½n. Los registros se guardarï¿½n localmente.', 'error');
           });
           cargarPendientesOffline();
         }
@@ -1218,7 +1221,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             ultimoResultado.value = {
               error: false,
               offline: true,
-              mensaje: '?? Sin conexión. Asistencia guardada localmente. Pendientes: ' + pendientesOffline.value
+              mensaje: '?? Sin conexiï¿½n. Asistencia guardada localmente. Pendientes: ' + pendientesOffline.value
             };
             emitirSonido('exito');
           } catch (e) {
@@ -1241,10 +1244,10 @@ document.addEventListener('DOMContentLoaded', async function() {
           try {
             const resultado = await window.OfflineApp.sincronizarPendientes(sesion.token);
             pendientesOffline.value = await window.OfflineApp.contarPendientes();
-            const msg = 'Sincronización: ' + resultado.sincronizados + ' OK, ' + resultado.duplicados + ' duplicados, ' + resultado.errores + ' errores';
+            const msg = 'Sincronizaciï¿½n: ' + resultado.sincronizados + ' OK, ' + resultado.duplicados + ' duplicados, ' + resultado.errores + ' errores';
             mostrarNotificacion(msg, resultado.errores > 0 ? 'error' : 'exito');
           } catch (e) {
-            mostrarNotificacion('Error en sincronización: ' + (e.message || String(e)), 'error');
+            mostrarNotificacion('Error en sincronizaciï¿½n: ' + (e.message || String(e)), 'error');
           } finally {
             sincronizandoOffline.value = false;
           }
@@ -1371,6 +1374,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         onMounted(() => {
+          window.addEventListener('resize', handleResize);
+          fetch('/sw.js', {cache: 'no-store'}).then(res => res.text()).then(text => { const m = text.match(/const CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/); if(m) swVersion.value = m[1]; }).catch(e => console.error('Error fetching SW version', e));
           try {
             const params = new URLSearchParams(location.search);
             if (params.get('invitacion') === '1') {
@@ -1390,7 +1395,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         return {
-          cargando, vista, sidebarAbierto, mostrarModalLogout, subtabUsuario, sesion, modoPublico, duiPublico, ultimos4Publico, resultadoPublico, errorPublico, cargandoInvitacion, consultarInvitacionPublica, formatearDuiInput, loginForm, loginError, loginCargando, mostrarPassword,
+          swVersion, windowWidth, cargando, vista, sidebarAbierto, mostrarModalLogout, subtabUsuario, sesion, modoPublico, duiPublico, ultimos4Publico, resultadoPublico, errorPublico, cargandoInvitacion, consultarInvitacionPublica, formatearDuiInput, loginForm, loginError, loginCargando, mostrarPassword,
           escaneando, ultimoResultado, duiManual, procesandoAsistencia, sorteando, ganadorSorteo, ganadorActual, errorRifa, generalError, notificacion,
           resumenData, esAdmin, listaDistritos, listaDias, listaMeses, listaAnios, fechaNacObj,
           guardandoEmpleado, guardandoDpto, guardandoPremio, guardandoUsuario, guardandoRol, guardandoSorteo, guardandoEvento, guardandoPermiso,
@@ -1453,7 +1458,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 // New version available, show toast and reload
-                if (confirm('Hay una nueva versión disponible. ¿Recargar ahora?')) {
+                if (confirm('Hay una nueva versiï¿½n disponible. ï¿½Recargar ahora?')) {
                   window.location.reload();
                 }
               }
@@ -1463,3 +1468,9 @@ document.addEventListener('DOMContentLoaded', async function() {
       });
     }
   });
+
+
+
+
+
+

@@ -1,6 +1,6 @@
-<aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-40 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 overflow-y-auto overflow-x-visible"
+<aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-40 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 overflow-visible"
   :class="sidebarAbierto ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'">
-  <div class="h-full px-3 py-4 overflow-y-auto flex flex-col justify-between" :class="!sidebarAbierto ? 'items-center' : ''">
+  <div class="h-full px-3 py-4  flex flex-col justify-between" :class="!sidebarAbierto ? 'items-center' : ''">
     <div class="w-full">
       <div class="p-3.5 mb-4 bg-slate-100/70 rounded-2xl border border-slate-200/50 flex items-center gap-3 transition-all" :class="!sidebarAbierto ? 'justify-center p-2' : ''">
         <div class="w-10 h-10 rounded-2xl bg-[#001ba0] text-white font-bold flex items-center justify-center text-sm shadow-md shadow-blue-900/20 flex-shrink-0">
@@ -143,3 +143,4 @@
     </div>
   </div>
 </aside>
+
