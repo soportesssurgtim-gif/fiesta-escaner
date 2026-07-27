@@ -154,6 +154,19 @@
       }
     }
 
+    /* Sidebar y contenido principal */
+    aside {
+      transition: transform 0.3s ease, width 0.3s ease;
+    }
+    main {
+      transition: margin-left 0.3s ease;
+    }
+    @media (max-width: 767px) {
+      main {
+        margin-left: 0 !important;
+      }
+    }
+
     /* Sidebar colapsado: centrar iconos */
     aside .fa,
     aside [class*="fa-"] {

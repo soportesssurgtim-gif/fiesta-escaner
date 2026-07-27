@@ -3,7 +3,7 @@
   <i class="fas fa-bars"></i>
 </button>
 <div v-if="sidebarAbierto" @click="sidebarAbierto = false" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-10 md:hidden"></div>
-<aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-20 w-64 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300"
+<aside v-if="!cargando && sesion.token" class="fixed top-0 left-0 z-40 w-64 h-screen pt-16 bg-white/80 backdrop-blur-xl border-r border-slate-200/60 transition-all duration-300 overflow-y-auto overflow-x-visible"
   :class="sidebarAbierto ? 'translate-x-0' : '-translate-x-full md:translate-x-0 md:w-20'">
   <div class="h-full px-3 py-4 overflow-y-auto flex flex-col justify-between">
     <div>
