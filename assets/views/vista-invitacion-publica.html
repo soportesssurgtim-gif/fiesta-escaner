@@ -1,0 +1,45 @@
+﻿<section v-if="vista === 'invitacion-publica'" class="w-full min-h-screen bg-slate-50">
+  <div class="max-w-lg mx-auto px-4 py-8">
+    <div class="text-center mb-6">
+      <img src="https://sansalvadorsur.gob.sv/images/logo-blanco-vertical.png" alt="Alcaldía San Salvador Sur" class="w-20 h-20 object-contain mx-auto mb-3" />
+      <h1 class="text-2xl font-extrabold text-slate-900">Consulta tu Invitación</h1>
+      <p class="text-xs text-slate-500 mt-1">Ingresa tu DUI y los últimos 4 dígitos para ver tu código QR.</p>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] p-6 shadow-2xl border border-slate-100 space-y-4">
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Número de DUI</label>
+        <input v-model="duiPublico" type="text" inputmode="numeric" maxlength="10" placeholder="Ej: 12345678-9" @input="formatearDuiInput" class="w-full p-3.5 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800" />
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Últimos 4 dígitos del DUI</label>
+        <input v-model="ultimos4Publico" type="text" inputmode="numeric" maxlength="4" placeholder="Ej: 5678" class="w-full p-3.5 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800" />
+      </div>
+      <button @click="consultarInvitacionPublica" :disabled="cargandoInvitacion" class="w-full bg-[#001ba0] hover:bg-[#000060] text-white font-bold py-3.5 rounded-2xl shadow-lg ios-btn disabled:opacity-50">
+        <span v-if="!cargandoInvitacion">Consultar Invitación</span>
+        <span v-else class="flex items-center justify-center gap-2"><i class="fas fa-spinner fa-spin"></i> Consultando...</span>
+      </button>
+    </div>
+
+    <div v-if="resultadoPublico" class="mt-6 bg-white rounded-[2.5rem] p-6 shadow-2xl border border-slate-100 space-y-4">
+      <div class="text-center">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Evento</p>
+        <p class="text-sm font-extrabold text-slate-800">{{ resultadoPublico.evento }}</p>
+      </div>
+      <div class="text-center">
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Empleado</p>
+        <p class="text-base font-extrabold text-slate-900">{{ resultadoPublico.empleado.nombres }} {{ resultadoPublico.empleado.apellidos }}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">DUI: {{ resultadoPublico.empleado.dui }}</p>
+        <p v-if="resultadoPublico.empleado.codigo" class="text-[11px] text-slate-500">Código: {{ resultadoPublico.empleado.codigo }}</p>
+      </div>
+      <div class="flex justify-center">
+        <img :src="resultadoPublico.empleado.qr_url" alt="QR Invitación" class="w-64 h-64 object-contain rounded-xl border border-slate-200" />
+      </div>
+      <p class="text-[10px] text-center text-slate-400">Presenta este código QR en el acceso del evento.</p>
+    </div>
+
+    <div v-if="errorPublico" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs font-semibold text-center">
+      {{ errorPublico }}
+    </div>
+  </div>
+</section>

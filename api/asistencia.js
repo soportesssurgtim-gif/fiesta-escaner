@@ -1,5 +1,36 @@
 import { supabase, requireAuth, getSession, jsonResponse, parseBody } from './_lib/supabase.js';
 
+function buscarEmpleadoPorIdentificador(identificador, empleadosRaw) {
+  const valorCrudo = String(identificador || '').trim();
+  if (!valorCrudo) return null;
+  const soloNumeros = /^[0-9]+$/.test(valorCrudo);
+  const valorLimpio = soloNumeros ? (valorCrudo.replace(/^0+/, '') || '0') : valorCrudo;
+  const lista = empleadosRaw || [];
+
+  if (soloNumeros) {
+    const idNum = parseInt(valorLimpio, 10);
+    const porId = lista.find(function(e) { return Number(e.id) === idNum; });
+    if (porId) return porId;
+  }
+
+  const duiNormalizado = valorLimpio.length === 8 ? '0' + valorLimpio : valorLimpio;
+  const porDui = lista.find(function(e) {
+    const d = String(e.dui || '').replace(/[^0-9]/g, '');
+    const dN = d.length === 8 ? '0' + d : d;
+    const dLimpio = d.replace(/^0+/, '') || '0';
+    return d === valorLimpio || dN === duiNormalizado || dLimpio === valorLimpio || String(e.dui || '') === valorCrudo;
+  });
+  if (porDui) return porDui;
+
+  const porCodigo = lista.find(function(e) {
+    const c = String(e.codigo || '').trim();
+    return c && (c === valorCrudo || c === valorLimpio || c === String(identificador).trim());
+  });
+  if (porCodigo) return porCodigo;
+
+  return null;
+}
+
 export default async function handler(req, res) {
   const auth = requireAuth(req);
   if (auth.error) {
@@ -35,10 +66,10 @@ export default async function handler(req, res) {
 async function registrarAsistencia(req, res, sesion) {
   const body = await parseBody(req);
   const { dui, dispositivo, id_cliente } = body;
-  const duiLimpio = String(dui || '').replace(/[^0-9]/g, '');
+  const identificador = String(dui || '').trim();
 
-  if (!duiLimpio) {
-    return jsonResponse(res, 400, { error: 'DUI o QR inválido.' });
+  if (!identificador) {
+    return jsonResponse(res, 400, { error: 'DUI, código o ID inválido.' });
   }
 
   try {
@@ -53,7 +84,6 @@ async function registrarAsistencia(req, res, sesion) {
       return jsonResponse(res, 400, { error: 'No hay un evento activo configurado.' });
     }
 
-    const duiNormalizado = duiLimpio.length === 8 ? '0' + duiLimpio : duiLimpio;
     const { data: empleadosRaw, error: errEmp } = await supabase
       .from('empleados')
       .select('*')
@@ -61,14 +91,10 @@ async function registrarAsistencia(req, res, sesion) {
 
     if (errEmp) throw errEmp;
 
-    const empleado = (empleadosRaw || []).find(function (e) {
-      const d = String(e.dui || '').replace(/[^0-9]/g, '');
-      const dN = d.length === 8 ? '0' + d : d;
-      return d === duiLimpio || dN === duiLimpio || d === duiNormalizado || dN === duiNormalizado;
-    });
+    const empleado = buscarEmpleadoPorIdentificador(identificador, empleadosRaw);
 
     if (!empleado) {
-      return jsonResponse(res, 404, { error: 'No se encontró un empleado activo con el DUI: ' + dui });
+      return jsonResponse(res, 404, { error: 'No se encontró un empleado activo con el DUI, código o ID: ' + identificador });
     }
 
     // Si viene id_cliente, verificar duplicado por cliente
@@ -155,11 +181,11 @@ async function sincronizarPendientes(req, res, sesion) {
   for (const registro of registros) {
     try {
       const { dui, dispositivo, id_cliente } = registro;
-      const duiLimpio = String(dui || '').replace(/[^0-9]/g, '');
+      const identificador = String(dui || '').trim();
 
-      if (!duiLimpio) {
+      if (!identificador) {
         resultados.errores++;
-        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'DUI vacío' });
+        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'Identificador vacío' });
         continue;
       }
 
@@ -176,21 +202,16 @@ async function sincronizarPendientes(req, res, sesion) {
         continue;
       }
 
-      const duiNormalizado = duiLimpio.length === 8 ? '0' + duiLimpio : duiLimpio;
       const { data: empleadosRaw } = await supabase
         .from('empleados')
         .select('*')
         .eq('activo', 'TRUE');
 
-      const empleado = (empleadosRaw || []).find(function (e) {
-        const d = String(e.dui || '').replace(/[^0-9]/g, '');
-        const dN = d.length === 8 ? '0' + d : d;
-        return d === duiLimpio || dN === duiLimpio || d === duiNormalizado || dN === duiNormalizado;
-      });
+      const empleado = buscarEmpleadoPorIdentificador(identificador, empleadosRaw);
 
       if (!empleado) {
         resultados.errores++;
-        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'Empleado no encontrado' });
+        resultados.detalle.push({ id_cliente, estado: 'error', mensaje: 'Empleado no encontrado (' + identificador + ')' });
         continue;
       }
 

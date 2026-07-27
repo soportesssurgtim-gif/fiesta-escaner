@@ -53,9 +53,8 @@
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
-      const index = store.index('sincronizado');
-      const request = index.getAll(IDBKeyRange.only(false));
-      request.onsuccess = () => resolve(request.result || []);
+      const request = store.getAll();
+      request.onsuccess = () => resolve((request.result || []).filter(function(r) { return r.sincronizado !== true; }));
       request.onerror = (event) => reject(event.target.error);
     });
   }

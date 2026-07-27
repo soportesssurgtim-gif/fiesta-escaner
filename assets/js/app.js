@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       'assets/views/vista-usuarios-roles.html',
       'assets/views/vista-permisos.html',
       'assets/views/vista-tarjetas.html',
+      'assets/views/vista-invitacion-publica.html',
+      'assets/views/modal-guia.html',
       'assets/views/layout-logueado-fin.html',
       'assets/views/modal-logout.html'
     ];
@@ -91,6 +93,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const mostrarModalLogout = ref(false);
         const subtabUsuario = ref('usuarios');
         const sesion = reactive({ token: null, usuario: null, correo: null, nombreMostrar: null, rol: null });
+        const modoPublico = ref(false);
+        const duiPublico = ref('');
+        const ultimos4Publico = ref('');
+        const resultadoPublico = ref(null);
+        const errorPublico = ref('');
+        const cargandoInvitacion = ref(false);
 
         const loginForm = reactive({ usuario: '', password: '' });
         const loginError = ref('');
@@ -299,6 +307,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         const ganadorActual = ref(null);
         const errorGanador = ref('');
 
+        const mostrarGuia = ref(false);
+        const guiaActual = ref({ titulo: '', icono: '', color: '', pasos: [], tips: '' });
+
+        function abrirGuiaVista() {
+          const clave = String(vista.value || '').toLowerCase();
+          const data = (window.GUIAS_VISTAS && window.GUIAS_VISTAS[clave]) ? window.GUIAS_VISTAS[clave] : (window.GUIAS_VISTAS && window.GUIAS_VISTAS.scanner) || { titulo: 'Guía', icono: 'question-circle', color: '#4b5563', pasos: [], tips: '' };
+          guiaActual.value = data;
+          mostrarGuia.value = true;
+        }
+
         function formatearDui(val) {
           if (!val) return '';
           let nums = String(val).replace(/[^0-9]/g, '');
@@ -418,6 +436,36 @@ document.addEventListener('DOMContentLoaded', async function() {
           if (!perm) return false;
           var campo = 'puede' + tipo.charAt(0).toUpperCase() + tipo.slice(1);
           return String(perm[campo]).toUpperCase() === 'TRUE';
+        }
+
+        async function consultarInvitacionPublica() {
+          errorPublico.value = '';
+          resultadoPublico.value = null;
+          if (!duiPublico.value || !ultimos4Publico.value) {
+            errorPublico.value = 'Ingresa tu DUI y los últimos 4 dígitos.';
+            return;
+          }
+          cargandoInvitacion.value = true;
+          try {
+            const url = '/api/invitacion-publica?dui=' + encodeURIComponent(duiPublico.value) + '&ultimos4=' + encodeURIComponent(ultimos4Publico.value);
+            const res = await fetch(url);
+            const data = await res.json();
+            if (!res.ok) {
+              errorPublico.value = data.error || 'No se pudo consultar la invitación.';
+              return;
+            }
+            resultadoPublico.value = data;
+          } catch (err) {
+            errorPublico.value = err.message || 'Error de conexión.';
+          } finally {
+            cargandoInvitacion.value = false;
+          }
+        }
+
+        function formatearDuiInput() {
+          let v = String(duiPublico.value || '').replace(/[^0-9]/g, '');
+          if (v.length > 9) v = v.slice(0, 9);
+          duiPublico.value = v;
         }
 
         async function cargarDatosInicialesBatch() {
@@ -1323,6 +1371,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         onMounted(() => {
+          try {
+            const params = new URLSearchParams(location.search);
+            if (params.get('invitacion') === '1') {
+              modoPublico.value = true;
+              vista.value = 'invitacion-publica';
+              cargando.value = false;
+              return;
+            }
+          } catch (_) {}
           cargarSesionLocal();
           cargando.value = false;
           _setupOfflineListeners();
@@ -1333,7 +1390,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         return {
-          cargando, vista, sidebarAbierto, mostrarModalLogout, subtabUsuario, sesion, loginForm, loginError, loginCargando, mostrarPassword,
+          cargando, vista, sidebarAbierto, mostrarModalLogout, subtabUsuario, sesion, modoPublico, duiPublico, ultimos4Publico, resultadoPublico, errorPublico, cargandoInvitacion, consultarInvitacionPublica, formatearDuiInput, loginForm, loginError, loginCargando, mostrarPassword,
           escaneando, ultimoResultado, duiManual, procesandoAsistencia, sorteando, ganadorSorteo, ganadorActual, errorRifa, generalError, notificacion,
           resumenData, esAdmin, listaDistritos, listaDias, listaMeses, listaAnios, fechaNacObj,
           guardandoEmpleado, guardandoDpto, guardandoPremio, guardandoUsuario, guardandoRol, guardandoSorteo, guardandoEvento, guardandoPermiso,
@@ -1350,7 +1407,8 @@ document.addEventListener('DOMContentLoaded', async function() {
           permisosMatriz, permisosFiltrados, cambiarRol, alternarPermiso, alternarTodo, guardarPermisosRol,
           importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion, procesandoArchivo,
           listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
-          listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
+           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
+           mostrarGuia, guiaActual, abrirGuiaVista,
           formatearDui, limpiarTildes, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
           procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
           abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,

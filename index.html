@@ -29,6 +29,7 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.lordicon.com/lordicon.js"></script>
 
   <style>
     html, body {
@@ -38,6 +39,32 @@
       min-height: 100% !important;
       background-color: #f2f2f7;
       overflow-x: hidden;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    @media (min-width: 768px) {
+      .app-container {
+        padding: 0 1rem;
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .app-container {
+        padding: 0 2rem;
+      }
     }
 
     *, html, body, button, input, textarea, select, option, label {
@@ -100,6 +127,44 @@
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 10px; }
+
+    /* Layout full-width: el contenido principal usa todo el ancho disponible */
+    main, .view-container {
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+    @media (min-width: 768px) {
+      main, .view-container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+    }
+    @media (min-width: 1024px) {
+      main, .view-container {
+        padding-left: 2rem;
+        padding-right: 2rem;
+      }
+    }
+
+    /* Contenedores de tarjeta usan todo el ancho disponible en pantallas grandes */
+    @media (min-width: 1024px) {
+      .bg-white.rounded-\[2\.5rem\] {
+        max-width: 100% !important;
+      }
+    }
+
+    /* Sidebar colapsado: centrar iconos */
+    aside .fa,
+    aside [class*="fa-"] {
+      transition: margin 0.2s ease;
+    }
+    aside:not(:hover) button span:not(.absolute) {
+      transition: opacity 0.2s ease;
+    }
+    aside .absolute.left-full {
+      z-index: 50;
+    }
 
     .toast-container {
       position: fixed;
