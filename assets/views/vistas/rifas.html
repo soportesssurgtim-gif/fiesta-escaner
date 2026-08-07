@@ -1,0 +1,120 @@
+<!--
+  Sorteos en vivo.
+
+  Esta pantalla se proyecta frente al público, así que el nombre del ganador va
+  en grande y con harto aire alrededor. Todo lo demás es secundario.
+-->
+<section v-show="vista === 'rifa'" class="animar-aparecer">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+    <!-- Panel de control -->
+    <div class="tarjeta lg:col-span-1">
+      <div class="tarjeta-encabezado">
+        <h2 class="tarjeta-titulo">Control del sorteo</h2>
+      </div>
+
+      <div class="tarjeta-cuerpo space-y-5">
+        <div>
+          <label for="sorteo-elegido" class="etiqueta">Sorteo a realizar</label>
+          <select id="sorteo-elegido" v-model="sorteoElegido" class="campo campo-select">
+            <option value="">Selecciona un sorteo…</option>
+            <option v-for="item in sorteos.lista"
+                    :key="item.id"
+                    :value="item.id"
+                    :disabled="esVerdadero(item.realizado)">
+              {{ item.nombre }}{{ esVerdadero(item.realizado) ? ' (ya realizado)' : '' }}
+            </option>
+          </select>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <p class="text-theme-xs uppercase tracking-wide text-gray-400">Participan</p>
+          <p class="mt-1 text-title-sm font-bold text-gray-800 dark:text-white/90">
+            {{ asistencias.length }}
+          </p>
+          <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+            personas con asistencia confirmada
+          </p>
+        </div>
+
+        <button type="button"
+                @click="sortear()"
+                class="boton boton-primario w-full py-3 text-base"
+                :disabled="sorteando || !sorteoElegido || asistencias.length === 0">
+          <i class="fa-solid" :class="sorteando ? 'fa-circle-notch animar-girar' : 'fa-dice'"></i>
+          {{ sorteando ? 'Sorteando…' : 'Extraer ganador' }}
+        </button>
+
+        <div v-if="errorSorteo"
+             class="flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ errorSorteo }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Escenario del ganador -->
+    <div class="lg:col-span-2">
+      <div class="tarjeta flex min-h-[420px] items-center justify-center overflow-hidden">
+
+        <!-- Todavía sin sortear -->
+        <div v-if="!ganador && !sorteando" class="p-10 text-center">
+          <i class="fa-solid fa-gift mb-4 block text-6xl text-gray-200 dark:text-gray-800"></i>
+          <p class="text-theme-xl font-semibold text-gray-500 dark:text-gray-400">
+            Todo listo para sortear
+          </p>
+          <p class="mt-2 text-theme-sm text-gray-400">
+            Elige un sorteo y pulsa «Extraer ganador».
+          </p>
+        </div>
+
+        <!-- Sorteando -->
+        <div v-else-if="sorteando" class="p-10 text-center">
+          <i class="fa-solid fa-dice mb-4 block animate-bounce text-6xl text-brand-500"></i>
+          <p class="text-theme-xl font-semibold text-gray-700 dark:text-gray-300">
+            Eligiendo al azar…
+          </p>
+        </div>
+
+        <!-- Ganador -->
+        <div v-else class="animar-aparecer w-full p-8 text-center sm:p-12">
+          <div class="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-warning-50 text-5xl text-warning-500 dark:bg-warning-500/15">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+
+          <p class="mb-2 text-theme-sm font-medium uppercase tracking-widest text-brand-500">
+            Ganador
+          </p>
+          <p class="text-title-md font-bold leading-tight text-gray-800 dark:text-white/90">
+            {{ nombreCompleto(ganador.empleado) }}
+          </p>
+
+          <p v-if="ganador.empleado?.cargo" class="mt-2 text-theme-xl text-gray-500 dark:text-gray-400">
+            {{ ganador.empleado.cargo }}
+          </p>
+          <p class="mt-1 text-theme-sm text-gray-400">
+            DUI {{ formatearDui(ganador.empleado?.dui) }}
+          </p>
+
+          <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <span class="insignia-marca">
+              <i class="fa-solid fa-users"></i>
+              {{ ganador.participantes }} participantes
+            </span>
+            <span v-if="ganador.esUltimo" class="insignia-alerta">
+              <i class="fa-solid fa-flag-checkered"></i>
+              Sorteo finalizado
+            </span>
+          </div>
+
+          <button type="button"
+                  @click="sortear()"
+                  class="boton boton-secundario mt-8"
+                  :disabled="ganador.esUltimo">
+            <i class="fa-solid fa-rotate"></i> Extraer otro ganador
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

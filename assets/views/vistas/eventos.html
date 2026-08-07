@@ -1,0 +1,141 @@
+<!--
+  Eventos.
+
+  Se muestran como tarjetas y no como tabla porque lo importante acá no es
+  comparar filas, sino ver de un vistazo cuál está activo. Solo puede haber uno.
+-->
+<section v-show="vista === 'eventos'" class="animar-aparecer">
+  <div class="tarjeta">
+
+    <barra-catalogo :catalogo="eventos" titulo="Eventos" marcador="Nombre o lugar">
+      <template #acciones>
+        <button v-if="permisos.tienePermiso('eventos', 'Agregar')"
+                type="button" @click="eventos.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo evento
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="eventos.paginados.length === 0">
+      <estado-vacio icono="fa-calendar-day"
+                    titulo="No hay eventos creados"
+                    descripcion="Crea un evento y actívalo para empezar a registrar asistencias."
+                    :buscando="eventos.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tarjeta-cuerpo">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article v-for="evento in eventos.paginados" :key="evento.id"
+                 class="rounded-xl border p-5 transition"
+                 :class="esVerdadero(evento.activo)
+                         ? 'border-success-300 bg-success-25 dark:border-success-500/40 dark:bg-success-500/5'
+                         : 'border-gray-200 dark:border-gray-800'">
+
+          <div class="mb-3 flex items-start justify-between gap-3">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+                 :class="esVerdadero(evento.activo)
+                         ? 'bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400'
+                         : 'bg-gray-100 text-gray-400 dark:bg-gray-800'">
+              <i class="fa-solid fa-calendar-day"></i>
+            </div>
+
+            <span v-if="esVerdadero(evento.activo)" class="insignia-exito">
+              <span class="h-1.5 w-1.5 rounded-full bg-success-500"></span> Activo
+            </span>
+            <span v-else class="insignia-neutra">Inactivo</span>
+          </div>
+
+          <h3 class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+            {{ evento.nombre }}
+          </h3>
+
+          <dl class="mt-3 space-y-1.5 text-theme-sm text-gray-500 dark:text-gray-400">
+            <div v-if="evento.fecha_evento" class="flex items-center gap-2">
+              <i class="fa-solid fa-calendar w-4 text-gray-400"></i>
+              <dd>{{ formatearFechaLarga(evento.fecha_evento) }}</dd>
+            </div>
+            <div v-if="evento.ubicacion" class="flex items-center gap-2">
+              <i class="fa-solid fa-location-dot w-4 text-gray-400"></i>
+              <dd class="truncate">{{ evento.ubicacion }}</dd>
+            </div>
+          </dl>
+
+          <div class="mt-5 flex gap-2">
+            <button v-if="!esVerdadero(evento.activo) && permisos.tienePermiso('eventos', 'Editar')"
+                    type="button" @click="activarEvento(evento.id)"
+                    class="boton boton-exito flex-1 text-theme-xs">
+              <i class="fa-solid fa-power-off"></i> Activar
+            </button>
+            <span v-else-if="esVerdadero(evento.activo)"
+                  class="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success-100 py-2.5 text-theme-xs font-medium text-success-700 dark:bg-success-500/15 dark:text-success-400">
+              <i class="fa-solid fa-check"></i> En curso
+            </span>
+
+            <button v-if="permisos.tienePermiso('eventos', 'Editar')"
+                    type="button" @click="eventos.abrir(evento)"
+                    class="boton boton-secundario" aria-label="Editar evento">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+
+    <paginacion-tabla :catalogo="eventos"></paginacion-tabla>
+  </div>
+
+  <div v-if="eventos.modalAbierto" class="modal-fondo" @click.self="eventos.cerrar()">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">
+          {{ eventos.formulario.id ? 'Editar evento' : 'Nuevo evento' }}
+        </h2>
+        <button type="button" @click="eventos.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="eventos.guardar(recargarCatalogos)">
+        <div class="space-y-4">
+          <div>
+            <label class="etiqueta">Nombre del evento *</label>
+            <input v-model="eventos.formulario.nombre" type="text" class="campo"
+                   placeholder="Fiesta de fin de año 2026" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">Fecha</label>
+            <input v-model="eventos.formulario.fechaEvento" type="date" class="campo" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Lugar</label>
+            <input v-model="eventos.formulario.ubicacion" type="text" class="campo"
+                   placeholder="Salón municipal, Panchimalco" />
+          </div>
+        </div>
+
+        <!-- Activar se hace desde la tarjeta, no desde el formulario: así el
+             sistema puede apagar los demás eventos en la misma operación. -->
+        <p class="mt-4 text-theme-xs text-gray-400">
+          Para poner este evento en curso, usa el botón «Activar» de su tarjeta.
+        </p>
+
+        <div v-if="eventos.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ eventos.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="eventos.cerrar()" class="boton boton-secundario flex-1">Cancelar</button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="eventos.guardando">
+            <i v-if="eventos.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ eventos.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

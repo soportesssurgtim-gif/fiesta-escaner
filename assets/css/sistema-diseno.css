@@ -1,0 +1,634 @@
+/* =====================================================================
+   Sistema de diseño
+   Basado en TailAdmin Free (licencia MIT) — https://github.com/TailAdmin
+   Adaptado a la identidad de la Alcaldía Municipal de San Salvador Sur.
+   =====================================================================
+
+   Por qué esto es CSS plano y no clases de Tailwind con @apply:
+   el proyecto se sirve sin build, con Tailwind desde CDN. En ese modo @apply
+   solo funciona dentro de un <style type="text/tailwindcss"> en el HTML, no en
+   una hoja externa. Escribirlo plano nos da un archivo cacheable de verdad y
+   sin trabajo de JIT en el navegador.
+
+   Las utilidades de Tailwind se siguen usando dentro de las vistas para
+   maquetar (grid, flex, espaciados). Acá viven solo los componentes que se
+   repiten: si una combinación aparece en más de tres vistas, baja a este
+   archivo.
+
+   Organización:
+     1. Tokens (paleta TailAdmin, sombras, medidas)
+     2. Base y tipografía
+     3. Componentes
+     4. Utilidades y animaciones
+   ===================================================================== */
+
+
+/* ---------------------------------------------------------------------
+   1. Tokens
+   --------------------------------------------------------------------- */
+:root {
+  /* --- Marca --- */
+  --marca-25:  #f2f7ff;
+  --marca-50:  #ecf3ff;
+  --marca-100: #dde9ff;
+  --marca-200: #c2d6ff;
+  --marca-300: #9cb9ff;
+  --marca-400: #7592ff;
+  --marca-500: #465fff;   /* color principal de acción */
+  --marca-600: #3641f5;
+  --marca-700: #2a31d8;
+  --marca-800: #252dae;
+  --marca-900: #262e89;
+  --marca-950: #161950;
+
+  /* --- Grises --- */
+  --gris-25:  #fcfcfd;
+  --gris-50:  #f9fafb;
+  --gris-100: #f2f4f7;
+  --gris-200: #e4e7ec;
+  --gris-300: #d0d5dd;
+  --gris-400: #98a2b3;
+  --gris-500: #667085;
+  --gris-600: #475467;
+  --gris-700: #344054;
+  --gris-800: #1d2939;
+  --gris-900: #101828;
+  --gris-950: #0c111d;
+  --gris-oscuro: #1a2231;
+
+  /* --- Semánticos --- */
+  --exito-50:  #ecfdf3;
+  --exito-500: #12b76a;
+  --exito-600: #039855;
+  --exito-700: #027a48;
+
+  --error-50:  #fef3f2;
+  --error-500: #f04438;
+  --error-600: #d92d20;
+  --error-700: #b42318;
+
+  --alerta-50:  #fffaeb;
+  --alerta-500: #f79009;
+  --alerta-600: #dc6803;
+  --alerta-700: #b54708;
+
+  --info-50:  #f0f9ff;
+  --info-500: #0ba5ec;
+  --info-600: #0086c9;
+
+  /* --- Superficies (cambian en modo oscuro) --- */
+  --fondo-pagina: var(--gris-50);
+  --fondo-panel: #ffffff;
+  --fondo-panel-tenue: var(--gris-50);
+  --borde: var(--gris-200);
+  --borde-tenue: var(--gris-100);
+  --texto-fuerte: var(--gris-800);
+  --texto: var(--gris-700);
+  --texto-tenue: var(--gris-500);
+  --texto-suave: var(--gris-400);
+
+  /* --- Sombras --- */
+  --sombra-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+  --sombra-sm: 0 1px 3px 0 rgba(16, 24, 40, 0.1), 0 1px 2px 0 rgba(16, 24, 40, 0.06);
+  --sombra-md: 0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --sombra-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --sombra-xl: 0 20px 24px -4px rgba(16, 24, 40, 0.08), 0 8px 8px -4px rgba(16, 24, 40, 0.03);
+
+  /* --- Medidas del layout --- */
+  --sidebar-ancho: 290px;
+  --sidebar-ancho-colapsado: 90px;
+  --altura-header: 72px;
+  --transicion: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --radio: 0.75rem;
+  --radio-lg: 1rem;
+}
+
+/* Modo oscuro: se activa agregando la clase .dark en <html>.
+   Solo redefinimos las superficies; la paleta de marca no cambia. */
+html.dark {
+  --fondo-pagina: var(--gris-900);
+  --fondo-panel: var(--gris-oscuro);
+  --fondo-panel-tenue: rgba(255, 255, 255, 0.03);
+  --borde: #1f2937;
+  --borde-tenue: #1a2231;
+  --texto-fuerte: rgba(255, 255, 255, 0.9);
+  --texto: var(--gris-300);
+  --texto-tenue: var(--gris-400);
+  --texto-suave: var(--gris-500);
+}
+
+
+/* ---------------------------------------------------------------------
+   2. Base
+   --------------------------------------------------------------------- */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--fondo-pagina);
+  color: var(--texto);
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color var(--transicion), color var(--transicion);
+}
+
+/* Font Awesome tiene que ganarle a la fuente base, si no los iconos se ven
+   como cuadritos vacíos. */
+.fa, .fas, .far, .fal, .fab, [class*='fa-'] {
+  font-family: 'Font Awesome 6 Free', 'Font Awesome 6 Brands' !important;
+}
+
+/* Las flechitas de los inputs numéricos estorban en formularios de cantidades
+   y documentos. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'] { -moz-appearance: textfield; }
+
+/* Anillo de foco visible y consistente para quien navega con teclado. */
+:focus-visible {
+  outline: 2px solid var(--marca-500);
+  outline-offset: 2px;
+}
+
+
+/* ---------------------------------------------------------------------
+   3. Componentes
+   --------------------------------------------------------------------- */
+
+/* --- Tarjeta: el contenedor base de todo el contenido --- */
+.tarjeta {
+  background-color: var(--fondo-panel);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-lg);
+  transition: background-color var(--transicion), border-color var(--transicion);
+}
+
+.tarjeta-encabezado {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--borde);
+}
+
+@media (min-width: 640px) {
+  .tarjeta-encabezado {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.tarjeta-titulo {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--texto-fuerte);
+}
+
+.tarjeta-subtitulo {
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  color: var(--texto-tenue);
+}
+
+.tarjeta-cuerpo { padding: 1.25rem; }
+
+
+/* --- Botones --- */
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.boton:disabled { opacity: 0.5; cursor: not-allowed; }
+.boton:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(70, 95, 255, 0.16); }
+
+.boton-primario { background-color: var(--marca-500); color: #fff; box-shadow: var(--sombra-xs); }
+.boton-primario:hover:not(:disabled) { background-color: var(--marca-600); }
+
+.boton-secundario {
+  background-color: var(--fondo-panel);
+  border-color: var(--gris-300);
+  color: var(--texto);
+  box-shadow: var(--sombra-xs);
+}
+.boton-secundario:hover:not(:disabled) { background-color: var(--gris-50); }
+html.dark .boton-secundario { border-color: #344054; background-color: var(--gris-800); color: var(--gris-300); }
+html.dark .boton-secundario:hover:not(:disabled) { background-color: var(--gris-700); }
+
+.boton-peligro { background-color: var(--error-500); color: #fff; box-shadow: var(--sombra-xs); }
+.boton-peligro:hover:not(:disabled) { background-color: var(--error-600); }
+
+.boton-exito { background-color: var(--exito-500); color: #fff; box-shadow: var(--sombra-xs); }
+.boton-exito:hover:not(:disabled) { background-color: var(--exito-600); }
+
+/* Botón cuadrado de solo icono, para las acciones de fila en las tablas. */
+.boton-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: transparent;
+  color: var(--texto-tenue);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.boton-icono:hover { background-color: var(--gris-100); color: var(--texto-fuerte); }
+html.dark .boton-icono:hover { background-color: rgba(255, 255, 255, 0.05); }
+
+.boton-icono-peligro:hover { background-color: var(--error-50); color: var(--error-600); }
+html.dark .boton-icono-peligro:hover { background-color: rgba(240, 68, 56, 0.15); color: #fda29b; }
+
+
+/* --- Formularios --- */
+.etiqueta {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--texto);
+}
+
+.campo {
+  display: block;
+  width: 100%;
+  height: 2.75rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--gris-300);
+  border-radius: 0.5rem;
+  background-color: transparent;
+  color: var(--texto-fuerte);
+  font-family: inherit;
+  font-size: 0.875rem;
+  box-shadow: var(--sombra-xs);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.campo::placeholder { color: var(--texto-suave); }
+
+.campo:focus {
+  outline: none;
+  border-color: var(--marca-300);
+  box-shadow: 0 0 0 4px rgba(70, 95, 255, 0.1);
+}
+
+.campo:disabled {
+  background-color: var(--gris-50);
+  color: var(--texto-tenue);
+  cursor: not-allowed;
+}
+
+html.dark .campo { border-color: #344054; }
+html.dark .campo:focus { border-color: var(--marca-800); }
+html.dark .campo:disabled { background-color: var(--gris-900); }
+
+/* El select necesita alto automático y espacio a la derecha para su flecha. */
+.campo-select {
+  appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+}
+html.dark .campo-select { background-color: var(--gris-900); }
+
+.campo-area { height: auto; min-height: 100px; padding-top: 0.75rem; resize: vertical; }
+
+.campo-invalido { border-color: var(--error-500); }
+.campo-invalido:focus { border-color: var(--error-500); box-shadow: 0 0 0 4px rgba(240, 68, 56, 0.1); }
+
+.texto-ayuda { margin-top: 0.375rem; font-size: 0.75rem; color: var(--texto-tenue); }
+
+/* Interruptor tipo switch, para las banderas de activo/inactivo. */
+.interruptor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 2.75rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: var(--gris-300);
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+.interruptor::after {
+  content: '';
+  position: absolute;
+  left: 0.1875rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background-color: #fff;
+  box-shadow: var(--sombra-sm);
+  transition: transform 200ms ease;
+}
+.interruptor-activo { background-color: var(--marca-500); }
+.interruptor-activo::after { transform: translateX(1.25rem); }
+html.dark .interruptor { background-color: var(--gris-700); }
+
+
+/* --- Tablas --- */
+/* El contenedor con su propio overflow es obligatorio: sin él una tabla ancha
+   empuja el layout y aparece scroll horizontal en toda la página. */
+.tabla-contenedor { width: 100%; overflow-x: auto; }
+
+.tabla { width: 100%; min-width: 640px; border-collapse: collapse; }
+
+.tabla thead th {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--borde-tenue);
+  border-bottom: 1px solid var(--borde-tenue);
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--texto-tenue);
+  white-space: nowrap;
+}
+
+.tabla tbody tr { border-bottom: 1px solid var(--borde-tenue); transition: background-color 150ms ease; }
+.tabla tbody tr:last-child { border-bottom: 0; }
+.tabla tbody tr:hover { background-color: var(--gris-50); }
+html.dark .tabla tbody tr:hover { background-color: rgba(255, 255, 255, 0.02); }
+
+.tabla td {
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--texto);
+  vertical-align: middle;
+}
+
+.tabla-celda-principal { font-weight: 500; color: var(--texto-fuerte); }
+
+/* El estado vacío de las tablas lo dibuja el componente <estado-vacio>,
+   definido en assets/js/componentes/comunes.js. */
+
+
+/* --- Insignias de estado --- */
+.insignia {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.insignia-exito  { background-color: var(--exito-50);  color: var(--exito-700); }
+.insignia-error  { background-color: var(--error-50);  color: var(--error-700); }
+.insignia-alerta { background-color: var(--alerta-50); color: var(--alerta-700); }
+.insignia-neutra { background-color: var(--gris-100);  color: var(--gris-700); }
+.insignia-marca  { background-color: var(--marca-50);  color: var(--marca-700); }
+
+html.dark .insignia-exito  { background-color: rgba(18, 183, 106, 0.15); color: #6ce9a6; }
+html.dark .insignia-error  { background-color: rgba(240, 68, 56, 0.15);  color: #fda29b; }
+html.dark .insignia-alerta { background-color: rgba(247, 144, 9, 0.15);  color: #fec84b; }
+html.dark .insignia-neutra { background-color: var(--gris-800);          color: var(--gris-300); }
+html.dark .insignia-marca  { background-color: rgba(70, 95, 255, 0.15);  color: #9cb9ff; }
+
+
+/* --- Navegación lateral --- */
+.enlace-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  border-radius: 0.5rem;
+  background-color: transparent;
+  color: var(--texto-tenue);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.enlace-menu:hover { background-color: var(--gris-100); color: var(--texto-fuerte); }
+html.dark .enlace-menu:hover { background-color: rgba(255, 255, 255, 0.05); color: #fff; }
+
+.enlace-menu-activo { background-color: var(--marca-50); color: var(--marca-600); }
+.enlace-menu-activo:hover { background-color: var(--marca-50); color: var(--marca-600); }
+html.dark .enlace-menu-activo,
+html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12); color: #9cb9ff; }
+
+.enlace-menu-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.grupo-menu-titulo {
+  margin: 0 0 0.5rem;
+  padding: 0 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--texto-suave);
+}
+
+/* Tooltip que aparece cuando el sidebar está colapsado y solo se ven iconos. */
+.menu-tooltip {
+  position: absolute;
+  left: calc(100% + 0.75rem);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.375rem;
+  background-color: var(--gris-900);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  z-index: 60;
+}
+.enlace-menu:hover .menu-tooltip { opacity: 1; }
+
+
+/* --- Modales --- */
+.modal-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgba(16, 24, 40, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  position: relative;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1.5rem;
+  border-radius: var(--radio-lg);
+  background-color: var(--fondo-panel);
+  box-shadow: var(--sombra-xl);
+}
+
+.modal-titulo {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--texto-fuerte);
+}
+
+
+/* --- Métricas del panel --- */
+.metrica-icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radio);
+  font-size: 1.25rem;
+}
+
+.metrica-valor {
+  margin-top: 0.75rem;
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--texto-fuerte);
+}
+
+.metrica-etiqueta { font-size: 0.875rem; color: var(--texto-tenue); }
+
+
+/* --- Notificaciones (toasts) --- */
+.pila-notificaciones {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 380px;
+}
+
+.notificacion {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radio);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: var(--sombra-lg);
+  animation: entrar-derecha 250ms ease-out;
+}
+
+.notificacion-exito { background-color: var(--exito-600); }
+.notificacion-error { background-color: var(--error-600); }
+.notificacion-alerta { background-color: var(--alerta-600); }
+.notificacion-info  { background-color: var(--info-600); }
+.notificacion-saliendo { animation: salir-derecha 250ms ease-in forwards; }
+
+
+/* ---------------------------------------------------------------------
+   4. Utilidades y animaciones
+   --------------------------------------------------------------------- */
+
+/* Desplazamiento del contenido según el estado del sidebar.
+   Solo en escritorio: en móvil el sidebar flota encima y no corre nada. */
+.contenido-principal { transition: margin-left var(--transicion); }
+
+@media (min-width: 1024px) {
+  .contenido-con-sidebar     { margin-left: var(--sidebar-ancho); }
+  .contenido-sidebar-cerrado { margin-left: var(--sidebar-ancho-colapsado); }
+}
+
+/* Scrollbars discretas, en línea con el resto del panel. */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(152, 162, 179, 0.4); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(152, 162, 179, 0.7); }
+
+@keyframes aparecer {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animar-aparecer { animation: aparecer 200ms ease-out; }
+
+@keyframes entrar-derecha {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes salir-derecha {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(24px); }
+}
+
+@keyframes girar { to { transform: rotate(360deg); } }
+.animar-girar { animation: girar 800ms linear infinite; }
+
+/* Respetamos a quien pidió menos movimiento en su sistema operativo. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* El lector de QR inyecta su propio HTML; lo alineamos con el resto. */
+#lector-qr video,
+#lector-qr #reader {
+  border-radius: var(--radio) !important;
+  border: none !important;
+  width: 100% !important;
+}
+#lector-qr #reader__scan_region { background: transparent !important; }
+#lector-qr #reader__dashboard_section_csr button {
+  background: var(--marca-500) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 0.5rem !important;
+  padding: 0.5rem 0.875rem !important;
+  font-weight: 500 !important;
+}

@@ -1,0 +1,82 @@
+<!--
+  Progreso de una importación de CSV.
+
+  Es el mismo modal para empleados y departamentos: cambia solo el título.
+  Antes había una copia casi idéntica dentro de cada una de las dos vistas.
+-->
+<div v-if="importacion.abierto" class="modal-fondo">
+  <div class="modal-panel max-w-xl">
+
+    <div class="mb-5 flex items-start gap-4">
+      <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+        <i class="fa-solid fa-file-csv"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h2 class="modal-titulo">Importando {{ importacion.tipo }}</h2>
+        <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+          {{ importacion.procesando ? 'El servidor está procesando el archivo…' : 'Revisando fila por fila' }}
+        </p>
+      </div>
+    </div>
+
+    <div class="mb-5">
+      <div class="mb-2 flex items-center justify-between text-theme-xs text-gray-500 dark:text-gray-400">
+        <span>Progreso</span>
+        <span class="font-medium">{{ importacion.progreso }}%</span>
+      </div>
+      <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+        <div class="h-full rounded-full bg-brand-500 transition-all duration-200"
+             :style="{ width: importacion.progreso + '%' }"></div>
+      </div>
+    </div>
+
+    <!-- Contadores en vivo -->
+    <div class="mb-5 grid grid-cols-3 gap-3">
+      <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+        <p class="text-theme-xl font-bold text-success-600">{{ importacion.totales.insertados }}</p>
+        <p class="text-theme-xs text-gray-500 dark:text-gray-400">Nuevos</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+        <p class="text-theme-xl font-bold text-brand-500">{{ importacion.totales.actualizados }}</p>
+        <p class="text-theme-xs text-gray-500 dark:text-gray-400">Actualizados</p>
+      </div>
+      <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+        <p class="text-theme-xl font-bold text-error-500">{{ importacion.totales.errores }}</p>
+        <p class="text-theme-xs text-gray-500 dark:text-gray-400">Con problema</p>
+      </div>
+    </div>
+
+    <!-- Detalle. Alto fijo para que el modal no crezca sin control con
+         archivos de cientos de filas. -->
+    <div class="max-h-64 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800">
+      <div v-if="importacion.detalle.length === 0" class="p-6 text-center text-theme-sm text-gray-400">
+        <i class="fa-solid fa-circle-notch animar-girar"></i>
+        Esperando la respuesta del servidor…
+      </div>
+
+      <div v-for="fila in importacion.detalle"
+           :key="fila.linea"
+           class="flex items-start gap-3 border-b border-gray-100 px-4 py-2.5 last:border-0 dark:border-gray-800">
+        <i class="fa-solid mt-0.5 shrink-0"
+           :class="{
+             'fa-circle-check text-success-500': fila.accion === 'insertado',
+             'fa-arrows-rotate text-brand-500': fila.accion === 'actualizado',
+             'fa-circle-xmark text-error-500': fila.accion === 'error'
+           }"></i>
+        <span class="shrink-0 text-theme-xs text-gray-400">L{{ fila.linea }}</span>
+        <span class="min-w-0 flex-1 text-theme-sm"
+              :class="fila.accion === 'error' ? 'text-error-600 dark:text-error-400' : 'text-gray-700 dark:text-gray-300'">
+          {{ fila.mensaje }}
+        </span>
+      </div>
+    </div>
+
+    <button type="button"
+            @click="importacion.cerrar()"
+            class="boton mt-5 w-full"
+            :class="importacion.resumen ? 'boton-primario' : 'boton-secundario'"
+            :disabled="importacion.procesando">
+      {{ importacion.resumen ? 'Listo' : 'Cerrar' }}
+    </button>
+  </div>
+</div>

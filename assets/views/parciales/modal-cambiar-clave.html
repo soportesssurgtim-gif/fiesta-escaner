@@ -1,0 +1,108 @@
+<!--
+  Cambio de la contraseña propia.
+
+  Se abre de dos formas:
+    · A pedido, desde el menú de usuario.
+    · Solo, al iniciar sesión con una contraseña temporal. En ese caso no se
+      puede cerrar sin cambiarla: si se pudiera, nadie lo haría nunca y la
+      clave temporal quedaría viva para siempre.
+-->
+<div v-if="cambioClave.abierto"
+     class="modal-fondo"
+     @click.self="cambioClave.esObligatorio ? null : (cambioClave.abierto = false)">
+  <div class="modal-panel max-w-md">
+
+    <div class="mb-5 flex items-start gap-4">
+      <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-xl"
+           :class="cambioClave.esObligatorio
+                   ? 'bg-warning-50 text-warning-500 dark:bg-warning-500/15'
+                   : 'bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400'">
+        <i class="fa-solid fa-key"></i>
+      </div>
+
+      <div class="min-w-0 flex-1">
+        <h2 class="modal-titulo">
+          {{ cambioClave.esObligatorio ? 'Cambia tu contraseña temporal' : 'Cambiar mi contraseña' }}
+        </h2>
+        <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+          {{ cambioClave.esObligatorio
+             ? 'Estás usando una contraseña que alguien más definió por ti.'
+             : 'Necesitas tu contraseña actual para confirmar.' }}
+        </p>
+      </div>
+
+      <button v-if="!cambioClave.esObligatorio"
+              type="button"
+              @click="cambioClave.abierto = false"
+              class="boton-icono shrink-0"
+              aria-label="Cerrar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <form @submit.prevent="guardarClaveNueva" novalidate>
+      <div class="space-y-4">
+        <div>
+          <label for="clave-actual" class="etiqueta">Contraseña actual</label>
+          <input id="clave-actual"
+                 v-model="cambioClave.actual"
+                 :type="cambioClave.verClaves ? 'text' : 'password'"
+                 autocomplete="current-password"
+                 class="campo"
+                 required />
+        </div>
+
+        <div>
+          <label for="clave-nueva" class="etiqueta">Contraseña nueva</label>
+          <input id="clave-nueva"
+                 v-model="cambioClave.nueva"
+                 :type="cambioClave.verClaves ? 'text' : 'password'"
+                 autocomplete="new-password"
+                 class="campo"
+                 required />
+          <p class="texto-ayuda">Mínimo 8 caracteres.</p>
+        </div>
+
+        <div>
+          <label for="clave-repetida" class="etiqueta">Repite la contraseña nueva</label>
+          <input id="clave-repetida"
+                 v-model="cambioClave.repetida"
+                 :type="cambioClave.verClaves ? 'text' : 'password'"
+                 autocomplete="new-password"
+                 class="campo"
+                 :class="{ 'campo-invalido': cambioClave.repetida && cambioClave.nueva !== cambioClave.repetida }"
+                 required />
+          <p v-if="cambioClave.repetida && cambioClave.nueva !== cambioClave.repetida"
+             class="mt-1.5 text-theme-xs text-error-500">
+            No coinciden.
+          </p>
+        </div>
+
+        <label class="flex cursor-pointer items-center gap-2 text-theme-sm text-gray-600 dark:text-gray-400">
+          <input type="checkbox" v-model="cambioClave.verClaves"
+                 class="h-4 w-4 rounded accent-brand-500" />
+          Mostrar las contraseñas
+        </label>
+      </div>
+
+      <div v-if="cambioClave.error"
+           class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+        <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+        <p class="text-theme-sm text-error-700 dark:text-error-400">{{ cambioClave.error }}</p>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <button v-if="!cambioClave.esObligatorio"
+                type="button"
+                @click="cambioClave.abierto = false"
+                class="boton boton-secundario flex-1">
+          Cancelar
+        </button>
+        <button type="submit" class="boton boton-primario flex-1" :disabled="cambioClave.guardando">
+          <i v-if="cambioClave.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+          {{ cambioClave.guardando ? 'Guardando…' : 'Cambiar contraseña' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,133 @@
+<!-- Catálogo de premios que se rifan durante el evento. -->
+<section v-show="vista === 'premios'" class="animar-aparecer">
+  <div class="tarjeta">
+
+    <barra-catalogo :catalogo="premios" titulo="Premios" marcador="Nombre o descripción">
+      <template #acciones>
+        <button v-if="permisos.tienePermiso('premios', 'Agregar')"
+                type="button" @click="premios.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo premio
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="premios.paginados.length === 0">
+      <estado-vacio icono="fa-trophy"
+                    titulo="No hay premios registrados"
+                    descripcion="Registra los premios antes de configurar los sorteos."
+                    :buscando="premios.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Premio</th>
+            <th>Descripción</th>
+            <th>Disponibles</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="premio in premios.paginados" :key="premio.id">
+            <td>
+              <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+                  <i class="fa-solid fa-gift"></i>
+                </span>
+                <span class="tabla-celda-principal">{{ premio.nombre }}</span>
+              </div>
+            </td>
+            <td class="max-w-xs">
+              <span class="block truncate">{{ premio.descripcion || '—' }}</span>
+            </td>
+            <td>
+              <!-- Cuando la existencia llega a cero conviene que salte a la
+                   vista: ya no va a poder entregarse. -->
+              <span :class="Number(premio.cantidad) > 0 ? 'insignia-marca' : 'insignia-error'">
+                {{ premio.cantidad }} {{ Number(premio.cantidad) === 1 ? 'unidad' : 'unidades' }}
+              </span>
+            </td>
+            <td>
+              <span :class="esVerdadero(premio.activo) ? 'insignia-exito' : 'insignia-neutra'">
+                {{ esVerdadero(premio.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <button v-if="permisos.tienePermiso('premios', 'Editar')"
+                      type="button" @click="premios.abrir(premio)"
+                      class="boton-icono" aria-label="Editar premio">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="premios"></paginacion-tabla>
+  </div>
+
+  <div v-if="premios.modalAbierto" class="modal-fondo" @click.self="premios.cerrar()">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">
+          {{ premios.formulario.id ? 'Editar premio' : 'Nuevo premio' }}
+        </h2>
+        <button type="button" @click="premios.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="premios.guardar(recargarCatalogos)">
+        <div class="space-y-4">
+          <div>
+            <label class="etiqueta">Nombre *</label>
+            <input v-model="premios.formulario.nombre" type="text" class="campo" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">Descripción</label>
+            <textarea v-model="premios.formulario.descripcion" class="campo campo-area"
+                      placeholder="Detalle, marca, modelo…"></textarea>
+          </div>
+
+          <div>
+            <label class="etiqueta">Cantidad disponible</label>
+            <input v-model.number="premios.formulario.cantidad" type="number" min="0" class="campo" />
+            <p class="texto-ayuda">Baja sola con cada ganador extraído.</p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Estado</label>
+            <div class="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2.5 dark:border-gray-700">
+              <interruptor-simple
+                :model-value="esVerdadero(premios.formulario.activo)"
+                @update:model-value="premios.formulario.activo = $event ? 'TRUE' : 'FALSE'"
+                etiqueta="Premio activo"></interruptor-simple>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ esVerdadero(premios.formulario.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="premios.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ premios.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="premios.cerrar()" class="boton boton-secundario flex-1">Cancelar</button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="premios.guardando">
+            <i v-if="premios.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ premios.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

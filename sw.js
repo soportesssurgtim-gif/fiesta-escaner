@@ -1,135 +1,198 @@
-﻿const CACHE_VERSION = 'v1.0.19';
-const CACHE_NAME = `fiesta-escaner-${CACHE_VERSION}`;
-const ASSETS_TO_CACHE = [
+/**
+ * Service worker.
+ *
+ * Su única responsabilidad es cachear los archivos estáticos para que la
+ * aplicación abra rápido y siga abriendo sin señal. NO se mete con la API.
+ *
+ * ---
+ * Sobre un error grave que tenía la versión anterior:
+ *
+ * Ante un POST fallido a /api/asistencias devolvía una respuesta inventada
+ * `{ ok: true, offline: true }` con estado 200. El resultado era que la
+ * aplicación creía que la asistencia se había registrado, no la guardaba en
+ * IndexedDB, y el escaneo se perdía para siempre sin que nadie se enterara.
+ *
+ * Justo lo contrario de lo que hace falta: el fetch TIENE que fallar para que
+ * el código de la aplicación active su respaldo local. Por eso ahora las
+ * peticiones a la API pasan derecho a la red y, si fallan, fallan de verdad.
+ */
+
+const VERSION_CACHE = 'v2.1.0';
+const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
+
+/**
+ * Archivos que se guardan al instalar.
+ *
+ * Van solo los propios y los de terceros que sí permiten CORS. El CDN de
+ * Tailwind queda fuera a propósito: responde sin cabeceras CORS y hace fallar
+ * el cache.addAll() entero.
+ */
+const ARCHIVOS_BASE = [
   '/',
   '/index.html',
-  // cdn.tailwindcss.com bloqueado por CORS en SW — no cachear
-  'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+  '/manifest.json',
+  '/assets/css/sistema-diseno.css',
+
+  // Punto de entrada y núcleo
+  '/assets/js/app.js',
+  '/assets/js/nucleo/almacenSesion.js',
+  '/assets/js/nucleo/cargadorVistas.js',
+  '/assets/js/nucleo/clienteHttp.js',
+  '/assets/js/nucleo/formato.js',
+  '/assets/js/nucleo/tema.js',
+
+  // Servicios
+  '/assets/js/servicios/servicioApi.js',
+  '/assets/js/servicios/servicioOffline.js',
+  '/assets/js/servicios/servicioTarjetas.js',
+
+  // Composables
+  '/assets/js/composables/usarCatalogo.js',
+  '/assets/js/composables/usarEscanerQr.js',
+  '/assets/js/composables/usarImportacionCsv.js',
+  '/assets/js/composables/usarNotificaciones.js',
+  '/assets/js/composables/usarPermisos.js',
+
+  // Componentes y contenido
+  '/assets/js/componentes/comunes.js',
+  '/assets/js/contenido/guias.js',
+  '/assets/js/contenido/menu.js',
+
+  // Plantillas
+  '/assets/views/aplicacion.html',
+  '/assets/views/parciales/barra-lateral.html',
+  '/assets/views/parciales/encabezado.html',
+  '/assets/views/parciales/login.html',
+  '/assets/views/parciales/modal-cierre-sesion.html',
+  '/assets/views/parciales/modal-guia.html',
+  '/assets/views/parciales/modal-importacion.html',
+  '/assets/views/parciales/notificaciones.html',
+  '/assets/views/vistas/asistencias.html',
+  '/assets/views/vistas/configuracion.html',
+  '/assets/views/vistas/departamentos.html',
+  '/assets/views/vistas/empleados.html',
+  '/assets/views/vistas/escaner.html',
+  '/assets/views/vistas/eventos.html',
+  '/assets/views/vistas/invitacion-publica.html',
+  '/assets/views/vistas/permisos.html',
+  '/assets/views/vistas/premios.html',
+  '/assets/views/vistas/rifas.html',
+  '/assets/views/vistas/sorteos.html',
+  '/assets/views/vistas/tarjetas.html',
+  '/assets/views/vistas/usuarios.html',
+
+  // Librerías externas que sí permiten CORS
   'https://unpkg.com/vue@3/dist/vue.global.prod.js',
   'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  '/assets/js/api.js',
-  '/assets/js/app.js',
-  '/assets/js/tarjetas.js',
-  '/assets/js/offline.js',
-  '/assets/js/guias.js',
-  '/assets/views/overlay-cargando.html',
-  '/assets/views/login.html',
-  '/assets/views/layout-logueado-inicio.html',
-  '/assets/views/navbar.html',
-  '/assets/views/sidebar.html',
-  '/assets/views/notificaciones-toast.html',
-  '/assets/views/main-inicio.html',
-  '/assets/views/vista-escaner-qr.html',
-  '/assets/views/vista-asistencias.html',
-  '/assets/views/vista-sorteos-rifas.html',
-  '/assets/views/vista-departamentos.html',
-  '/assets/views/vista-empleados.html',
-  '/assets/views/vista-eventos.html',
-  '/assets/views/vista-sorteos-admin.html',
-  '/assets/views/vista-premios.html',
-  '/assets/views/vista-configuracion.html',
-  '/assets/views/vista-usuarios-roles.html',
-  '/assets/views/vista-permisos.html',
-  '/assets/views/vista-tarjetas.html',
-  '/assets/views/layout-logueado-fin.html',
-  '/assets/views/modal-logout.html'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('SW install: some assets failed to cache', err);
-      });
-    })
+self.addEventListener('install', (evento) => {
+  evento.waitUntil(
+    (async () => {
+      const cache = await caches.open(NOMBRE_CACHE);
+
+      // Guardamos uno por uno en lugar de con addAll: si un solo archivo falla,
+      // addAll descarta TODO el lote y la aplicación queda sin caché. Así, lo
+      // que se pueda guardar se guarda.
+      await Promise.all(
+        ARCHIVOS_BASE.map((ruta) =>
+          cache.add(ruta).catch((fallo) => {
+            console.warn('[sw] No se pudo cachear', ruta, fallo);
+          })
+        )
+      );
+    })()
   );
+
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+self.addEventListener('activate', (evento) => {
+  evento.waitUntil(
+    (async () => {
+      // Fuera las versiones viejas del caché.
+      const nombres = await caches.keys();
+      await Promise.all(
+        nombres
+          .filter((nombre) => nombre.startsWith('asistencia-sssur-') && nombre !== NOMBRE_CACHE)
+          .map((nombre) => caches.delete(nombre))
       );
-    })
+
+      // Y también las del nombre anterior del proyecto.
+      await Promise.all(
+        nombres.filter((nombre) => nombre.startsWith('fiesta-escaner-')).map((n) => caches.delete(n))
+      );
+
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+self.addEventListener('fetch', (evento) => {
+  const peticion = evento.request;
+  const url = new URL(peticion.url);
 
-  // API calls: network first, fallback to offline queue
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(handleApiRequest(request));
+  // Lo que no sea GET (los POST de asistencias, por ejemplo) no se toca.
+  if (peticion.method !== 'GET') return;
+
+  // La API nunca se cachea ni se intercepta: si no hay red, el fetch debe
+  // fallar para que la aplicación guarde el registro localmente.
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Las plantillas van primero a la red, para que un cambio de diseño se vea
+  // sin tener que borrar el caché a mano. Si no hay red, sale la copia guardada.
+  if (url.pathname.startsWith('/assets/views/')) {
+    evento.respondWith(redPrimero(peticion));
     return;
   }
 
-  // Static assets: cache first
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      return cached || fetch(request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return response;
-      });
-    }).catch(() => {
-      return caches.match('/index.html');
-    })
-  );
+  // El resto de estáticos: primero el caché, que es lo más rápido.
+  evento.respondWith(cachePrimero(peticion));
 });
 
-async function handleApiRequest(request) {
+/** Devuelve lo cacheado y, si no está, lo busca en la red y lo guarda. */
+async function cachePrimero(peticion) {
+  const guardado = await caches.match(peticion);
+  if (guardado) return guardado;
+
   try {
-    const response = await fetch(request);
-    return response;
-  } catch (error) {
-    // If offline, return a synthetic response for certain endpoints
-    if (request.method === 'POST' && request.url.includes('/api/asistencias')) {
-      return new Response(JSON.stringify({ ok: true, offline: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+    const respuesta = await fetch(peticion);
+    if (respuesta.ok) {
+      const cache = await caches.open(NOMBRE_CACHE);
+      cache.put(peticion, respuesta.clone());
     }
-    return new Response(JSON.stringify({ error: 'Offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return respuesta;
+  } catch (fallo) {
+    // Si era una navegación, al menos devolvemos la aplicación.
+    if (peticion.mode === 'navigate') {
+      const inicio = await caches.match('/index.html');
+      if (inicio) return inicio;
+    }
+    throw fallo;
   }
 }
 
-// Listen for messages from main thread to skip waiting
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+/** Intenta la red y cae al caché solo si falla. */
+async function redPrimero(peticion) {
+  try {
+    const respuesta = await fetch(peticion);
+    if (respuesta.ok) {
+      const cache = await caches.open(NOMBRE_CACHE);
+      cache.put(peticion, respuesta.clone());
+    }
+    return respuesta;
+  } catch (fallo) {
+    const guardado = await caches.match(peticion);
+    if (guardado) return guardado;
+    throw fallo;
+  }
+}
+
+// Permite que la aplicación fuerce la activación de una versión nueva.
+self.addEventListener('message', (evento) => {
+  if (evento.data && evento.data.type === 'ACTUALIZAR_AHORA') {
     self.skipWaiting();
   }
 });
-
-// Auto-update logic
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    (async () => {
-      // Delete old caches
-      const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames
-          .filter((name) => name.startsWith('fiesta-escaner-') && name !== CACHE_NAME)
-          .map((name) => caches.delete(name))
-      );
-      // Notify all clients to reload
-      const clients = await self.clients.matchAll();
-      clients.forEach((client) => client.postMessage({ type: 'NEW_VERSION_AVAILABLE' }));
-    })()
-  );
-  self.clients.claim();
-});
-
-
-
-

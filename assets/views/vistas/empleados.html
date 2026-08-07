@@ -1,0 +1,199 @@
+<!-- Catálogo de empleados: el padrón contra el que se valida todo el sistema. -->
+<section v-show="vista === 'empleados'" class="animar-aparecer">
+  <div class="tarjeta">
+
+    <barra-catalogo :catalogo="empleados" titulo="Empleados"
+                    marcador="Nombre, DUI, código o cargo">
+      <template #acciones>
+        <button type="button" @click="exportar('empleados')" class="boton boton-secundario">
+          <i class="fa-solid fa-file-arrow-down"></i> Exportar
+        </button>
+
+        <label v-if="permisos.tienePermiso('empleados', 'Agregar')"
+               class="boton boton-secundario cursor-pointer">
+          <i class="fa-solid fa-file-arrow-up"></i> Importar
+          <input type="file" accept=".csv,text/csv" class="hidden" @change="importarEmpleados($event)" />
+        </label>
+
+        <button v-if="permisos.tienePermiso('empleados', 'Agregar')"
+                type="button" @click="empleados.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="empleados.paginados.length === 0">
+      <estado-vacio icono="fa-users"
+                    titulo="El padrón está vacío"
+                    descripcion="Agrega empleados uno por uno o impórtalos desde un archivo CSV."
+                    :buscando="empleados.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Empleado</th>
+            <th>DUI</th>
+            <th>Departamento</th>
+            <th>Cargo</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="persona in empleados.paginados" :key="persona.id">
+            <td>
+              <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  {{ iniciales(nombreCompleto(persona)) }}
+                </span>
+                <div class="min-w-0">
+                  <p class="tabla-celda-principal truncate">{{ nombreCompleto(persona) }}</p>
+                  <p v-if="persona.correo" class="truncate text-theme-xs text-gray-400">{{ persona.correo }}</p>
+                </div>
+              </div>
+            </td>
+            <td class="whitespace-nowrap">{{ formatearDui(persona.dui) }}</td>
+            <td>
+              {{ (departamentos.lista.find(d => d.id === persona.dpto) || {}).nombre_dpto || '—' }}
+            </td>
+            <td>{{ persona.cargo || '—' }}</td>
+            <td>
+              <span :class="esVerdadero(persona.activo) ? 'insignia-exito' : 'insignia-neutra'">
+                {{ esVerdadero(persona.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <button v-if="permisos.tienePermiso('empleados', 'Editar')"
+                      type="button" @click="empleados.abrir(persona)"
+                      class="boton-icono" aria-label="Editar empleado">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="empleados"></paginacion-tabla>
+  </div>
+
+  <!-- Formulario de alta / edición -->
+  <div v-if="empleados.modalAbierto" class="modal-fondo" @click.self="empleados.cerrar()">
+    <div class="modal-panel max-w-2xl">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h2 class="modal-titulo">
+            {{ empleados.formulario.id ? 'Editar empleado' : 'Nuevo empleado' }}
+          </h2>
+          <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+            Los campos marcados con * son obligatorios.
+          </p>
+        </div>
+        <button type="button" @click="empleados.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="empleados.guardar(recargarCatalogos)">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+          <div>
+            <label class="etiqueta">Nombres *</label>
+            <input v-model="empleados.formulario.nombres" type="text" class="campo" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">Apellidos *</label>
+            <input v-model="empleados.formulario.apellidos" type="text" class="campo" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">DUI *</label>
+            <input v-model="empleados.formulario.dui"
+                   @blur="empleados.formulario.dui = formatearDui(empleados.formulario.dui)"
+                   type="text" inputmode="numeric" class="campo" placeholder="01234567-8" required />
+            <p class="texto-ayuda">Se acomoda solo al salir del campo.</p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Código interno</label>
+            <input v-model="empleados.formulario.codigo" type="text" class="campo" placeholder="Opcional" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Departamento</label>
+            <select v-model="empleados.formulario.dpto" class="campo campo-select">
+              <option value="">Sin asignar</option>
+              <option v-for="dep in departamentos.lista" :key="dep.id" :value="dep.id">
+                {{ dep.nombre_dpto }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="etiqueta">Cargo</label>
+            <input v-model="empleados.formulario.cargo" type="text" class="campo" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Distrito</label>
+            <select v-model="empleados.formulario.distrito" class="campo campo-select">
+              <option value="">Sin asignar</option>
+              <option v-for="distrito in DISTRITOS" :key="distrito" :value="distrito">{{ distrito }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="etiqueta">Fecha de nacimiento</label>
+            <input v-model="empleados.formulario.fechaNacimiento" type="date" class="campo" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Teléfono</label>
+            <input v-model="empleados.formulario.telefono" type="tel" inputmode="numeric"
+                   maxlength="8" class="campo" placeholder="70001234" />
+            <p class="texto-ayuda">8 dígitos, sin guion.</p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Correo</label>
+            <input v-model="empleados.formulario.correo" type="email" class="campo" />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="etiqueta">Estado</label>
+            <div class="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2.5 dark:border-gray-700">
+              <interruptor-simple
+                :model-value="esVerdadero(empleados.formulario.activo)"
+                @update:model-value="empleados.formulario.activo = $event ? 'TRUE' : 'FALSE'"
+                etiqueta="Empleado activo"></interruptor-simple>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ esVerdadero(empleados.formulario.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+            <p class="texto-ayuda">Solo el personal activo puede registrar asistencia.</p>
+          </div>
+        </div>
+
+        <div v-if="empleados.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ empleados.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="empleados.cerrar()" class="boton boton-secundario flex-1">
+            Cancelar
+          </button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="empleados.guardando">
+            <i v-if="empleados.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ empleados.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

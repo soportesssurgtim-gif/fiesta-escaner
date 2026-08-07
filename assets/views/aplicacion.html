@@ -1,0 +1,71 @@
+<!--
+  Plantilla principal.
+
+  Los marcadores de inclusión que aparecen más abajo los resuelve
+  cargadorVistas.js antes de que Vue compile nada. Cada archivo incluido es HTML
+  completo y se puede leer por su cuenta, sin etiquetas abiertas a medias.
+
+  (El ejemplo del formato no se escribe aquí a propósito: el cargador lo tomaría
+  como una inclusión de verdad e intentaría descargar un archivo inexistente.)
+
+  Hay tres estados excluyentes en la raíz:
+    1. Portal público  → quien entra con ?invitacion=1, sin sesión
+    2. Pantalla de login
+    3. La aplicación
+-->
+
+<!-- ============================ 1. PORTAL PÚBLICO ======================== -->
+<div v-if="modoPublico">
+  <!--#incluir: vistas/invitacion-publica.html-->
+</div>
+
+<!-- ============================ 2. INICIO DE SESIÓN ===================== -->
+<div v-else-if="!haySesion && !cargando">
+  <!--#incluir: parciales/login.html-->
+</div>
+
+<!-- ============================ 3. APLICACIÓN ========================== -->
+<div v-else-if="haySesion">
+
+  <!--#incluir: parciales/barra-lateral.html-->
+
+  <!-- Velo oscuro del sidebar en móvil. Cierra al tocarlo. -->
+  <div v-if="sidebarMovil"
+       @click="sidebarMovil = false"
+       class="fixed inset-0 z-40 bg-gray-900/50 lg:hidden"></div>
+
+  <div class="contenido-principal"
+       :class="sidebarAbierto ? 'contenido-con-sidebar' : 'contenido-sidebar-cerrado'">
+
+    <!--#incluir: parciales/encabezado.html-->
+
+    <main class="p-4 md:p-6">
+      <div class="mx-auto w-full max-w-[1600px]">
+
+        <!--#incluir: vistas/escaner.html-->
+        <!--#incluir: vistas/asistencias.html-->
+        <!--#incluir: vistas/rifas.html-->
+        <!--#incluir: vistas/tarjetas.html-->
+        <!--#incluir: vistas/empleados.html-->
+        <!--#incluir: vistas/departamentos.html-->
+        <!--#incluir: vistas/eventos.html-->
+        <!--#incluir: vistas/premios.html-->
+        <!--#incluir: vistas/sorteos.html-->
+        <!--#incluir: vistas/usuarios.html-->
+        <!--#incluir: vistas/permisos.html-->
+        <!--#incluir: vistas/configuracion.html-->
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modales: viven fuera del contenido para que el fondo oscuro cubra
+       también el sidebar. -->
+  <!--#incluir: parciales/modal-guia.html-->
+  <!--#incluir: parciales/modal-cierre-sesion.html-->
+  <!--#incluir: parciales/modal-importacion.html-->
+  <!--#incluir: parciales/modal-cambiar-clave.html-->
+</div>
+
+<!-- Las notificaciones se muestran en cualquiera de los tres estados. -->
+<!--#incluir: parciales/notificaciones.html-->

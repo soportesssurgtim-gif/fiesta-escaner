@@ -1,0 +1,129 @@
+<!--
+  Portal público de invitaciones.
+
+  Es la única pantalla sin sesión: el empleado entra desde su teléfono, escribe
+  su DUI y los últimos 4 dígitos, y obtiene el QR con el que ingresa al evento.
+
+  Todo el diseño está pensado para móvil: es donde va a usarse el 99% de las
+  veces, en la fila de entrada y con una mano ocupada.
+-->
+<div class="flex min-h-screen flex-col items-center justify-center px-4 py-10">
+  <div class="w-full max-w-md">
+
+    <div class="mb-8 text-center">
+      <img src="https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png"
+           alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
+           class="mx-auto mb-4 h-20 w-20 rounded-full bg-brand-500 object-contain p-2"
+           loading="lazy" />
+      <h1 class="text-title-sm font-bold text-gray-800 dark:text-white/90">Tu invitación</h1>
+      <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+        Alcaldía Municipal de San Salvador Sur
+      </p>
+    </div>
+
+    <!-- Formulario de consulta -->
+    <div v-if="!invitacion.resultado" class="tarjeta">
+      <div class="tarjeta-cuerpo">
+        <p class="mb-5 text-theme-sm text-gray-600 dark:text-gray-400">
+          Escribe tu número de DUI y los últimos 4 dígitos para ver tu código QR.
+        </p>
+
+        <form @submit.prevent="consultarInvitacion" novalidate>
+          <div class="mb-4">
+            <label for="dui-publico" class="etiqueta">Número de DUI</label>
+            <input id="dui-publico"
+                   v-model="invitacion.dui"
+                   @input="invitacion.dui = invitacion.dui.replace(/[^0-9]/g, '').slice(0, 9)"
+                   type="text"
+                   inputmode="numeric"
+                   autocomplete="off"
+                   class="campo text-center text-lg tracking-widest"
+                   placeholder="012345678" />
+            <p class="texto-ayuda text-center">Solo los números, sin guion.</p>
+          </div>
+
+          <div class="mb-5">
+            <label for="verificacion" class="etiqueta">Últimos 4 dígitos</label>
+            <input id="verificacion"
+                   v-model="invitacion.ultimos4"
+                   @input="invitacion.ultimos4 = invitacion.ultimos4.replace(/[^0-9]/g, '').slice(0, 4)"
+                   type="text"
+                   inputmode="numeric"
+                   maxlength="4"
+                   autocomplete="off"
+                   class="campo text-center text-lg tracking-[0.5em]"
+                   placeholder="0000" />
+            <p class="texto-ayuda text-center">Es para confirmar que el documento es tuyo.</p>
+          </div>
+
+          <div v-if="invitacion.error"
+               class="mb-5 flex items-start gap-3 rounded-lg border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+            <p class="text-theme-sm text-error-700 dark:text-error-400">{{ invitacion.error }}</p>
+          </div>
+
+          <button type="submit" class="boton boton-primario w-full py-3"
+                  :disabled="invitacion.consultando">
+            <i v-if="invitacion.consultando" class="fa-solid fa-circle-notch animar-girar"></i>
+            <i v-else class="fa-solid fa-qrcode"></i>
+            {{ invitacion.consultando ? 'Buscando…' : 'Ver mi invitación' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Resultado con el QR -->
+    <div v-else class="animar-aparecer tarjeta overflow-hidden">
+      <div class="bg-brand-500 px-6 py-5 text-center">
+        <p class="text-theme-xs uppercase tracking-widest text-brand-100">Estás invitado a</p>
+        <p class="mt-1 text-theme-xl font-bold text-white">{{ invitacion.resultado.evento }}</p>
+        <p v-if="invitacion.resultado.fechaEvento" class="mt-1 text-theme-sm text-brand-100">
+          {{ formatearFechaLarga(invitacion.resultado.fechaEvento) }}
+        </p>
+        <p v-if="invitacion.resultado.ubicacion" class="text-theme-sm text-brand-100">
+          <i class="fa-solid fa-location-dot"></i> {{ invitacion.resultado.ubicacion }}
+        </p>
+      </div>
+
+      <div class="p-6 text-center">
+        <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">
+          {{ nombreCompleto(invitacion.resultado.empleado) }}
+        </p>
+        <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+          DUI {{ formatearDui(invitacion.resultado.empleado.dui) }}
+        </p>
+
+        <!-- El QR sobre fondo blanco siempre, incluso en modo oscuro: los
+             lectores necesitan el contraste original para leerlo bien. -->
+        <div class="mx-auto mt-6 w-fit rounded-2xl bg-white p-4 shadow-theme-md">
+          <img :src="invitacion.resultado.empleado.qr_url"
+               alt="Código QR de tu invitación"
+               class="h-56 w-56 object-contain" />
+        </div>
+
+        <p class="mt-5 text-theme-sm text-gray-500 dark:text-gray-400">
+          Muestra este código en la entrada del evento.
+        </p>
+
+        <div class="mt-6 flex flex-col gap-2">
+          <a :href="invitacion.resultado.empleado.qr_url"
+             download="mi-invitacion-qr.png"
+             target="_blank"
+             rel="noopener"
+             class="boton boton-primario w-full">
+            <i class="fa-solid fa-download"></i> Guardar el código
+          </a>
+          <button type="button"
+                  @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.ultimos4 = ''"
+                  class="boton boton-secundario w-full">
+            Consultar otro DUI
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="mt-8 text-center text-theme-xs text-gray-400">
+      ¿Problemas para ver tu invitación? Comunícate con la Gerencia de Tecnología.
+    </p>
+  </div>
+</div>

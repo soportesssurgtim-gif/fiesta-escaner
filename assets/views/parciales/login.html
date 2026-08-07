@@ -1,0 +1,124 @@
+<!--
+  Pantalla de inicio de sesión.
+
+  Dos columnas en escritorio: el formulario a la izquierda y el panel de marca a
+  la derecha. En móvil el panel de marca se oculta y queda solo el formulario,
+  centrado, que es lo único que importa en una pantalla chica.
+-->
+<div class="flex min-h-screen">
+
+  <!-- Columna del formulario -->
+  <div class="flex w-full flex-col justify-center px-6 py-12 lg:w-1/2 lg:px-16">
+    <div class="mx-auto w-full max-w-md">
+
+      <div class="mb-8">
+        <div class="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-2xl text-white shadow-theme-md">
+          <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <h1 class="text-title-sm font-bold text-gray-800 dark:text-white/90">
+          Control de Asistencia
+        </h1>
+        <p class="mt-2 text-theme-sm text-gray-500 dark:text-gray-400">
+          Alcaldía Municipal de San Salvador Sur · Gerencia de Tecnología
+        </p>
+      </div>
+
+      <form @submit.prevent="iniciarSesion" novalidate>
+        <div class="mb-5">
+          <label for="campo-usuario" class="etiqueta">
+            Usuario o correo <span class="text-error-500">*</span>
+          </label>
+          <input id="campo-usuario"
+                 v-model="formularioLogin.usuario"
+                 type="text"
+                 autocomplete="username"
+                 autocapitalize="none"
+                 spellcheck="false"
+                 class="campo"
+                 :class="{ 'campo-invalido': errorLogin }"
+                 placeholder="tu.usuario o correo@sansalvadorsur.gob.sv" />
+        </div>
+
+        <div class="mb-5">
+          <label for="campo-clave" class="etiqueta">
+            Contraseña <span class="text-error-500">*</span>
+          </label>
+          <div class="relative">
+            <input id="campo-clave"
+                   v-model="formularioLogin.password"
+                   :type="verPassword ? 'text' : 'password'"
+                   autocomplete="current-password"
+                   class="campo pr-12"
+                   :class="{ 'campo-invalido': errorLogin }"
+                   placeholder="••••••••" />
+            <button type="button"
+                    @click="verPassword = !verPassword"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600 dark:hover:text-gray-300"
+                    :aria-label="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+              <i class="fa-solid" :class="verPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- El error va antes del botón: si va después, en móvil queda debajo
+             del teclado y no se ve. -->
+        <div v-if="errorLogin"
+             class="mb-5 flex items-start gap-3 rounded-lg border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ errorLogin }}</p>
+        </div>
+
+        <button type="submit"
+                class="boton boton-primario w-full"
+                :disabled="entrando">
+          <i v-if="entrando" class="fa-solid fa-circle-notch animar-girar"></i>
+          <i v-else class="fa-solid fa-right-to-bracket"></i>
+          {{ entrando ? 'Verificando…' : 'Iniciar sesión' }}
+        </button>
+      </form>
+
+      <p class="mt-8 text-center text-theme-xs text-gray-400">
+        ¿Vienes por tu invitación?
+        <a href="/?invitacion=1" class="font-medium text-brand-500 hover:text-brand-600">
+          Consulta tu código QR aquí
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Panel de marca. Decorativo, por eso desaparece en pantallas chicas. -->
+  <div class="relative hidden w-1/2 items-center justify-center overflow-hidden bg-gray-900 lg:flex">
+    <!-- Círculos difuminados de fondo -->
+    <div class="absolute -left-24 -top-24 h-96 w-96 rounded-full bg-brand-500/20 blur-3xl"></div>
+    <div class="absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-brand-700/20 blur-3xl"></div>
+
+    <div class="relative z-10 max-w-md px-12 text-center">
+      <img src="https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png"
+           alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
+           class="mx-auto mb-8 h-24 w-24 object-contain"
+           loading="lazy" />
+      <h2 class="mb-4 text-title-sm font-bold text-white">
+        Eventos institucionales
+      </h2>
+      <p class="text-theme-sm leading-relaxed text-gray-400">
+        Registro de asistencia por código QR, invitaciones digitales y sorteos,
+        en una sola plataforma.
+      </p>
+
+      <div class="mt-10 grid grid-cols-3 gap-4">
+        <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+          <i class="fa-solid fa-bolt mb-2 text-brand-400"></i>
+          <p class="text-theme-xs text-gray-400">Registro en segundos</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+          <i class="fa-solid fa-wifi mb-2 text-brand-400"></i>
+          <p class="text-theme-xs text-gray-400">Funciona sin señal</p>
+        </div>
+        <div class="rounded-xl border border-white/10 bg-white/5 p-4">
+          <i class="fa-solid fa-shield-halved mb-2 text-brand-400"></i>
+          <p class="text-theme-xs text-gray-400">Acceso por rol</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

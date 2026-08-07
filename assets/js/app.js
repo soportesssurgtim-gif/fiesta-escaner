@@ -1,1476 +1,913 @@
-﻿document.addEventListener('DOMContentLoaded', async function() {
-
-    const skeleton = document.getElementById('app-skeleton');
-    function setSkeleton(html) {
-      if (skeleton) skeleton.innerHTML = html;
-    }
-
-    if (typeof Vue === 'undefined') {
-      console.error('Vue no se cargó de la CDN.');
-      setSkeleton('<div class="text-sm text-red-700 font-bold flex items-center gap-2"><i class="fas fa-exclamation-triangle text-red-500"></i> Vue no cargó (revisa conexión o CDN).</div>');
-      return;
-    }
-
-    if (typeof Vue.compile !== 'function') {
-      console.error('Vue Runtime-only sin compilador.');
-      setSkeleton('<div class="text-sm text-red-700 font-bold flex items-center gap-2"><i class="fas fa-exclamation-triangle text-red-500"></i> Versión Vue sin compilador (recarga con Ctrl + F5).</div>');
-      return;
-    }
-
-    let BASE = '';
-    try {
-      if (document.currentScript && document.currentScript.src) {
-        BASE = new URL('../../', document.currentScript.src).pathname;
-      }
-    } catch (_) {}
-    if (!BASE || BASE === '/') BASE = location.pathname.replace(/[^/]*$/, '');
-
-    const PLANTILLAS_VISTAS = [
-      'assets/views/overlay-cargando.html',
-      'assets/views/login.html',
-      'assets/views/layout-logueado-inicio.html',
-      'assets/views/navbar.html',
-      'assets/views/sidebar.html',
-      'assets/views/notificaciones-toast.html',
-      'assets/views/main-inicio.html',
-      'assets/views/vista-escaner-qr.html',
-      'assets/views/vista-asistencias.html',
-      'assets/views/vista-sorteos-rifas.html',
-      'assets/views/vista-departamentos.html',
-      'assets/views/vista-empleados.html',
-      'assets/views/vista-eventos.html',
-      'assets/views/vista-sorteos-admin.html',
-      'assets/views/vista-premios.html',
-      'assets/views/vista-configuracion.html',
-      'assets/views/vista-usuarios-roles.html',
-      'assets/views/vista-permisos.html',
-      'assets/views/vista-tarjetas.html',
-      'assets/views/vista-invitacion-publica.html',
-      'assets/views/modal-guia.html',
-      'assets/views/layout-logueado-fin.html',
-      'assets/views/modal-logout.html'
-    ];
-
-    setSkeleton('<div class="animate-pulse text-sm font-medium flex items-center gap-2"><i class="fas fa-spinner fa-spin text-lg"></i> Cargando ' + PLANTILLAS_VISTAS.length + ' módulos de vista…</div>');
-
-    try {
-      const respuestas = await Promise.all(PLANTILLAS_VISTAS.map(function(ruta) {
-        const url = (BASE || '') + ruta;
-        return fetch(url, { cache: 'no-store' }).then(function(res) {
-          if (!res.ok) throw new Error('HTTP ' + res.status + ' en ' + ruta);
-          return res.text();
-        }).then(function(txt) {
-          if (!txt || txt.trim().length === 0) throw new Error('Archivo vacío: ' + ruta);
-          return txt;
-        });
-      }));
-      const htmlFinal = respuestas.join('\n');
-      const appContenedor = document.getElementById('app');
-      if (!appContenedor) throw new Error('#app no existe en DOM');
-      appContenedor.innerHTML = htmlFinal;
-      if (skeleton) skeleton.style.display = 'none';
-      appContenedor.classList.remove('hidden');
-    } catch (errCarga) {
-      console.error('Error al cargar plantillas de vistas:', errCarga);
-      setSkeleton(
-        '<div class="text-sm text-red-700 font-bold flex flex-col gap-2"><div class="flex items-center gap-2"><i class="fas fa-exclamation-triangle text-red-500"></i> ' +
-        'Error al cargar módulos: ' + (errCarga.message || String(errCarga)) +
-        '</div><div><button style="background:#001ba0;color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer" onclick="location.reload()">Recargar página</button>' +
-        ' <button id="debugFetchBtn" style="background:#dc2626;color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer;margin-left:6px">Reintentar Cargas</button></div></div>'
-      );
-      const retryBtn = document.getElementById('debugFetchBtn');
-      if (retryBtn) retryBtn.addEventListener('click', function() { location.reload(); });
-      return;
-    }
-
-    const { createApp, ref, reactive, onMounted, onBeforeUnmount, computed, watch } = Vue;
-
-    const app = createApp({
-      setup() {
-        const cargando = ref(true);
-        const vista = ref('scanner');
-        const windowWidth = ref(window.innerWidth);
-        const swVersion = ref('');
-        const sidebarAbierto = ref(window.innerWidth >= 768);
-        const handleResize = () => { windowWidth.value = window.innerWidth; };
-        const mostrarModalLogout = ref(false);
-        const subtabUsuario = ref('usuarios');
-        const sesion = reactive({ token: null, usuario: null, correo: null, nombreMostrar: null, rol: null });
-        const modoPublico = ref(false);
-        const duiPublico = ref('');
-        const ultimos4Publico = ref('');
-        const resultadoPublico = ref(null);
-        const errorPublico = ref('');
-        const cargandoInvitacion = ref(false);
-
-        const loginForm = reactive({ usuario: '', password: '' });
-        const loginError = ref('');
-        const loginCargando = ref(false);
-        const mostrarPassword = ref(false);
-
-        const escaneando = ref(false);
-        const ultimoResultado = ref(null);
-        const duiManual = ref('');
-        const procesandoAsistencia = ref(false);
-        const colaAsistencia = ref([]);
-        let html5QrCodeScanner = null;
-        const QR_CONTAINER_ID = 'lector-qr';
-
-        const sorteando = ref(false);
-        const ganadorSorteo = ref(null);
-        const errorRifa = ref('');
-        const generalError = ref('');
-        const notificacion = reactive({ visible: false, mensaje: '', tipo: 'exito' });
-
-        const resumenData = reactive({ total: 0, eventoActivo: true });
-        const asistenciasDetalladas = ref([]);
-        const busquedaAsistencia = ref('');
-
-        const listaDistritos = ref(['Panchimalco', 'Rosario de Mora', 'San Marcos', 'Santiago Texacuangos', 'Santo Tomás']);
-
-        const listaDias = Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'));
-        const listaMeses = [
-          { val: '01', nombre: 'Enero' }, { val: '02', nombre: 'Febrero' }, { val: '03', nombre: 'Marzo' },
-          { val: '04', nombre: 'Abril' }, { val: '05', nombre: 'Mayo' }, { val: '06', nombre: 'Junio' },
-          { val: '07', nombre: 'Julio' }, { val: '08', nombre: 'Agosto' }, { val: '09', nombre: 'Septiembre' },
-          { val: '10', nombre: 'Octubre' }, { val: '11', nombre: 'Noviembre' }, { val: '12', nombre: 'Diciembre' }
-        ];
-        const anioActual = new Date().getFullYear();
-        const listaAnios = Array.from({ length: anioActual - 1920 + 1 }, (_, i) => String(anioActual - i));
-
-        const fechaNacObj = reactive({ dia: '', mes: '', anio: '' });
-
-        const busquedaEmpleadoModal = ref('');
-        const mostrarMenuEmpleadoModal = ref(false);
-
-        const guardandoEmpleado = ref(false);
-        const guardandoDpto = ref(false);
-        const guardandoPremio = ref(false);
-        const guardandoUsuario = ref(false);
-        const guardandoRol = ref(false);
-        const guardandoSorteo = ref(false);
-        const guardandoEvento = ref(false);
-        const guardandoPermiso = ref(false);
-
-        const cargarAsistenciasDetalladas = ref(null);
-        const cargarResumen = ref(null);
-        const cargandoResumen = ref(false);
-
-        const busquedaDpto = ref('');
-        const paginaDpto = ref(1);
-        const itemsPorPaginaDpto = ref(10);
-        const listaDepartamentos = ref([]);
-        const modalDpto = ref(false);
-        const formDpto = reactive({ id: null, codDpto: '', nombreDpto: '', activo: 'TRUE' });
-
-        const listaEmpleados = ref([]);
-        const busquedaEmpleado = ref('');
-        const modalEmpleado = ref(false);
-        const errorEmpleado = ref('');
-        const formEmpleado = reactive({ id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE' });
-        const busquedaDptoModal = ref('');
-
-        const listaPremios = ref([]);
-        const modalPremio = ref(false);
-        const formPremio = reactive({ id: null, nombre: '', descripcion: '', cantidad: 1, activo: 'TRUE' });
-
-        const listaUsuarios = ref([]);
-        const modalUsuario = ref(false);
-        const formUsuario = reactive({ id: null, empleado: '', telefono: '', correo: '', usuario: '', passwordPlano: '', rol: '', activo: 'TRUE' });
-
-        const listaRoles = ref([]);
-        const modalRol = ref(false);
-        const formRol = reactive({ id: null, nombreRol: '', activo: 'TRUE' });
-
-        const rolSeleccionado = ref(null);
-        const busquedaPermiso = ref('');
-        const guardandoPermisos = ref(false);
-        const exitoPermisos = ref('');
-        const permisosMatriz = ref([]);
-
-        const importandoArchivo = ref(false);
-        const procesandoArchivo = ref(false);
-        const progresoImportacion = ref(0);
-        const detalleImportacion = ref([]);
-        const resumenImportacion = ref(null);
-        const tipoImportacion = ref('');
-
-        const listaPlantillas = ref([]);
-        const plantillaSeleccionada = ref('');
-        const modalGenerar = ref(false);
-        const empleadosSeleccionados = ref([]);
-        const busquedaEmpleadoTarjeta = ref('');
-        const generandoTarjetas = ref(false);
-        const progresoTarjetas = ref(0);
-        const tarjetasProcesadas = ref(0);
-        const zonasPredefinidas = ref({});
-
-        const estaOnline = ref(navigator.onLine);
-        const pendientesOffline = ref(0);
-        const sincronizandoOffline = ref(false);
-
-        function _construirMatriz() {
-          const rolId = rolSeleccionado.value;
-          if (!rolId) { permisosMatriz.value = []; return; }
-          const delRol = listaPermisos.value.filter(function(p) { return p.rol === rolId; });
-          const modulosSet = {};
-          delRol.forEach(function(p) {
-            if (String(p.puedeVer).toUpperCase() === 'TRUE' || String(p.puedeAgregar).toUpperCase() === 'TRUE' || String(p.puedeEditar).toUpperCase() === 'TRUE' || String(p.puedeEliminar).toUpperCase() === 'TRUE') {
-              modulosSet[p.modulo] = true;
-            }
-          });
-          permisosMatriz.value = Object.keys(modulosSet).map(function(mod) {
-            const ex = delRol.find(function(p) { return p.modulo === mod; });
-            return {
-              modulo: mod,
-              id: ex ? ex.id : null,
-              rol: rolId,
-              puedeVer: ex ? String(ex.puedeVer).toUpperCase() === 'TRUE' : false,
-              puedeAgregar: ex ? String(ex.puedeAgregar).toUpperCase() === 'TRUE' : false,
-              puedeEditar: ex ? String(ex.puedeEditar).toUpperCase() === 'TRUE' : false,
-              puedeEliminar: ex ? String(ex.puedeEliminar).toUpperCase() === 'TRUE' : false,
-              seleccionado: false
-            };
-          });
-        }
-
-        const permisosFiltrados = computed(function() {
-          var q = busquedaPermiso.value.toLowerCase().trim();
-          return permisosMatriz.value.filter(function(p) {
-            return p.modulo.toLowerCase().includes(q);
-          });
-        });
-
-        function cambiarRol(rolId) {
-          rolSeleccionado.value = rolId;
-          exitoPermisos.value = '';
-          _construirMatriz();
-        }
-
-        function alternarPermiso(perm, campo) {
-          perm[campo] = !perm[campo];
-          if (campo === 'puedeVer' && !perm.puedeVer) {
-            perm.puedeAgregar = false;
-            perm.puedeEditar = false;
-            perm.puedeEliminar = false;
-          }
-          if (campo !== 'puedeVer' && (perm.puedeAgregar || perm.puedeEditar || perm.puedeEliminar)) {
-            perm.puedeVer = true;
-          }
-          perm.seleccionado = perm.puedeVer && perm.puedeAgregar && perm.puedeEditar && perm.puedeEliminar;
-        }
-
-        function alternarTodo(perm) {
-          var val = !perm.seleccionado;
-          perm.puedeVer = val;
-          perm.puedeAgregar = val;
-          perm.puedeEditar = val;
-          perm.puedeEliminar = val;
-          perm.seleccionado = val;
-        }
-
-        async function guardarPermisosRol() {
-          guardandoPermisos.value = true;
-          exitoPermisos.value = '';
-          var datos = permisosMatriz.value.map(function(p) {
-            return {
-              id: p.id,
-              rol: p.rol,
-              modulo: p.modulo,
-              puedeVer: p.puedeVer ? 'TRUE' : 'FALSE',
-              puedeAgregar: p.puedeAgregar ? 'TRUE' : 'FALSE',
-              puedeEditar: p.puedeEditar ? 'TRUE' : 'FALSE',
-              puedeEliminar: p.puedeEliminar ? 'TRUE' : 'FALSE'
-            };
-          });
-          try {
-            const res = await apiGuardarPermisosRol(sesion.token, datos);
-            guardandoPermisos.value = false;
-            exitoPermisos.value = (res.saved || 0) + ' permisos guardados correctamente.';
-            setTimeout(function() { exitoPermisos.value = ''; }, 4000);
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoPermisos.value = false;
-            mostrarNotificacion(err.message || 'Error al guardar permisos.', 'error');
-          }
-        }
-
-        const listaPermisos = ref([]);
-        const modalPermiso = ref(false);
-        const formPermiso = reactive({ id: null, rol: '', modulo: '', puedeVer: 'TRUE', puedeAgregar: 'FALSE', puedeEditar: 'FALSE', puedeEliminar: 'FALSE' });
-
-        const listaEventos = ref([]);
-        const modalEvento = ref(false);
-        const formEvento = reactive({ id: null, nombre: '', fechaEvento: '', ubicacion: '', activo: 'FALSE' });
-        const eventoActivo = ref(null);
-
-        const listaSorteos = ref([]);
-        const modalSorteo = ref(false);
-        const formSorteo = reactive({ id: null, nombre: '', premio: '' });
-        const ganadorActual = ref(null);
-        const errorGanador = ref('');
-
-        const mostrarGuia = ref(false);
-        const guiaActual = ref({ titulo: '', icono: '', color: '', pasos: [], tips: '' });
-
-        function abrirGuiaVista() {
-          const clave = String(vista.value || '').toLowerCase();
-          const data = (window.GUIAS_VISTAS && window.GUIAS_VISTAS[clave]) ? window.GUIAS_VISTAS[clave] : (window.GUIAS_VISTAS && window.GUIAS_VISTAS.scanner) || { titulo: 'Gu�a', icono: 'question-circle', color: '#4b5563', pasos: [], tips: '' };
-          guiaActual.value = data;
-          mostrarGuia.value = true;
-        }
-
-        function formatearDui(val) {
-          if (!val) return '';
-          let nums = String(val).replace(/[^0-9]/g, '');
-          if (!nums) return '';
-          if (nums.length === 8) nums = '0' + nums;
-          nums = nums.slice(0, 9);
-          if (nums.length === 9) return nums.slice(0, 8) + '-' + nums.slice(8);
-          return nums;
-        }
-
-
-        function limpiarTildes(val) {
-          if (!val) return '';
-          return String(val)
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[�����]/g, 'a')
-            .replace(/[����]/g, 'e')
-            .replace(/[����]/g, 'i')
-            .replace(/[�����]/g, 'o')
-            .replace(/[����]/g, 'u');
-        }
-
-        function emitirSonido(tipo) {
-          try {
-            const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.frequency.setValueAtTime(tipo === 'exito' ? 880 : 220, ctx.currentTime);
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            osc.start(); osc.stop(ctx.currentTime + 0.2);
-          } catch (e) {}
-        }
-
-        let _notifTimer = null;
-        function mostrarNotificacion(mensaje, tipo = 'exito') {
-          if (_notifTimer) clearTimeout(_notifTimer);
-          notificacion.mensaje = mensaje;
-          notificacion.tipo = tipo;
-          notificacion.visible = true;
-          _notifTimer = setTimeout(() => {
-            notificacion.visible = false;
-          }, 3000);
-        }
-
-        function guardarSesionLocal(data) {
-          if (!data || !data.token) return;
-          localStorage.setItem('sssur_sesion', JSON.stringify({
-            token: data.token,
-            usuario: data.usuario || '',
-            correo: data.correo || '',
-            nombreMostrar: data.nombreMostrar || '',
-            rol: data.rol || ''
-          }));
-        }
-
-        function cargarSesionLocal() {
-          const raw = localStorage.getItem('sssur_sesion');
-          if (raw) {
-            try {
-              const data = JSON.parse(raw);
-              Object.assign(sesion, data);
-              cargarDatosInicialesBatch();
-            } catch (e) { localStorage.removeItem('sssur_sesion'); }
-          }
-        }
-
-        async function login() {
-          loginError.value = ''; loginCargando.value = true;
-          try {
-            const res = await apiLogin(loginForm.usuario.trim(), loginForm.password);
-            if (!res || !res.token) {
-              loginError.value = 'Respuesta vacía del servidor. Intenta nuevamente.';
-              loginCargando.value = false;
-              return;
-            }
-
-            Object.assign(sesion, res);
-            guardarSesionLocal(res);
-
-            if (res.datosIniciales) {
-              poblarCatalogos(res.datosIniciales);
-            }
-
-            vista.value = 'scanner';
-            loginCargando.value = false;
-            mostrarNotificacion('Bienvenido ' + (res.nombreMostrar || res.usuario) + '.', 'exito');
-          } catch (err) {
-            loginError.value = err.message || 'Error al iniciar sesión.';
-            loginCargando.value = false;
-          }
-        }
-
-        function poblarCatalogos(payload) {
-          if (!payload) return;
-          listaEmpleados.value = Array.isArray(payload.empleados) ? payload.empleados : [];
-          listaDepartamentos.value = Array.isArray(payload.departamentos) ? payload.departamentos : [];
-          listaPremios.value = Array.isArray(payload.premios) ? payload.premios : [];
-          listaRoles.value = Array.isArray(payload.roles) ? payload.roles : [];
-          listaUsuarios.value = Array.isArray(payload.usuarios) ? payload.usuarios : [];
-          asistenciasDetalladas.value = Array.isArray(payload.asistencias) ? payload.asistencias : [];
-          listaEventos.value = Array.isArray(payload.eventos) ? payload.eventos : [];
-          listaSorteos.value = Array.isArray(payload.sorteos) ? payload.sorteos : [];
-          listaPermisos.value = Array.isArray(payload.permisos) ? payload.permisos : [];
-          eventoActivo.value = (payload.eventos || []).find(function(e) { return String(e.activo).toUpperCase() === 'TRUE'; }) || null;
-          var primerRol = (payload.roles || [])[0];
-          rolSeleccionado.value = primerRol ? primerRol.id : null;
-          if (primerRol) _construirMatriz();
-          resumenData.total = (payload.resumen && payload.resumen.total) || asistenciasDetalladas.value.length || 0;
-        }
-
-        function tienePermiso(modulo, tipo) {
-          if (!sesion.token) return false;
-          if (String(sesion.rol || '').toUpperCase() === 'ADMIN' || String(sesion.rol || '').toUpperCase() === 'ADMINISTRADOR') return true;
-          var perm = listaPermisos.value.find(function(p) { return p.modulo === modulo; });
-          if (!perm) return false;
-          var campo = 'puede' + tipo.charAt(0).toUpperCase() + tipo.slice(1);
-          return String(perm[campo]).toUpperCase() === 'TRUE';
-        }
-
-        async function consultarInvitacionPublica() {
-          errorPublico.value = '';
-          resultadoPublico.value = null;
-          if (!duiPublico.value || !ultimos4Publico.value) {
-            errorPublico.value = 'Ingresa tu DUI y los �ltimos 4 d�gitos.';
-            return;
-          }
-          cargandoInvitacion.value = true;
-          try {
-            const url = '/api/invitacion-publica?dui=' + encodeURIComponent(duiPublico.value) + '&ultimos4=' + encodeURIComponent(ultimos4Publico.value);
-            const res = await fetch(url);
-            const data = await res.json();
-            if (!res.ok) {
-              errorPublico.value = data.error || 'No se pudo consultar la invitaci�n.';
-              return;
-            }
-            resultadoPublico.value = data;
-          } catch (err) {
-            errorPublico.value = err.message || 'Error de conexi�n.';
-          } finally {
-            cargandoInvitacion.value = false;
-          }
-        }
-
-        function formatearDuiInput() {
-          let v = String(duiPublico.value || '').replace(/[^0-9]/g, '');
-          if (v.length > 9) v = v.slice(0, 9);
-          duiPublico.value = v;
-        }
-
-        async function cargarDatosInicialesBatch() {
-          if (!sesion.token) return;
-          try {
-            const data = await apiDatosIniciales(sesion.token);
-            poblarCatalogos(data);
-          } catch (err) {
-            console.error('Error al recargar batch:', err);
-            if (err && err.message && (err.message.includes('Sesión') || err.message.includes('expirada') || err.status === 401)) {
-              confirmarLogout();
-            }
-          }
-        }
-
-        async function cargarPlantillas() {
-          if (!sesion.token) return;
-          try {
-            const data = await apiListarPlantillas(sesion.token);
-            listaPlantillas.value = Array.isArray(data) ? data : [];
-          } catch (e) { /* ignore */ }
-        }
-
-        async function onSeleccionarPlantilla(e) {
-          const file = e.target && e.target.files && e.target.files[0];
-          if (!file) return;
-          try {
-            await window.TarjetasApp.cargarPlantilla(file);
-            mostrarNotificacion('Plantilla cargada. Ajust� la posici�n del QR.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al cargar plantilla.', 'error');
-          } finally {
-            e.target.value = '';
-          }
-        }
-
-        function onCambiarZona(e) {
-          const nombre = e.target.value;
-          if (!nombre) return;
-          window.TarjetasApp.aplicarZona(nombre);
-        }
-
-        async function guardarPlantillaAction() {
-          const img = window.TarjetasApp.plantillaActual;
-          if (!img) {
-            mostrarNotificacion('Primero sub� una plantilla.', 'error');
-            return;
-          }
-          try {
-            const blob = await (await fetch(img.src)).blob();
-            const file = new File([blob], 'plantilla.png', { type: 'image/png' });
-            const { data: upload, error: errUpload } = await supabase.storage.from('plantillas').upload('plantillas/' + Date.now() + '_plantilla.png', file, { contentType: 'image/png', upsert: true });
-            if (errUpload) throw errUpload;
-
-            const qr = window.TarjetasApp.qrConfig;
-            await apiGuardarPlantilla(sesion.token, {
-              nombre: 'Plantilla ' + new Date().toLocaleDateString('es-SV'),
-              imagen_url: upload.path,
-              qr_x: Math.round(qr.x),
-              qr_y: Math.round(qr.y),
-              qr_w: Math.round(qr.w),
-              qr_h: Math.round(qr.h),
-              campo_qr: document.getElementById('campoQrSelect')?.value || 'dui',
-              activo: 'TRUE'
-            });
-            await cargarPlantillas();
-            mostrarNotificacion('Plantilla guardada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al guardar plantilla.', 'error');
-          }
-        }
-
-        function abrirModalGenerar() {
-          if (listaPlantillas.value.length === 0) {
-            mostrarNotificacion('Primero cre� y guard� una plantilla.', 'error');
-            return;
-          }
-          modalGenerar.value = true;
-          empleadosSeleccionados.value = [];
-          busquedaEmpleadoTarjeta.value = '';
-          progresoTarjetas.value = 0;
-          tarjetasProcesadas.value = 0;
-        }
-
-        async function generarIndividualAction(emp) {
-          if (!plantillaSeleccionada.value) {
-            mostrarNotificacion('Selecciona una plantilla primero.', 'error');
-            return;
-          }
-          const plantilla = listaPlantillas.value.find(p => p.id === plantillaSeleccionada.value);
-          if (!plantilla) return;
-
-          try {
-            const { data: urlData } = supabase.storage.from('plantillas').getPublicUrl(plantilla.imagen_url);
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = urlData.publicUrl; });
-            plantillaImg = img;
-            window.TarjetasApp.plantillaActual = img;
-            window.TarjetasApp.qrConfig = { x: plantilla.qr_x, y: plantilla.qr_y, w: plantilla.qr_w, h: plantilla.qr_h };
-            const campo = plantilla.campo_qr || 'dui';
-            await window.TarjetasApp.descargarIndividual({ ...emp, _campo: campo }, campo);
-            mostrarNotificacion('Tarjeta generada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al generar tarjeta.', 'error');
-          }
-        }
-
-        async function generarLoteAction() {
-          if (!plantillaSeleccionada.value) {
-            mostrarNotificacion('Selecciona una plantilla.', 'error');
-            return;
-          }
-          if (empleadosSeleccionados.value.length === 0) {
-            mostrarNotificacion('Selecciona al menos un empleado.', 'error');
-            return;
-          }
-          const plantilla = listaPlantillas.value.find(p => p.id === plantillaSeleccionada.value);
-          if (!plantilla) return;
-
-          try {
-            generandoTarjetas.value = true;
-            progresoTarjetas.value = 0;
-            tarjetasProcesadas.value = 0;
-
-            const { data: urlData } = supabase.storage.from('plantillas').getPublicUrl(plantilla.imagen_url);
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = urlData.publicUrl; });
-            plantillaImg = img;
-            window.TarjetasApp.plantillaActual = img;
-            window.TarjetasApp.qrConfig = { x: plantilla.qr_x, y: plantilla.qr_y, w: plantilla.qr_w, h: plantilla.qr_h };
-            const campo = plantilla.campo_qr || 'dui';
-            const empleados = (listaEmpleados.value || []).filter(e => empleadosSeleccionados.value.includes(e.id));
-
-            const zip = new JSZip();
-            const folder = zip.folder('tarjetas-invitacion');
-            const max = Math.min(empleados.length, 50);
-
-            for (let i = 0; i < max; i++) {
-              try {
-                const dataUrl = await window.TarjetasApp.generarTarjetaDataURL(empleados[i], campo);
-                folder.file(`tarjeta-${empleados[i].codigo || empleados[i].dui}.png`, dataUrl.split(',')[1], { base64: true });
-              } catch (e) {
-                console.error('Error en tarjeta', empleados[i], e);
-              }
-              tarjetasProcesadas.value = i + 1;
-              progresoTarjetas.value = Math.round(((i + 1) / max) * 100);
-            }
-
-            const blob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `tarjetas-invitacion-${Date.now()}.zip`;
-            a.click();
-            URL.revokeObjectURL(url);
-
-            modalGenerar.value = false;
-            mostrarNotificacion('Descarga iniciada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al generar ZIP.', 'error');
-          } finally {
-            generandoTarjetas.value = false;
-            progresoTarjetas.value = 0;
-            tarjetasProcesadas.value = 0;
-          }
-        }
-
-        function solicitarLogout() { mostrarModalLogout.value = true; }
-
-        function _setupOfflineListeners() {
-          window.addEventListener('online', async () => {
-            estaOnline.value = true;
-            mostrarNotificacion('Conexi�n recuperada. Sincronizando pendientes...', 'exito');
-            await cargarPendientesOffline();
-            if (pendientesOffline.value > 0) {
-              await forzarSincronizacion();
-            }
-          });
-          window.addEventListener('offline', () => {
-            estaOnline.value = false;
-            mostrarNotificacion('Sin conexi�n. Los registros se guardar�n localmente.', 'error');
-          });
-          cargarPendientesOffline();
-        }
-
-        async function confirmarLogout() {
-          mostrarModalLogout.value = false;
-          cargando.value = true;
-          await detenerEscaneo();
-
-          if (sesion.token) {
-            try { await apiLogout(sesion.token); } catch (_) { /* ignore */ }
-          }
-
-          loginForm.password = ''; loginForm.usuario = ''; loginError.value = ''; mostrarPassword.value = false;
-          localStorage.removeItem('sssur_sesion');
-          sesion.token = null; sesion.usuario = null; sesion.correo = null; sesion.nombreMostrar = null; sesion.rol = null;
-          sidebarAbierto.value = window.innerWidth >= 768; vista.value = 'scanner';
-
-          setTimeout(() => { cargando.value = false; }, 450);
-        }
-
-        function cambiarVista(nuevaVista) {
-          generalError.value = '';
-          vista.value = nuevaVista;
-          if (window.innerWidth < 768) sidebarAbierto.value = false;
-        }
-
-        function abrirModalDpto(dptoObj = null) {
-          if (dptoObj) {
-            Object.assign(formDpto, {
-              id: dptoObj.id,
-              codDpto: dptoObj.cod_dpto || dptoObj.codDpto || '',
-              nombreDpto: dptoObj.nombre_dpto || dptoObj.nombreDpto || '',
-              activo: String(dptoObj.activo || 'TRUE').toUpperCase()
-            });
-          } else {
-            Object.assign(formDpto, { id: null, codDpto: '', nombreDpto: '', activo: 'TRUE' });
-          }
-          modalDpto.value = true;
-        }
-
-        async function guardarDptoAction() {
-          guardandoDpto.value = true;
-          try {
-            await apiGuardarDepartamento(sesion.token, { ...formDpto });
-            guardandoDpto.value = false;
-            modalDpto.value = false;
-            mostrarNotificacion('Departamento guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoDpto.value = false;
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        async function exportarCsvDptoAction() {
-          try {
-            await apiExportarDepartamentos(sesion.token);
-            mostrarNotificacion('Exportación iniciada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al exportar.', 'error');
-          }
-        }
-
-        async function importarCsvDptoAction(e) {
-          const file = e.target && e.target.files && e.target.files[0];
-          if (!file) return;
-          try {
-            const texto = await file.text();
-            tipoImportacion.value = 'departamentos';
-            importandoArchivo.value = true;
-            procesandoArchivo.value = true;
-            progresoImportacion.value = 0;
-            detalleImportacion.value = [];
-            resumenImportacion.value = null;
-
-            const res = await apiImportarDepartamentos(sesion.token, texto);
-            procesandoArchivo.value = false;
-            const detalle = (res && Array.isArray(res.detalle)) ? res.detalle : [];
-            for (let i = 0; i < detalle.length; i++) {
-              detalleImportacion.value.push(detalle[i]);
-              progresoImportacion.value = Math.round(((i + 1) / Math.max(detalle.length, 1)) * 100);
-              if (i < detalle.length - 1) await new Promise(r => setTimeout(r, 80));
-            }
-            resumenImportacion.value = res;
-            await cargarDatosInicialesBatch();
-            await new Promise(r => setTimeout(r, 600));
-            mostrarNotificacion('Importación completada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al importar.', 'error');
-          } finally {
-            e.target.value = '';
-            importandoArchivo.value = false;
-          }
-        }
-
-        function abrirModalEmpleado(emp = null) {
-          errorEmpleado.value = '';
-          if (emp) {
-            Object.assign(formEmpleado, {
-              id: emp.id,
-              distrito: emp.distrito || '',
-              dpto: emp.dpto || '',
-              cargo: emp.cargo || '',
-              nombres: emp.nombres || '',
-              apellidos: emp.apellidos || '',
-              fechaNacimiento: emp.fecha_nacimiento || emp.fechaNacimiento || '',
-              telefono: emp.telefono || '',
-              correo: emp.correo || '',
-              dui: emp.dui || '',
-              codigo: emp.codigo || '',
-              activo: String(emp.activo || 'TRUE').toUpperCase()
-            });
-            formEmpleado.dui = formatearDui(formEmpleado.dui);
-            const fn = formEmpleado.fechaNacimiento;
-            if (fn) {
-              const partes = String(fn).split(/[-T/]/);
-              if (partes.length >= 3) {
-                if (partes[0].length === 4) {
-                  fechaNacObj.anio = partes[0];
-                  fechaNacObj.mes = String(partes[1]).padStart(2, '0');
-                  fechaNacObj.dia = String(partes[2]).padStart(2, '0');
-                } else if (partes[2].length === 4) {
-                  fechaNacObj.dia = String(partes[0]).padStart(2, '0');
-                  fechaNacObj.mes = String(partes[1]).padStart(2, '0');
-                  fechaNacObj.anio = partes[2];
-                }
-              }
-            } else { fechaNacObj.dia = ''; fechaNacObj.mes = ''; fechaNacObj.anio = ''; }
-          } else {
-            Object.assign(formEmpleado, { id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '', fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE' });
-            fechaNacObj.dia = ''; fechaNacObj.mes = ''; fechaNacObj.anio = '';
-          }
-          modalEmpleado.value = true;
-          busquedaDptoModal.value = '';
-        }
-
-        async function guardarEmpleadoAction() {
-          errorEmpleado.value = '';
-          formEmpleado.dui = formatearDui(formEmpleado.dui);
-          if (formEmpleado.telefono && !/^\d{8}$/.test(formEmpleado.telefono)) {
-            errorEmpleado.value = 'El teléfono debe contener exactamente 8 dígitos numéricos sin guiones.';
-            return;
-          }
-          if (fechaNacObj.anio && fechaNacObj.mes && fechaNacObj.dia) {
-            formEmpleado.fechaNacimiento = `${fechaNacObj.anio}-${fechaNacObj.mes}-${fechaNacObj.dia}`;
-          }
-          guardandoEmpleado.value = true;
-          try {
-            await apiGuardarEmpleado(sesion.token, { ...formEmpleado });
-            guardandoEmpleado.value = false;
-            modalEmpleado.value = false;
-            mostrarNotificacion('Empleado guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoEmpleado.value = false;
-            errorEmpleado.value = err.message || 'Error al guardar el empleado.';
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        async function exportarCsvEmpleadoAction() {
-          try {
-            await apiExportarEmpleados(sesion.token);
-            mostrarNotificacion('Exportación iniciada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al exportar.', 'error');
-          }
-        }
-
-        async function importarCsvEmpleadoAction(e) {
-          const file = e.target && e.target.files && e.target.files[0];
-          if (!file) return;
-          try {
-            const texto = await file.text();
-            tipoImportacion.value = 'empleados';
-            importandoArchivo.value = true;
-            procesandoArchivo.value = true;
-            progresoImportacion.value = 0;
-            detalleImportacion.value = [];
-            resumenImportacion.value = null;
-
-            const res = await apiImportarEmpleados(sesion.token, texto);
-            procesandoArchivo.value = false;
-            const detalle = (res && Array.isArray(res.detalle)) ? res.detalle : [];
-            for (let i = 0; i < detalle.length; i++) {
-              detalleImportacion.value.push(detalle[i]);
-              progresoImportacion.value = Math.round(((i + 1) / Math.max(detalle.length, 1)) * 100);
-              if (i < detalle.length - 1) await new Promise(r => setTimeout(r, 80));
-            }
-            resumenImportacion.value = res;
-            await cargarDatosInicialesBatch();
-            await new Promise(r => setTimeout(r, 600));
-            mostrarNotificacion('Importación completada.', 'exito');
-          } catch (err) {
-            mostrarNotificacion(err.message || 'Error al importar.', 'error');
-          } finally {
-            e.target.value = '';
-            importandoArchivo.value = false;
-          }
-        }
-
-        function abrirModalPremio(prm = null) {
-          if (prm) {
-            Object.assign(formPremio, {
-              id: prm.id,
-              nombre: prm.nombre || '',
-              descripcion: prm.descripcion || '',
-              cantidad: Number(prm.cantidad) || 1,
-              activo: String(prm.activo || 'TRUE').toUpperCase()
-            });
-          } else {
-            Object.assign(formPremio, { id: null, nombre: '', descripcion: '', cantidad: 1, activo: 'TRUE' });
-          }
-          modalPremio.value = true;
-        }
-
-        async function guardarPremioAction() {
-          guardandoPremio.value = true;
-          try {
-            await apiGuardarPremio(sesion.token, { ...formPremio });
-            guardandoPremio.value = false;
-            modalPremio.value = false;
-            mostrarNotificacion('Premio guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoPremio.value = false;
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        function abrirModalUsuario(usr = null) {
-          busquedaEmpleadoModal.value = '';
-          mostrarMenuEmpleadoModal.value = false;
-          if (usr) {
-            Object.assign(formUsuario, {
-              id: usr.id,
-              empleado: usr.empleadoId || usr.empleado || '',
-              telefono: usr.telefono || '',
-              correo: usr.correo || '',
-              usuario: usr.usuario || '',
-              passwordPlano: '',
-              rol: usr.rolId || usr.rol || '',
-              activo: String(usr.activo || 'TRUE').toUpperCase()
-            });
-          } else {
-            Object.assign(formUsuario, { id: null, empleado: '', telefono: '', correo: '', usuario: '', passwordPlano: '', rol: '', activo: 'TRUE' });
-          }
-          modalUsuario.value = true;
-        }
-
-        function seleccionarEmpleadoModal(empId) {
-          formUsuario.empleado = empId;
-          mostrarMenuEmpleadoModal.value = false;
-          busquedaEmpleadoModal.value = '';
-        }
-
-        async function guardarUsuarioAction() {
-          guardandoUsuario.value = true;
-          try {
-            await apiGuardarUsuario(sesion.token, { ...formUsuario });
-            guardandoUsuario.value = false;
-            modalUsuario.value = false;
-            mostrarNotificacion('Usuario guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoUsuario.value = false;
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        function abrirModalRol(r = null) {
-          if (r) {
-            Object.assign(formRol, {
-              id: r.id,
-              nombreRol: r.nombre_rol || r.nombreRol || '',
-              activo: String(r.activo || 'TRUE').toUpperCase()
-            });
-          } else {
-            Object.assign(formRol, { id: null, nombreRol: '', activo: 'TRUE' });
-          }
-          modalRol.value = true;
-        }
-
-        async function guardarRolAction() {
-          guardandoRol.value = true;
-          try {
-            await apiGuardarRol(sesion.token, { ...formRol });
-            guardandoRol.value = false;
-            modalRol.value = false;
-            mostrarNotificacion('Rol guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoRol.value = false;
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        function abrirModalEvento(evt = null) {
-          if (evt) {
-            Object.assign(formEvento, {
-              id: evt.id,
-              nombre: evt.nombre || '',
-              fechaEvento: evt.fecha_evento || evt.fechaEvento || '',
-              ubicacion: evt.ubicacion || '',
-              activo: String(evt.activo || 'FALSE').toUpperCase()
-            });
-          } else {
-            Object.assign(formEvento, { id: null, nombre: '', fechaEvento: '', ubicacion: '', activo: 'FALSE' });
-          }
-          modalEvento.value = true;
-        }
-
-        async function guardarEventoAction() {
-          guardandoEvento.value = true;
-          generalError.value = '';
-          try {
-            await apiGuardarEvento(sesion.token, { ...formEvento });
-            guardandoEvento.value = false;
-            modalEvento.value = false;
-            mostrarNotificacion('Evento guardado.', 'exito');
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoEvento.value = false;
-            generalError.value = err.message || 'Error al guardar el evento.';
-            mostrarNotificacion(err.message || 'Error al guardar.', 'error');
-          }
-        }
-
-        async function setEventoActivoAction(eventoId) {
-          generalError.value = '';
-          try {
-            await apiSetEventoActivo(sesion.token, eventoId);
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            generalError.value = err.message || 'Error al cambiar el evento activo.';
-          }
-        }
-
-        function abrirModalPermiso(perm = null) {
-          if (perm) {
-            Object.assign(formPermiso, {
-              id: perm.id,
-              rol: perm.rol || '',
-              modulo: perm.modulo || '',
-              puedeVer: String(perm.puedeVer || perm.puede_ver || 'TRUE').toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE',
-              puedeAgregar: String(perm.puedeAgregar || perm.puede_agregar || 'FALSE').toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE',
-              puedeEditar: String(perm.puedeEditar || perm.puede_editar || 'FALSE').toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE',
-              puedeEliminar: String(perm.puedeEliminar || perm.puede_eliminar || 'FALSE').toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE'
-            });
-          } else {
-            Object.assign(formPermiso, { id: null, rol: '', modulo: '', puedeVer: 'TRUE', puedeAgregar: 'FALSE', puedeEditar: 'FALSE', puedeEliminar: 'FALSE' });
-          }
-          modalPermiso.value = true;
-        }
-
-        async function guardarPermisoAction() {
-          guardandoPermiso.value = true;
-          generalError.value = '';
-          try {
-            await apiGuardarPermiso(sesion.token, { ...formPermiso });
-            guardandoPermiso.value = false;
-            modalPermiso.value = false;
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoPermiso.value = false;
-            generalError.value = err.message || 'Error al guardar el permiso.';
-          }
-        }
-
-        function editarPermiso(perm) {
-          abrirModalPermiso(perm);
-        }
-
-        function abrirModalSorteo(srt = null) {
-          if (srt) {
-            Object.assign(formSorteo, {
-              id: srt.id,
-              nombre: srt.nombre || '',
-              premio: srt.premio || ''
-            });
-          } else {
-            Object.assign(formSorteo, { id: null, nombre: '', premio: '' });
-          }
-          modalSorteo.value = true;
-        }
-
-        async function guardarSorteoAction() {
-          guardandoSorteo.value = true;
-          errorGanador.value = '';
-          try {
-            await apiGuardarSorteo(sesion.token, { nombre: formSorteo.nombre, premio: formSorteo.premio, id: formSorteo.id });
-            guardandoSorteo.value = false;
-            modalSorteo.value = false;
-            await cargarDatosInicialesBatch();
-          } catch (err) {
-            guardandoSorteo.value = false;
-            errorGanador.value = err.message || 'Error al guardar el sorteo.';
-          }
-        }
-
-        async function sortearGanadorAction() {
-          if (!formSorteo.id) {
-            errorGanador.value = 'Debes guardar el sorteo antes de extraer un ganador.';
-            return;
-          }
-          errorGanador.value = '';
-          ganadorActual.value = null;
-          sorteando.value = true;
-          try {
-            const res = await apiSortearGanador(sesion.token, formSorteo.id);
-            ganadorActual.value = res;
-            errorGanador.value = '';
-            emitirSonido('exito');
-          } catch (err) {
-            errorGanador.value = err.message || 'Error al sortear.';
-          } finally {
-            sorteando.value = false;
-          }
-        }
-
-        async function iniciarEscaneo() {
-          escaneando.value = true;
-          ultimoResultado.value = null;
-          await _iniciarCamaraQr();
-        }
-
-        async function detenerEscaneo() {
-          escaneando.value = false;
-          await _detenerCamaraQr();
-        }
-
-        async function _iniciarCamaraQr() {
-          if (typeof Html5QrcodeScanner === 'undefined' && typeof Html5Qrcode === 'undefined') {
-            ultimoResultado.value = { error: true, mensaje: 'Librería QR no cargada. Recarga la página.' };
-            escaneando.value = false;
-            return;
-          }
-          try {
-            const container = document.getElementById(QR_CONTAINER_ID);
-            if (!container) {
-              setTimeout(() => _iniciarCamaraQr(), 200);
-              return;
-            }
-            container.innerHTML = '';
-            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
-
-            if (typeof Html5Qrcode !== 'undefined') {
-              if (!html5QrCodeScanner) {
-                html5QrCodeScanner = new Html5Qrcode(QR_CONTAINER_ID);
-              }
-              await html5QrCodeScanner.start(
-                { facingMode: 'environment' },
-                config,
-                (decodedText) => {
-                  if (decodedText) {
-                    try { html5QrCodeScanner.pause(); } catch (_) {}
-                    registrarAsistencia(decodedText);
-                    setTimeout(() => {
-                      if (html5QrCodeScanner && escaneando.value) {
-                        try { html5QrCodeScanner.resume(); } catch (_) {}
-                      }
-                    }, 1500);
-                  }
-                },
-                () => {}
-              );
-            } else if (typeof Html5QrcodeScanner !== 'undefined') {
-              html5QrCodeScanner = new Html5QrcodeScanner(QR_CONTAINER_ID, config, false);
-              html5QrCodeScanner.render((decodedText) => {
-                registrarAsistencia(decodedText);
-              }, () => {});
-            }
-          } catch (err) {
-            console.error('QR camera error:', err);
-            ultimoResultado.value = { error: true, mensaje: 'No se pudo acceder a la cámara: ' + (err.message || String(err)) };
-            escaneando.value = false;
-          }
-        }
-
-        async function _detenerCamaraQr() {
-          if (html5QrCodeScanner) {
-            try {
-              if (typeof html5QrCodeScanner.stop === 'function') {
-                await html5QrCodeScanner.stop();
-              }
-              if (typeof html5QrCodeScanner.clear === 'function') {
-                try { html5QrCodeScanner.clear(); } catch (_) {}
-              }
-            } catch (_) { /* ignore */ }
-            html5QrCodeScanner = null;
-          }
-          const container = document.getElementById(QR_CONTAINER_ID);
-          if (container) container.innerHTML = '';
-        }
-
-        function abrirSelectorFoto() { document.getElementById('input-foto-qr').click(); }
-
-        function procesarFotoQr(event) {
-          const files = event.target.files; if (!files || files.length === 0) return;
-          if (typeof Html5Qrcode === 'undefined') {
-            ultimoResultado.value = { error: true, mensaje: 'Librería QR no disponible.' };
-            return;
-          }
-          const html5QrCode = new Html5Qrcode("lector-qr-temp");
-          html5QrCode.scanFile(files[0], true)
-            .then(dui => registrarAsistencia(dui))
-            .catch(() => { ultimoResultado.value = { error: true, mensaje: 'No se detectó un código QR válido en la foto.' }; });
-          event.target.value = '';
-        }
-
-        function registrarAsistencia(dui) {
-          if (procesandoAsistencia.value) {
-            colaAsistencia.value.push(dui);
-            return;
-          }
-          _enviarAsistencia(dui, 0);
-        }
-
-        async function _enviarAsistencia(dui, intento) {
-          procesandoAsistencia.value = true;
-          try {
-            if (!estaOnline.value) {
-              await _guardarAsistenciaOffline(dui);
-              return;
-            }
-            const res = await apiRegistrarAsistencia(sesion.token, dui, 'app-web');
-            procesandoAsistencia.value = false;
-            ultimoResultado.value = res; emitirSonido(res.duplicado ? 'error' : 'exito');
-            if (!res.duplicado) resumenData.total++;
-            if (!res.duplicado && res.empleado) {
-              asistenciasDetalladas.value.unshift({
-                id: Date.now().toString(),
-                fechaHora: new Date().toISOString(),
-                empleadoNombre: (res.empleado.nombres || '') + ' ' + (res.empleado.apellidos || ''),
-                dui: dui,
-                fuente: 'qr'
-              });
-            }
-            _procesarSiguienteEnCola();
-          } catch (err) {
-            procesandoAsistencia.value = false;
-            var msg = (err && err.message) ? err.message : String(err);
-            if (intento < 2 && estaOnline.value) {
-              setTimeout(() => _enviarAsistencia(dui, intento + 1), 800 * (intento + 1));
-            } else {
-              await _guardarAsistenciaOffline(dui);
-              _procesarSiguienteEnCola();
-            }
-          }
-        }
-
-        async function _guardarAsistenciaOffline(dui) {
-          try {
-            const empleado = (listaEmpleados.value || []).find(function(e) {
-              const d = String(e.dui || '').replace(/[^0-9]/g, '');
-              return d === String(dui || '').replace(/[^0-9]/g, '');
-            });
-            const registro = await window.OfflineApp.guardarAsistenciaOffline(
-              empleado ? empleado.id : null,
-              dui,
-              empleado ? empleado.nombres : 'Desconocido',
-              empleado ? empleado.apellidos : '',
-              'qr'
-            );
-            pendientesOffline.value = await window.OfflineApp.contarPendientes();
-            ultimoResultado.value = {
-              error: false,
-              offline: true,
-              mensaje: '?? Sin conexi�n. Asistencia guardada localmente. Pendientes: ' + pendientesOffline.value
-            };
-            emitirSonido('exito');
-          } catch (e) {
-            ultimoResultado.value = { error: true, mensaje: 'Error al guardar offline: ' + (e.message || String(e)) };
-            emitirSonido('error');
-          }
-        }
-
-        async function cargarPendientesOffline() {
-          if (!sesion.token) return;
-          try {
-            const count = await window.OfflineApp.contarPendientes();
-            pendientesOffline.value = count;
-          } catch (e) { /* ignore */ }
-        }
-
-        async function forzarSincronizacion() {
-          if (!sesion.token || !window.OfflineApp) return;
-          sincronizandoOffline.value = true;
-          try {
-            const resultado = await window.OfflineApp.sincronizarPendientes(sesion.token);
-            pendientesOffline.value = await window.OfflineApp.contarPendientes();
-            const msg = 'Sincronizaci�n: ' + resultado.sincronizados + ' OK, ' + resultado.duplicados + ' duplicados, ' + resultado.errores + ' errores';
-            mostrarNotificacion(msg, resultado.errores > 0 ? 'error' : 'exito');
-          } catch (e) {
-            mostrarNotificacion('Error en sincronizaci�n: ' + (e.message || String(e)), 'error');
-          } finally {
-            sincronizandoOffline.value = false;
-          }
-        }
-
-        function _procesarSiguienteEnCola() {
-          if (colaAsistencia.value.length > 0) {
-            const siguiente = colaAsistencia.value.shift();
-            _enviarAsistencia(siguiente, 0);
-          }
-        }
-
-        function registrarManual() {
-          if (!duiManual.value.trim()) return;
-          registrarAsistencia(duiManual.value.trim()); duiManual.value = '';
-        }
-
-        function ejecutarSorteo() {
-          if (!formSorteo.id) {
-            errorRifa.value = 'Debes seleccionar un sorteo primero.';
-            return;
-          }
-          errorRifa.value = '';
-          sortearGanadorAction();
-        }
-
-        const departamentosFiltrados = computed(() => {
-          const q = busquedaDpto.value.toLowerCase().trim();
-          const lista = Array.isArray(listaDepartamentos.value) ? listaDepartamentos.value : [];
-          return lista.filter(d => String(d.nombreDpto || d.nombre_dpto || '').toLowerCase().includes(q) || String(d.codDpto || d.cod_dpto || '').toLowerCase().includes(q));
-        });
-
-        const departamentosFiltradosModal = computed(() => {
-          const q = String(busquedaDptoModal.value || '').toLowerCase().trim();
-          const lista = Array.isArray(listaDepartamentos.value) ? listaDepartamentos.value : [];
-          if (!q) return lista;
-          return lista.filter(d => String(d.nombreDpto || d.nombre_dpto || '').toLowerCase().includes(q));
-        });
-
-        const departamentoSeleccionadoNombre = computed(() => {
-          if (!formEmpleado.dpto) return '';
-          const d = (listaDepartamentos.value || []).find(function(x) { return x.id === formEmpleado.dpto; });
-          return d ? (d.nombreDpto || d.nombre_dpto) : '';
-        });
-
-        const totalPaginasDpto = computed(() => {
-          if (itemsPorPaginaDpto.value === 'Todos') return 1;
-          const limite = Number(itemsPorPaginaDpto.value) || 10;
-          return Math.ceil(departamentosFiltrados.value.length / limite) || 1;
-        });
-
-        const departamentosPaginados = computed(() => {
-          const filtrados = departamentosFiltrados.value;
-          if (itemsPorPaginaDpto.value === 'Todos') return filtrados;
-          const limite = Number(itemsPorPaginaDpto.value) || 10;
-          const inicio = (paginaDpto.value - 1) * limite;
-          return filtrados.slice(inicio, inicio + limite);
-        });
-
-        const departamentoRangoTexto = computed(() => {
-          const total = departamentosFiltrados.value.length;
-          if (total === 0) return '0';
-          if (itemsPorPaginaDpto.value === 'Todos') return `1 a ${total}`;
-          const limite = Number(itemsPorPaginaDpto.value) || 10;
-          const inicio = (paginaDpto.value - 1) * limite + 1;
-          const fin = Math.min(paginaDpto.value * limite, total);
-          return `${inicio} a ${fin}`;
-        });
-
-        watch(busquedaDpto, () => { paginaDpto.value = 1; });
-        watch(itemsPorPaginaDpto, () => { paginaDpto.value = 1; });
-
-        function getQrVal(key, fallback) {
-          return (window.TarjetasApp && window.TarjetasApp.qrConfig && window.TarjetasApp.qrConfig[key] != null) ? window.TarjetasApp.qrConfig[key] : fallback;
-        }
-
-        watch(vista, (nv) => {
-          if (nv === 'tarjetas') {
-            cargarPlantillas();
-            if (typeof window.TarjetasApp !== 'undefined') {
-              zonasPredefinidas.value = window.TarjetasApp.zonasPredefinidas || {};
-              if (typeof window.TarjetasApp.init === 'function') {
-                window.TarjetasApp.init();
-              }
-            }
-          }
-        });
-
-        const empleadosParaModalUsuario = computed(() => {
-          const q = busquedaEmpleadoModal.value.toLowerCase().trim();
-          const lista = Array.isArray(listaEmpleados.value) ? listaEmpleados.value : [];
-          if (!q) return lista.slice(0, 50);
-          return lista.filter(e => {
-            const nom = String(e.nombres || '').toLowerCase();
-            const ape = String(e.apellidos || '').toLowerCase();
-            const dui = String(e.dui || '').toLowerCase();
-            const tel = String(e.telefono || '').toLowerCase();
-            const email = String(e.correo || '').toLowerCase();
-            return nom.includes(q) || ape.includes(q) || dui.includes(q) || tel.includes(q) || email.includes(q);
-          });
-        });
-
-        const empleadoSeleccionadoNombre = computed(() => {
-          if (!formUsuario.empleado) return '-- Sin Empleado Vinculado --';
-          const emp = (listaEmpleados.value || []).find(e => String(e.id) === String(formUsuario.empleado));
-          if (!emp) return '-- Sin Empleado Vinculado --';
-          return `${emp.nombres} ${emp.apellidos} (DUI: ${formatearDui(emp.dui)})`;
-        });
-
-        const empleadosFiltrados = computed(() => {
-          const q = busquedaEmpleado.value.toLowerCase().trim();
-          const lista = Array.isArray(listaEmpleados.value) ? listaEmpleados.value : [];
-          return lista.filter(e => String(e.nombres || '').toLowerCase().includes(q) || String(e.apellidos || '').toLowerCase().includes(q) || String(e.dui || '').includes(q));
-        });
-
-        const asistenciasFiltradas = computed(() => {
-          const q = busquedaAsistencia.value.toLowerCase().trim();
-          const lista = Array.isArray(asistenciasDetalladas.value) ? asistenciasDetalladas.value : [];
-          return lista.filter(a => String(a.empleadoNombre || '').toLowerCase().includes(q) || String(a.dui || '').includes(q));
-        });
-
-        const esAdmin = computed(() => {
-          return String(sesion.rol).toUpperCase() === 'ADMIN' || String(sesion.rol).toUpperCase() === 'ADMINISTRADOR';
-        });
-
-        onMounted(() => {
-          window.addEventListener('resize', handleResize);
-          fetch('/sw.js', {cache: 'no-store'}).then(res => res.text()).then(text => { const m = text.match(/const CACHE_VERSION\s*=\s*['"]([^'"]+)['"]/); if(m) swVersion.value = m[1]; }).catch(e => console.error('Error fetching SW version', e));
-          try {
-            const params = new URLSearchParams(location.search);
-            if (params.get('invitacion') === '1') {
-              modoPublico.value = true;
-              vista.value = 'invitacion-publica';
-              cargando.value = false;
-              return;
-            }
-          } catch (_) {}
-          cargarSesionLocal();
-          cargando.value = false;
-          _setupOfflineListeners();
-        });
-
-        onBeforeUnmount(() => {
-          detenerEscaneo();
-        });
-
-        return {
-          swVersion, windowWidth, cargando, vista, sidebarAbierto, mostrarModalLogout, subtabUsuario, sesion, modoPublico, duiPublico, ultimos4Publico, resultadoPublico, errorPublico, cargandoInvitacion, consultarInvitacionPublica, formatearDuiInput, loginForm, loginError, loginCargando, mostrarPassword,
-          escaneando, ultimoResultado, duiManual, procesandoAsistencia, sorteando, ganadorSorteo, ganadorActual, errorRifa, generalError, notificacion,
-          resumenData, esAdmin, listaDistritos, listaDias, listaMeses, listaAnios, fechaNacObj,
-          guardandoEmpleado, guardandoDpto, guardandoPremio, guardandoUsuario, guardandoRol, guardandoSorteo, guardandoEvento, guardandoPermiso,
-          cargarAsistenciasDetalladas, cargarResumen, cargandoResumen,
-          busquedaEmpleadoModal, mostrarMenuEmpleadoModal, empleadosParaModalUsuario, empleadoSeleccionadoNombre, seleccionarEmpleadoModal,
-          listaDepartamentos, busquedaDpto, modalDpto, formDpto, departamentosFiltrados, paginaDpto, itemsPorPaginaDpto, totalPaginasDpto, departamentosPaginados, departamentoRangoTexto,
-           listaEmpleados, busquedaEmpleado, modalEmpleado, formEmpleado, errorEmpleado, empleadosFiltrados,
-           busquedaDptoModal, departamentosFiltradosModal, departamentoSeleccionadoNombre,
-          asistenciasDetalladas, busquedaAsistencia, asistenciasFiltradas, listaPremios, modalPremio, formPremio,
-          listaUsuarios, modalUsuario, formUsuario, listaRoles, modalRol, formRol,
-          listaPermisos, modalPermiso, formPermiso, tienePermiso, abrirModalPermiso,
-          guardarPermisoAction, editarPermiso,
-          rolSeleccionado, busquedaPermiso, guardandoPermisos, exitoPermisos,
-          permisosMatriz, permisosFiltrados, cambiarRol, alternarPermiso, alternarTodo, guardarPermisosRol,
-          importandoArchivo, progresoImportacion, detalleImportacion, resumenImportacion, tipoImportacion, procesandoArchivo,
-          listaEventos, modalEvento, formEvento, eventoActivo, guardarEventoAction, setEventoActivoAction, abrirModalEvento,
-           listaSorteos, modalSorteo, formSorteo, errorGanador, guardarSorteoAction, sortearGanadorAction, abrirModalSorteo,
-           mostrarGuia, guiaActual, abrirGuiaVista,
-          formatearDui, limpiarTildes, login, solicitarLogout, confirmarLogout, cambiarVista, iniciarEscaneo, detenerEscaneo, abrirSelectorFoto,
-          procesarFotoQr, registrarManual, ejecutarSorteo, abrirModalDpto, guardarDptoAction, exportarCsvDptoAction, importarCsvDptoAction,
-          abrirModalEmpleado, guardarEmpleadoAction, exportarCsvEmpleadoAction, importarCsvEmpleadoAction, abrirModalPremio, guardarPremioAction,
-          abrirModalUsuario, guardarUsuarioAction, abrirModalRol, guardarRolAction, cargarDatosInicialesBatch,
-          cargarPlantillas, onSeleccionarPlantilla, onCambiarZona, guardarPlantillaAction, abrirModalGenerar, generarIndividualAction, generarLoteAction,
-          generandoTarjetas, progresoTarjetas, tarjetasProcesadas, zonasPredefinidas, getQrVal,
-          estaOnline, pendientesOffline, sincronizandoOffline, cargarPendientesOffline, forzarSincronizacion
-        };
-      }
-    });
-
-    app.config.errorHandler = function(err, vm, info) {
-      console.error('[Vue Error] Info:', info, err);
-      const msj = (err && err.message) ? err.message : String(err);
-      setSkeleton(
-        '<div class="text-sm text-red-700 font-bold flex flex-col gap-2 p-4 rounded-2xl bg-red-50 border border-red-200 max-w-2xl"><div class="flex items-center gap-2"><i class="fas fa-exclamation-triangle text-red-500"></i> ' +
-        'Error Vue: ' + msj +
-        '</div><div class="text-xs font-medium text-red-600">' + (info || '') + '</div>' +
-        '<div><button style="background:#001ba0;color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer" onclick="location.reload()">Recargar</button></div></div>'
-      );
-    };
-
-    try {
-      app.mount('#app');
-      console.log('[OK] Vue app montada exitosamente en #app');
-      if (skeleton) skeleton.style.display = 'none';
-    } catch (errMount) {
-      console.error('Error al montar Vue app:', errMount);
-      setSkeleton(
-        '<div class="text-sm text-red-700 font-bold flex flex-col gap-2 p-4 rounded-2xl bg-red-50 border border-red-200 max-w-2xl"><div class="flex items-center gap-2"><i class="fas fa-exclamation-triangle text-red-500"></i> ' +
-        'No se pudo inicializar la app: ' + ((errMount && errMount.message) || String(errMount)) +
-        '</div><div><button style="background:#001ba0;color:#fff;padding:8px 14px;border-radius:12px;font-weight:700;cursor:pointer" onclick="location.reload()">Recargar</button></div></div>'
-      );
-    }
-
-    // Service Worker update listener
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then((registration) => {
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available, show toast and reload
-                if (confirm('Hay una nueva versi�n disponible. �Recargar ahora?')) {
-                  window.location.reload();
-                }
-              }
-            });
-          }
-        });
+/**
+ * Punto de entrada de la aplicación.
+ *
+ * Este archivo ensambla: carga las plantillas, arma el estado a partir de los
+ * composables y monta Vue. La lógica de verdad vive en `nucleo/`, `servicios/`
+ * y `composables/`; acá solo se conectan las piezas y se exponen a las vistas.
+ *
+ * Antes esto era un solo archivo de 65 KB con todo adentro: estado, llamadas
+ * HTTP, canvas, IndexedDB y la lógica de las catorce pantallas. Cualquier
+ * cambio implicaba leerlo entero para no romper algo tres pantallas más abajo.
+ */
+
+import { cargarPlantillas } from './nucleo/cargadorVistas.js';
+import { almacenSesion } from './nucleo/almacenSesion.js';
+import { http } from './nucleo/clienteHttp.js';
+import { tema } from './nucleo/tema.js';
+import * as formato from './nucleo/formato.js';
+
+import { api } from './servicios/servicioApi.js';
+import { disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE } from './servicios/servicioTarjetas.js';
+
+import { usarNotificaciones } from './composables/usarNotificaciones.js';
+import { usarCatalogo } from './composables/usarCatalogo.js';
+import { usarPermisos } from './composables/usarPermisos.js';
+import { usarEscanerQr } from './composables/usarEscanerQr.js';
+import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
+
+import { guiaDe } from './contenido/guias.js';
+import { MENU, DISTRITOS } from './contenido/menu.js';
+import { registrarComponentes } from './componentes/comunes.js';
+
+const { createApp, ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
+
+/** Actualiza el texto de la pantalla de carga inicial. */
+function avisarCarga(texto) {
+  const elemento = document.getElementById('pantalla-carga-texto');
+  if (elemento) elemento.textContent = texto;
+}
+
+/** Muestra un error fatal cuando ni siquiera se pudo arrancar. */
+function mostrarErrorFatal(mensaje) {
+  const pantalla = document.getElementById('pantalla-carga');
+  if (!pantalla) return;
+
+  pantalla.innerHTML = `
+    <div style="max-width:460px;padding:32px;text-align:center;font-family:Outfit,sans-serif">
+      <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:#fef3f2;
+                  display:flex;align-items:center;justify-content:center;font-size:24px;color:#d92d20">!</div>
+      <h1 style="margin:0 0 8px;font-size:18px;font-weight:600;color:#101828">No se pudo iniciar el sistema</h1>
+      <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#667085">${mensaje}</p>
+      <button onclick="location.reload()"
+              style="padding:10px 20px;border:none;border-radius:8px;background:#465fff;color:#fff;
+                     font-family:inherit;font-size:14px;font-weight:500;cursor:pointer">
+        Reintentar
+      </button>
+    </div>`;
+}
+
+async function iniciar() {
+  // --- 1. Cargar las plantillas ------------------------------------------
+  let plantilla;
+  try {
+    plantilla = await cargarPlantillas('aplicacion.html', '/assets/views/', avisarCarga);
+  } catch (fallo) {
+    console.error('[app] Error cargando plantillas:', fallo);
+    mostrarErrorFatal(fallo.message || 'No se pudieron cargar las vistas del sistema.');
+    return;
+  }
+
+  const contenedor = document.getElementById('app');
+  contenedor.innerHTML = plantilla;
+
+  // --- 2. Definir la aplicación ------------------------------------------
+  const aplicacion = createApp({
+    setup() {
+      // ---- Estado general ----
+      const cargando = ref(true);
+      const vista = ref('scanner');
+      const modoPublico = ref(false);
+      const anchoVentana = ref(window.innerWidth);
+
+      const sesion = reactive({
+        token: null, usuario: null, correo: null,
+        nombreMostrar: null, rol: null, rolId: null
       });
+
+      // El sidebar arranca abierto en escritorio y cerrado en móvil, donde
+      // flota por encima del contenido.
+      const sidebarAbierto = ref(window.innerWidth >= 1024);
+      const sidebarMovil = ref(false);
+      const menuUsuarioAbierto = ref(false);
+
+      // La vista de usuarios tiene dos pestañas: cuentas y roles.
+      const pestanaUsuarios = ref('usuarios');
+
+      const esMovil = computed(() => anchoVentana.value < 1024);
+      const haySesion = computed(() => Boolean(sesion.token));
+
+      // ---- Notificaciones ----
+      const {
+        notificaciones, cerrarNotificacion, notificar,
+        notificarExito, notificarError, notificarAlerta, notificarInfo
+      } = usarNotificaciones();
+
+      // ---- Tema ----
+      const modoOscuro = ref(tema.esOscuro());
+      function alternarTema() {
+        modoOscuro.value = tema.alternar() === 'oscuro';
+      }
+
+      // ---- Catálogos que llegan en el bundle inicial ----
+      const asistencias = ref([]);
+      const permisosCargados = ref([]);
+      const eventoActivo = ref(null);
+      const resumen = reactive({ total: 0 });
+
+      // Las asistencias no usan usarCatalogo porque son de solo lectura: no
+      // tienen formulario ni modal, solo listado y búsqueda.
+      const busquedaAsistencias = ref('');
+      const asistenciasFiltradas = computed(() => {
+        const termino = busquedaAsistencias.value.trim();
+        if (!termino) return asistencias.value;
+        return asistencias.value.filter(
+          (fila) =>
+            formato.coincide(fila.empleadoNombre, termino) ||
+            formato.coincide(fila.dui, termino)
+        );
+      });
+
+      // ---- Sesión ----
+      const formularioLogin = reactive({ usuario: '', password: '' });
+      const errorLogin = ref('');
+      const entrando = ref(false);
+      const verPassword = ref(false);
+      const modalCierreAbierto = ref(false);
+
+      // ---- Cambio de la contraseña propia ----
+      const cambioClave = reactive({
+        abierto: false,
+        actual: '',
+        nueva: '',
+        repetida: '',
+        verClaves: false,
+        guardando: false,
+        error: '',
+        // Se enciende cuando el login avisa que la clave sigue siendo temporal.
+        esObligatorio: false
+      });
+
+      function abrirCambioClave(obligatorio = false) {
+        Object.assign(cambioClave, {
+          abierto: true,
+          actual: '',
+          nueva: '',
+          repetida: '',
+          verClaves: false,
+          error: '',
+          esObligatorio: obligatorio
+        });
+        menuUsuarioAbierto.value = false;
+      }
+
+      async function guardarClaveNueva() {
+        cambioClave.error = '';
+
+        if (cambioClave.nueva !== cambioClave.repetida) {
+          cambioClave.error = 'Las dos contraseñas nuevas no coinciden.';
+          return;
+        }
+        if (cambioClave.nueva.length < 8) {
+          cambioClave.error = 'La contraseña nueva debe tener al menos 8 caracteres.';
+          return;
+        }
+
+        cambioClave.guardando = true;
+        try {
+          await api.usuarios.cambiarMiClave(cambioClave.actual, cambioClave.nueva);
+          cambioClave.abierto = false;
+          cambioClave.esObligatorio = false;
+          notificarExito('Tu contraseña quedó actualizada.');
+          // Recargamos para que la lista de usuarios refleje que ya no es temporal.
+          await recargarCatalogos();
+        } catch (fallo) {
+          cambioClave.error = fallo.message || 'No se pudo cambiar la contraseña.';
+        } finally {
+          cambioClave.guardando = false;
+        }
+      }
+
+      // ---- Guías ----
+      const guiaAbierta = ref(false);
+      const guiaActual = ref(guiaDe('scanner'));
+
+      function abrirGuia() {
+        guiaActual.value = guiaDe(vista.value);
+        guiaAbierta.value = true;
+      }
+
+      // =====================================================================
+      // Catálogos
+      //
+      // Cada uno son cuatro líneas gracias a usarCatalogo: trae lista,
+      // búsqueda, paginación, modal, formulario y guardado.
+      // =====================================================================
+
+      const departamentos = usarCatalogo({
+        alGuardar: (datos) => api.departamentos.guardar(datos),
+        formularioVacio: { id: null, codDpto: '', nombreDpto: '', activo: 'TRUE' },
+        alAbrir: (registro) => ({
+          id: registro.id,
+          codDpto: registro.cod_dpto || '',
+          nombreDpto: registro.nombre_dpto || '',
+          activo: String(registro.activo || 'TRUE').toUpperCase()
+        }),
+        camposBusqueda: ['nombre_dpto', 'cod_dpto']
+      });
+
+      const empleados = usarCatalogo({
+        alGuardar: (datos) => api.empleados.guardar(datos),
+        formularioVacio: {
+          id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '',
+          fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE'
+        },
+        alAbrir: (registro) => ({
+          id: registro.id,
+          distrito: registro.distrito || '',
+          dpto: registro.dpto || '',
+          cargo: registro.cargo || '',
+          nombres: registro.nombres || '',
+          apellidos: registro.apellidos || '',
+          fechaNacimiento: formato.aFechaIso(registro.fecha_nacimiento),
+          telefono: registro.telefono || '',
+          correo: registro.correo || '',
+          dui: formato.formatearDui(registro.dui),
+          codigo: registro.codigo || '',
+          activo: String(registro.activo || 'TRUE').toUpperCase()
+        }),
+        camposBusqueda: ['nombres', 'apellidos', 'dui', 'codigo', 'cargo'],
+        porPagina: 10
+      });
+
+      const premios = usarCatalogo({
+        alGuardar: (datos) => api.premios.guardar(datos),
+        formularioVacio: { id: null, nombre: '', descripcion: '', cantidad: 1, activo: 'TRUE' },
+        camposBusqueda: ['nombre', 'descripcion']
+      });
+
+      const usuarios = usarCatalogo({
+        alGuardar: (datos) => api.usuarios.guardar(datos),
+        formularioVacio: {
+          id: null, empleado: '', telefono: '', correo: '',
+          usuario: '', passwordPlano: '', rol: '', activo: 'TRUE'
+        },
+        alAbrir: (registro) => ({
+          id: registro.id,
+          empleado: registro.empleadoId || '',
+          telefono: registro.telefono || '',
+          correo: registro.correo || '',
+          usuario: registro.usuario || '',
+          passwordPlano: '',   // nunca se precarga: si se deja vacío, no se cambia
+          rol: registro.rolId || '',
+          activo: String(registro.activo || 'TRUE').toUpperCase()
+        }),
+        camposBusqueda: ['usuario', 'correo', 'empleadoNombre', 'rolNombre']
+      });
+
+      const roles = usarCatalogo({
+        alGuardar: (datos) => api.roles.guardar(datos),
+        formularioVacio: { id: null, nombreRol: '', descripcion: '', activo: 'TRUE' },
+        alAbrir: (registro) => ({
+          id: registro.id,
+          nombreRol: registro.nombre_rol || '',
+          descripcion: registro.descripcion || '',
+          activo: String(registro.activo || 'TRUE').toUpperCase()
+        }),
+        camposBusqueda: ['nombre_rol', 'descripcion']
+      });
+
+      const eventos = usarCatalogo({
+        alGuardar: (datos) => api.eventos.guardar(datos),
+        formularioVacio: { id: null, nombre: '', fechaEvento: '', ubicacion: '', activo: 'FALSE' },
+        alAbrir: (registro) => ({
+          id: registro.id,
+          nombre: registro.nombre || '',
+          fechaEvento: registro.fecha_evento || '',
+          ubicacion: registro.ubicacion || '',
+          activo: String(registro.activo || 'FALSE').toUpperCase()
+        }),
+        camposBusqueda: ['nombre', 'ubicacion']
+      });
+
+      const sorteos = usarCatalogo({
+        alGuardar: (datos) => api.sorteos.guardar(datos),
+        formularioVacio: { id: null, nombre: '', premio: '' },
+        camposBusqueda: ['nombre']
+      });
+
+      // ---- Permisos ----
+      const permisos = usarPermisos({
+        sesion,
+        obtenerPermisos: () => permisosCargados.value,
+        obtenerRoles: () => roles.lista,
+        notificar
+      });
+
+      // =====================================================================
+      // Carga de catálogos
+      // =====================================================================
+
+      function poblarCatalogos(bundle) {
+        if (!bundle) return;
+
+        empleados.lista = bundle.empleados || [];
+        departamentos.lista = bundle.departamentos || [];
+        premios.lista = bundle.premios || [];
+        roles.lista = bundle.roles || [];
+        usuarios.lista = bundle.usuarios || [];
+        eventos.lista = bundle.eventos || [];
+        sorteos.lista = bundle.sorteos || [];
+
+        permisosCargados.value = bundle.permisos || [];
+        asistencias.value = bundle.asistencias || [];
+        eventoActivo.value =
+          bundle.eventoActivo ||
+          (bundle.eventos || []).find((evento) => formato.esVerdadero(evento.activo)) ||
+          null;
+        resumen.total = bundle.resumen?.total ?? asistencias.value.length;
+
+        permisos.seleccionarPrimerRol();
+      }
+
+      async function recargarCatalogos() {
+        if (!sesion.token) return;
+        try {
+          poblarCatalogos(await api.sesion.catalogos());
+        } catch (fallo) {
+          if (!fallo.esSesionVencida) {
+            console.error('[app] No se pudieron recargar los catálogos:', fallo);
+          }
+        }
+      }
+
+      // =====================================================================
+      // Autenticación
+      // =====================================================================
+
+      async function iniciarSesion() {
+        errorLogin.value = '';
+        entrando.value = true;
+
+        try {
+          const respuesta = await api.sesion.iniciar(
+            formularioLogin.usuario.trim(),
+            formularioLogin.password
+          );
+
+          Object.assign(sesion, {
+            token: respuesta.token,
+            usuario: respuesta.usuario,
+            correo: respuesta.correo,
+            nombreMostrar: respuesta.nombreMostrar,
+            rol: respuesta.rol,
+            rolId: respuesta.rolId
+          });
+          almacenSesion.guardar(respuesta);
+          poblarCatalogos(respuesta.datosIniciales);
+
+          formularioLogin.password = '';
+          vista.value = 'scanner';
+          notificarExito(`Bienvenido, ${respuesta.nombreMostrar || respuesta.usuario}.`);
+
+          // Si la clave sigue siendo la temporal, abrimos el cambio de una vez.
+          // Avisar con una notificación no alcanzaba: desaparece a los pocos
+          // segundos y nadie volvía a acordarse.
+          if (respuesta.debeCambiarContrasena) {
+            abrirCambioClave(true);
+          }
+        } catch (fallo) {
+          errorLogin.value = fallo.message || 'No se pudo iniciar sesión.';
+        } finally {
+          entrando.value = false;
+        }
+      }
+
+      /** Limpia todo rastro de la sesión en el navegador. */
+      function limpiarSesion() {
+        almacenSesion.limpiar();
+        Object.assign(sesion, {
+          token: null, usuario: null, correo: null,
+          nombreMostrar: null, rol: null, rolId: null
+        });
+        formularioLogin.usuario = '';
+        formularioLogin.password = '';
+        errorLogin.value = '';
+        verPassword.value = false;
+        vista.value = 'scanner';
+        menuUsuarioAbierto.value = false;
+      }
+
+      async function confirmarCierre() {
+        modalCierreAbierto.value = false;
+        await escaner.detener();
+        try {
+          await api.sesion.cerrar();
+        } catch {
+          // Si el servidor no responde igual cerramos del lado del cliente:
+          // la sesión vence sola en seis horas.
+        }
+        limpiarSesion();
+      }
+
+      // Cuando cualquier petición recibe un 401, el cliente HTTP nos avisa acá.
+      http.alVencerSesion = () => {
+        if (!sesion.token) return;
+        limpiarSesion();
+        notificarAlerta('Tu sesión expiró. Vuelve a iniciar sesión.');
+      };
+
+      // =====================================================================
+      // Escáner
+      // =====================================================================
+
+      const escaner = usarEscanerQr({
+        notificar,
+        obtenerEmpleados: () => empleados.lista,
+        alRegistrar(respuesta, identificador) {
+          // Sumamos el registro a la lista local en el acto, sin esperar a
+          // recargar del servidor: en la puerta se necesita ver el conteo subir.
+          resumen.total += 1;
+          asistencias.value.unshift({
+            id: `local-${Date.now()}`,
+            fechaHora: new Date().toISOString(),
+            empleadoNombre: formato.nombreCompleto(respuesta.empleado),
+            dui: respuesta.empleado?.dui || identificador,
+            fuente: 'qr'
+          });
+        }
+      });
+
+      // =====================================================================
+      // Importación de CSV
+      // =====================================================================
+
+      const importacion = usarImportacionCsv({
+        notificar,
+        alTerminar: recargarCatalogos
+      });
+
+      const importarEmpleados = (evento) =>
+        importacion.importar(evento, 'empleados', (csv) => api.empleados.importar(csv));
+      const importarDepartamentos = (evento) =>
+        importacion.importar(evento, 'departamentos', (csv) => api.departamentos.importar(csv));
+
+      async function exportar(recurso) {
+        try {
+          await api[recurso].exportar();
+          notificarExito('La descarga comenzó.');
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo exportar.');
+        }
+      }
+
+      // =====================================================================
+      // Eventos y sorteos
+      // =====================================================================
+
+      async function activarEvento(eventoId) {
+        try {
+          const respuesta = await api.eventos.activar(eventoId);
+          notificarExito(respuesta.mensaje);
+          await recargarCatalogos();
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo activar el evento.');
+        }
+      }
+
+      const sorteando = ref(false);
+      const ganador = ref(null);
+      const errorSorteo = ref('');
+      const sorteoElegido = ref('');
+
+      async function sortear(sorteoId) {
+        const elegido = sorteoId || sorteoElegido.value || sorteos.formulario.id;
+        if (!elegido) {
+          errorSorteo.value = 'Primero elige un sorteo.';
+          return;
+        }
+
+        errorSorteo.value = '';
+        ganador.value = null;
+        sorteando.value = true;
+
+        try {
+          ganador.value = await api.sorteos.sortear(elegido);
+          notificarExito('¡Tenemos ganador!');
+          await recargarCatalogos();
+        } catch (fallo) {
+          errorSorteo.value = fallo.message || 'No se pudo realizar el sorteo.';
+        } finally {
+          sorteando.value = false;
+        }
+      }
+
+      // =====================================================================
+      // Tarjetas de invitación
+      // =====================================================================
+
+      const plantillas = ref([]);
+      const plantillaElegida = ref('');
+      const nombrePlantilla = ref('');
+      const campoQr = ref('dui');
+      const guardandoPlantilla = ref(false);
+      const hayPlantillaCargada = ref(false);
+
+      const modalGenerarAbierto = ref(false);
+      const seleccionEmpleados = ref([]);
+      const busquedaTarjetas = ref('');
+      const generando = ref(false);
+      const progresoTarjetas = reactive({ hechas: 0, total: 0, porcentaje: 0 });
+
+      const empleadosParaTarjetas = computed(() => {
+        const termino = busquedaTarjetas.value.trim();
+        const lista = empleados.lista.filter((persona) => formato.esVerdadero(persona.activo));
+        if (!termino) return lista;
+        return lista.filter(
+          (persona) =>
+            formato.coincide(formato.nombreCompleto(persona), termino) ||
+            formato.coincide(persona.dui, termino)
+        );
+      });
+
+      async function cargarPlantillas() {
+        try {
+          plantillas.value = await api.tarjetas.plantillas();
+        } catch (fallo) {
+          console.error('[tarjetas]', fallo);
+        }
+      }
+
+      async function subirPlantilla(evento) {
+        const archivo = evento.target.files && evento.target.files[0];
+        evento.target.value = '';
+        if (!archivo) return;
+
+        try {
+          await disenador.cargarPlantillaDesdeArchivo(archivo);
+          hayPlantillaCargada.value = true;
+          notificarExito('Plantilla lista. Arrastra el QR hasta su lugar.');
+        } catch (fallo) {
+          notificarError(fallo.message);
+        }
+      }
+
+      async function guardarPlantilla() {
+        if (!hayPlantillaCargada.value) {
+          notificarError('Primero sube una plantilla.');
+          return;
+        }
+
+        guardandoPlantilla.value = true;
+        try {
+          await api.tarjetas.guardarPlantilla(disenador.datosParaGuardar(nombrePlantilla.value));
+          await cargarPlantillas();
+          nombrePlantilla.value = '';
+          notificarExito('Plantilla guardada.');
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo guardar la plantilla.');
+        } finally {
+          guardandoPlantilla.value = false;
+        }
+      }
+
+      async function eliminarPlantilla(id) {
+        try {
+          await api.tarjetas.eliminarPlantilla(id);
+          await cargarPlantillas();
+          if (plantillaElegida.value === id) plantillaElegida.value = '';
+          notificarExito('Plantilla eliminada.');
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo eliminar.');
+        }
+      }
+
+      /** Deja lista la plantilla guardada que se eligió, para poder generar. */
+      async function prepararPlantillaElegida() {
+        const plantilla = plantillas.value.find((fila) => fila.id === plantillaElegida.value);
+        if (!plantilla) throw new Error('Elige una plantilla primero.');
+        await disenador.usarPlantillaGuardada(plantilla);
+        return plantilla;
+      }
+
+      async function generarUna(empleado) {
+        try {
+          await prepararPlantillaElegida();
+          await disenador.descargarIndividual(empleado);
+          notificarExito('Tarjeta generada.');
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo generar la tarjeta.');
+        }
+      }
+
+      function abrirGeneracionMasiva() {
+        if (plantillas.value.length === 0) {
+          notificarError('Primero guarda al menos una plantilla.');
+          return;
+        }
+        seleccionEmpleados.value = [];
+        busquedaTarjetas.value = '';
+        progresoTarjetas.hechas = 0;
+        progresoTarjetas.total = 0;
+        progresoTarjetas.porcentaje = 0;
+        modalGenerarAbierto.value = true;
+      }
+
+      function alternarSeleccion(id) {
+        const indice = seleccionEmpleados.value.indexOf(id);
+        if (indice >= 0) seleccionEmpleados.value.splice(indice, 1);
+        else seleccionEmpleados.value.push(id);
+      }
+
+      function seleccionarTodosVisibles() {
+        const visibles = empleadosParaTarjetas.value.slice(0, MAXIMO_POR_LOTE).map((e) => e.id);
+        seleccionEmpleados.value =
+          seleccionEmpleados.value.length === visibles.length ? [] : visibles;
+      }
+
+      async function generarLote() {
+        if (seleccionEmpleados.value.length === 0) {
+          notificarError('Selecciona al menos una persona.');
+          return;
+        }
+
+        generando.value = true;
+        try {
+          await prepararPlantillaElegida();
+
+          const elegidos = empleados.lista.filter((persona) =>
+            seleccionEmpleados.value.includes(persona.id)
+          );
+
+          const resultado = await disenador.generarLoteZip(elegidos, disenador.campoQr, (hechas, total) => {
+            progresoTarjetas.hechas = hechas;
+            progresoTarjetas.total = total;
+            progresoTarjetas.porcentaje = Math.round((hechas / total) * 100);
+          });
+
+          modalGenerarAbierto.value = false;
+
+          if (resultado.fallidos.length > 0) {
+            notificarAlerta(
+              `${resultado.generadas} generadas. No se pudo con: ${resultado.fallidos.join(', ')}`
+            );
+          } else {
+            notificarExito(`${resultado.generadas} tarjetas listas. La descarga comenzó.`);
+          }
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo generar el lote.');
+        } finally {
+          generando.value = false;
+          progresoTarjetas.porcentaje = 0;
+        }
+      }
+
+      // =====================================================================
+      // Configuración
+      // =====================================================================
+
+      const interruptores = ref([]);
+      const diagnostico = ref(null);
+      const revisandoSistema = ref(false);
+
+      async function cargarConfiguracion() {
+        try {
+          const datos = await api.configuracion.leer();
+          interruptores.value = datos.interruptores || [];
+        } catch (fallo) {
+          console.error('[configuracion]', fallo);
+        }
+      }
+
+      async function alternarInterruptor(interruptor) {
+        const nuevoValor = interruptor.activo ? 'FALSE' : 'TRUE';
+        // Lo cambiamos en pantalla de inmediato y lo revertimos si falla:
+        // esperar la respuesta hace sentir el interruptor pegajoso.
+        interruptor.activo = !interruptor.activo;
+
+        try {
+          await api.configuracion.guardar(interruptor.clave, nuevoValor);
+          notificarExito(`${interruptor.etiqueta}: ${interruptor.activo ? 'activado' : 'desactivado'}.`);
+        } catch (fallo) {
+          interruptor.activo = !interruptor.activo;
+          notificarError(fallo.message || 'No se pudo guardar el cambio.');
+        }
+      }
+
+      async function revisarSistema() {
+        revisandoSistema.value = true;
+        try {
+          diagnostico.value = await api.asistencias.diagnostico();
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo revisar el sistema.');
+        } finally {
+          revisandoSistema.value = false;
+        }
+      }
+
+      // =====================================================================
+      // Portal público de invitaciones
+      // =====================================================================
+
+      const invitacion = reactive({
+        dui: '', ultimos4: '', resultado: null, error: '', consultando: false
+      });
+
+      async function consultarInvitacion() {
+        invitacion.error = '';
+        invitacion.resultado = null;
+
+        if (!invitacion.dui || !invitacion.ultimos4) {
+          invitacion.error = 'Escribe tu DUI y los últimos 4 dígitos.';
+          return;
+        }
+
+        invitacion.consultando = true;
+        try {
+          invitacion.resultado = await api.invitacion.consultar(invitacion.dui, invitacion.ultimos4);
+        } catch (fallo) {
+          invitacion.error = fallo.message || 'No se pudo consultar la invitación.';
+        } finally {
+          invitacion.consultando = false;
+        }
+      }
+
+      // =====================================================================
+      // Navegación
+      // =====================================================================
+
+      /** Solo las entradas del menú que el rol actual puede ver. */
+      const menuVisible = computed(() =>
+        MENU.map((grupo) => ({
+          ...grupo,
+          items: grupo.items.filter((item) => permisos.tienePermiso(item.modulo, 'Ver'))
+        })).filter((grupo) => grupo.items.length > 0)
+      );
+
+      const tituloVista = computed(() => {
+        for (const grupo of MENU) {
+          const encontrado = grupo.items.find((item) => item.vista === vista.value);
+          if (encontrado) return encontrado.etiqueta;
+        }
+        return 'Panel';
+      });
+
+      async function cambiarVista(nueva) {
+        // Al salir del escáner apagamos la cámara: si no, sigue encendida y
+        // consumiendo batería en segundo plano.
+        if (vista.value === 'scanner' && nueva !== 'scanner') {
+          await escaner.detener();
+        }
+        if (vista.value === 'tarjetas' && nueva !== 'tarjetas') {
+          disenador.desmontar();
+        }
+
+        vista.value = nueva;
+        if (esMovil.value) sidebarMovil.value = false;
+      }
+
+      // Al entrar a tarjetas hay que esperar a que el canvas exista en el DOM.
+      watch(vista, async (nueva) => {
+        if (nueva !== 'tarjetas') return;
+        await nextTick();
+        disenador.montar('canvasTarjeta');
+        cargarPlantillas();
+      });
+
+      watch(vista, (nueva) => {
+        if (nueva === 'configuracion') cargarConfiguracion();
+      });
+
+      // =====================================================================
+      // Ciclo de vida
+      // =====================================================================
+
+      function alRedimensionar() {
+        anchoVentana.value = window.innerWidth;
+        if (window.innerWidth >= 1024) sidebarMovil.value = false;
+      }
+
+      /** Cierra el menú de usuario al hacer clic fuera de él. */
+      function alHacerClicFuera(evento) {
+        if (!menuUsuarioAbierto.value) return;
+        if (!evento.target.closest('[data-menu-usuario]')) {
+          menuUsuarioAbierto.value = false;
+        }
+      }
+
+      onMounted(async () => {
+        window.addEventListener('resize', alRedimensionar);
+        document.addEventListener('click', alHacerClicFuera);
+        tema.seguirAlSistema((modo) => { modoOscuro.value = modo === 'oscuro'; });
+
+        // El portal público no necesita sesión ni catálogos.
+        const parametros = new URLSearchParams(location.search);
+        if (parametros.get('invitacion') === '1') {
+          modoPublico.value = true;
+          vista.value = 'invitacion-publica';
+          const duiPrecargado = parametros.get('dui');
+          if (duiPrecargado) invitacion.dui = duiPrecargado.replace(/[^0-9]/g, '');
+          cargando.value = false;
+          ocultarPantallaCarga();
+          return;
+        }
+
+        // Sesión guardada de una visita anterior.
+        const guardada = almacenSesion.leer();
+        if (guardada && guardada.token) {
+          Object.assign(sesion, guardada);
+          await recargarCatalogos();
+        }
+
+        escaner.vigilarConexion();
+        cargando.value = false;
+        ocultarPantallaCarga();
+      });
+
+      onBeforeUnmount(() => {
+        window.removeEventListener('resize', alRedimensionar);
+        document.removeEventListener('click', alHacerClicFuera);
+        escaner.detener();
+        disenador.desmontar();
+      });
+
+      function ocultarPantallaCarga() {
+        const pantalla = document.getElementById('pantalla-carga');
+        if (pantalla) pantalla.style.display = 'none';
+      }
+
+      // =====================================================================
+      // Lo que ven las plantillas
+      // =====================================================================
+      return {
+        // General
+        cargando, vista, modoPublico, esMovil, haySesion, anchoVentana,
+        sesion, sidebarAbierto, sidebarMovil, menuUsuarioAbierto, pestanaUsuarios,
+        modoOscuro, alternarTema,
+        menuVisible, tituloVista, cambiarVista,
+
+        // Notificaciones
+        notificaciones, cerrarNotificacion,
+        notificar, notificarExito, notificarError, notificarAlerta, notificarInfo,
+
+        // Sesión
+        formularioLogin, errorLogin, entrando, verPassword,
+        iniciarSesion, modalCierreAbierto, confirmarCierre,
+
+        // Guías
+        guiaAbierta, guiaActual, abrirGuia,
+
+        // Cambio de la contraseña propia
+        cambioClave, abrirCambioClave, guardarClaveNueva,
+
+        // Catálogos
+        departamentos, empleados, premios, usuarios, roles, eventos, sorteos,
+        asistencias, busquedaAsistencias, asistenciasFiltradas,
+        permisosCargados, eventoActivo, resumen,
+        recargarCatalogos, DISTRITOS,
+
+        // Permisos
+        permisos,
+
+        // Escáner
+        escaner,
+
+        // Importar / exportar
+        importacion, importarEmpleados, importarDepartamentos, exportar,
+
+        // Eventos y sorteos
+        activarEvento, sortear, sorteando, ganador, errorSorteo, sorteoElegido,
+
+        // Tarjetas
+        plantillas, plantillaElegida, nombrePlantilla, campoQr, hayPlantillaCargada,
+        guardandoPlantilla, subirPlantilla, guardarPlantilla, eliminarPlantilla,
+        modalGenerarAbierto, seleccionEmpleados, busquedaTarjetas, generando,
+        progresoTarjetas, empleadosParaTarjetas, abrirGeneracionMasiva,
+        alternarSeleccion, seleccionarTodosVisibles, generarUna, generarLote,
+        ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
+        aplicarZona: (nombre) => disenador.aplicarZona(nombre),
+        cambiarCampoQr: (campo) => { campoQr.value = campo; disenador.establecerCampoQr(campo); },
+
+        // Configuración
+        interruptores, diagnostico, revisandoSistema,
+        alternarInterruptor, revisarSistema, cargarConfiguracion,
+
+        // Portal público
+        invitacion, consultarInvitacion,
+
+        // Utilidades de formato disponibles en las plantillas
+        ...formato
+      };
     }
   });
 
+  // Si algo revienta dentro de un componente, lo dejamos registrado y avisamos
+  // en pantalla en vez de quedar con la interfaz congelada sin explicación.
+  aplicacion.config.errorHandler = (error, instancia, informacion) => {
+    console.error('[vue]', informacion, error);
+  };
 
+  registrarComponentes(aplicacion);
+  aplicacion.mount('#app');
+}
 
-
-
-
+iniciar();

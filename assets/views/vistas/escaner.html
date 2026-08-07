@@ -1,0 +1,212 @@
+<!--
+  Escáner QR: la pantalla que se usa en la puerta del evento.
+
+  Prioridad de diseño: que el resultado del último escaneo se lea de lejos y de
+  un vistazo. Quien opera esto tiene gente esperando y no puede detenerse a leer
+  texto chico.
+-->
+<section v-show="vista === 'scanner'" class="animar-aparecer">
+
+  <!-- Métricas de arriba -->
+  <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="tarjeta p-5">
+      <div class="metrica-icono bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+        <i class="fa-solid fa-user-check"></i>
+      </div>
+      <p class="metrica-valor">{{ resumen.total }}</p>
+      <p class="metrica-etiqueta">Asistencias registradas</p>
+    </div>
+
+    <div class="tarjeta p-5">
+      <div class="metrica-icono bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+        <i class="fa-solid fa-users"></i>
+      </div>
+      <p class="metrica-valor">{{ empleados.lista.length }}</p>
+      <p class="metrica-etiqueta">Personas en el padrón</p>
+    </div>
+
+    <div class="tarjeta p-5">
+      <div class="metrica-icono"
+           :class="escaner.estadoRed.pendientes > 0
+                   ? 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400'
+                   : 'bg-gray-100 text-gray-400 dark:bg-gray-800'">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+      </div>
+      <p class="metrica-valor">{{ escaner.estadoRed.pendientes }}</p>
+      <p class="metrica-etiqueta">Pendientes de subir</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+
+    <!-- Cámara -->
+    <div class="tarjeta lg:col-span-3">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo">Lector de códigos</h2>
+          <p class="tarjeta-subtitulo">Apunta la cámara al QR de la invitación</p>
+        </div>
+        <span class="insignia" :class="escaner.escaneando ? 'insignia-exito' : 'insignia-neutra'">
+          <span class="h-1.5 w-1.5 rounded-full"
+                :class="escaner.escaneando ? 'bg-success-500' : 'bg-gray-400'"></span>
+          {{ escaner.escaneando ? 'Escaneando' : 'Detenido' }}
+        </span>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <!-- Sin evento activo no tiene sentido escanear: el backend va a
+             rechazar todo. Mejor avisarlo antes de que empiecen a hacer fila. -->
+        <div v-if="!eventoActivo"
+             class="mb-4 flex gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5 text-warning-500"></i>
+          <div>
+            <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">No hay evento activo</p>
+            <p class="mt-0.5 text-theme-sm text-gray-600 dark:text-gray-400">
+              Ve a <button type="button" @click="cambiarVista('eventos')" class="font-medium text-brand-500 underline">Eventos</button>
+              y activa el que corresponde antes de registrar asistencias.
+            </p>
+          </div>
+        </div>
+
+        <!-- Contenedor del lector. La librería inyecta el <video> acá dentro. -->
+        <div class="relative mb-4 overflow-hidden rounded-xl bg-gray-900"
+             :class="escaner.escaneando ? 'aspect-square' : 'aspect-video'">
+          <div id="lector-qr" class="h-full w-full"></div>
+
+          <div v-if="!escaner.escaneando"
+               class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
+            <i class="fa-solid fa-camera text-4xl text-gray-600"></i>
+            <p class="text-theme-sm text-gray-400">La cámara está apagada</p>
+          </div>
+
+          <div v-if="escaner.iniciandoCamara"
+               class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900/80">
+            <i class="fa-solid fa-circle-notch animar-girar text-3xl text-brand-400"></i>
+            <p class="text-theme-sm text-gray-300">Abriendo la cámara…</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <button v-if="!escaner.escaneando"
+                  type="button"
+                  @click="escaner.iniciar()"
+                  class="boton boton-primario flex-1"
+                  :disabled="escaner.iniciandoCamara">
+            <i class="fa-solid fa-camera"></i> Abrir cámara
+          </button>
+          <button v-else
+                  type="button"
+                  @click="escaner.detener()"
+                  class="boton boton-peligro flex-1">
+            <i class="fa-solid fa-stop"></i> Detener
+          </button>
+
+          <label class="boton boton-secundario flex-1 cursor-pointer">
+            <i class="fa-solid fa-image"></i> Leer desde una foto
+            <input type="file" accept="image/*" class="hidden" @change="escaner.leerDesdeFoto($event)" />
+          </label>
+        </div>
+
+        <!-- Ingreso manual: el plan B cuando el QR está rayado o borroso. -->
+        <div class="mt-5 border-t border-gray-200 pt-5 dark:border-gray-800">
+          <label for="dui-manual" class="etiqueta">Registrar a mano</label>
+          <div class="flex gap-2">
+            <input id="dui-manual"
+                   v-model="escaner.identificadorManual"
+                   @keyup.enter="escaner.registrarManual()"
+                   type="text"
+                   inputmode="numeric"
+                   class="campo flex-1"
+                   placeholder="DUI, código de empleado o ID" />
+            <button type="button"
+                    @click="escaner.registrarManual()"
+                    class="boton boton-primario"
+                    :disabled="escaner.procesando">
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+          <p class="texto-ayuda">Sirve el DUI con o sin guion.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Último resultado -->
+    <div class="lg:col-span-2">
+      <div class="tarjeta sticky top-[88px]">
+        <div class="tarjeta-encabezado">
+          <h2 class="tarjeta-titulo">Último registro</h2>
+        </div>
+
+        <div class="tarjeta-cuerpo">
+          <!-- Sin nada escaneado todavía -->
+          <div v-if="!escaner.ultimoResultado" class="py-10 text-center">
+            <i class="fa-solid fa-qrcode mb-3 block text-4xl text-gray-300 dark:text-gray-700"></i>
+            <p class="text-theme-sm text-gray-400">Aquí aparecerá el resultado de cada escaneo</p>
+          </div>
+
+          <template v-else>
+            <!-- Éxito -->
+            <div v-if="!escaner.ultimoResultado.error && !escaner.ultimoResultado.duplicado && !escaner.ultimoResultado.offline"
+                 class="animar-aparecer text-center">
+              <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-success-50 text-4xl text-success-500 dark:bg-success-500/15">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">
+                {{ nombreCompleto(escaner.ultimoResultado.empleado) }}
+              </p>
+              <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+                {{ formatearDui(escaner.ultimoResultado.empleado?.dui) }}
+              </p>
+              <p v-if="escaner.ultimoResultado.empleado?.cargo"
+                 class="text-theme-sm text-gray-500 dark:text-gray-400">
+                {{ escaner.ultimoResultado.empleado.cargo }}
+              </p>
+              <span class="insignia-exito mt-4">Asistencia registrada</span>
+            </div>
+
+            <!-- Ya estaba registrado -->
+            <div v-else-if="escaner.ultimoResultado.duplicado" class="animar-aparecer text-center">
+              <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-warning-50 text-4xl text-warning-500 dark:bg-warning-500/15">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+              </div>
+              <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">
+                {{ nombreCompleto(escaner.ultimoResultado.empleado) }}
+              </p>
+              <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+                {{ formatearDui(escaner.ultimoResultado.empleado?.dui) }}
+              </p>
+              <span class="insignia-alerta mt-4">Ya había ingresado</span>
+            </div>
+
+            <!-- Guardado sin conexión -->
+            <div v-else-if="escaner.ultimoResultado.offline" class="animar-aparecer text-center">
+              <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-light-50 text-4xl text-blue-light-500 dark:bg-blue-light-500/15">
+                <i class="fa-solid fa-cloud-arrow-down"></i>
+              </div>
+              <p class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ escaner.ultimoResultado.mensaje }}
+              </p>
+              <span class="insignia-neutra mt-4">Se subirá al recuperar la señal</span>
+            </div>
+
+            <!-- Error -->
+            <div v-else class="animar-aparecer text-center">
+              <div class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-error-50 text-4xl text-error-500 dark:bg-error-500/15">
+                <i class="fa-solid fa-circle-xmark"></i>
+              </div>
+              <p class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ escaner.ultimoResultado.mensaje }}
+              </p>
+              <span class="insignia-error mt-4">No se registró</span>
+            </div>
+          </template>
+
+          <div v-if="escaner.procesando"
+               class="mt-4 flex items-center justify-center gap-2 text-theme-sm text-gray-500">
+            <i class="fa-solid fa-circle-notch animar-girar"></i> Enviando…
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

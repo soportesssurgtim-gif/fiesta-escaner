@@ -1,0 +1,318 @@
+<!--
+  Usuarios del sistema y roles.
+
+  Dos pestañas en la misma vista porque son la misma tarea: definir quién entra
+  y con qué nivel de acceso.
+-->
+<section v-show="vista === 'usuarios'" class="animar-aparecer">
+
+  <!-- Pestañas -->
+  <div class="mb-6 flex gap-1 rounded-xl border border-gray-200 bg-white p-1 dark:border-gray-800 dark:bg-white/[0.03]">
+    <button type="button"
+            @click="pestanaUsuarios = 'usuarios'"
+            class="flex-1 rounded-lg px-4 py-2.5 text-theme-sm font-medium transition"
+            :class="pestanaUsuarios === 'usuarios'
+                    ? 'bg-brand-500 text-white shadow-theme-xs'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'">
+      <i class="fa-solid fa-user"></i> Usuarios
+    </button>
+    <button type="button"
+            @click="pestanaUsuarios = 'roles'"
+            class="flex-1 rounded-lg px-4 py-2.5 text-theme-sm font-medium transition"
+            :class="pestanaUsuarios === 'roles'
+                    ? 'bg-brand-500 text-white shadow-theme-xs'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'">
+      <i class="fa-solid fa-user-tag"></i> Roles
+    </button>
+  </div>
+
+  <!-- ============================ USUARIOS ============================ -->
+  <div v-show="pestanaUsuarios === 'usuarios'" class="tarjeta">
+
+    <barra-catalogo :catalogo="usuarios" titulo="Usuarios del sistema"
+                    marcador="Usuario, correo o empleado">
+      <template #acciones>
+        <button v-if="permisos.tienePermiso('usuarios', 'Agregar')"
+                type="button" @click="usuarios.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo usuario
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="usuarios.paginados.length === 0">
+      <estado-vacio icono="fa-user-shield"
+                    titulo="No hay usuarios creados"
+                    :buscando="usuarios.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Empleado vinculado</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="cuenta in usuarios.paginados" :key="cuenta.id">
+            <td>
+              <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  {{ iniciales(cuenta.usuario) }}
+                </span>
+                <div class="min-w-0">
+                  <p class="tabla-celda-principal truncate">{{ cuenta.usuario }}</p>
+                  <p v-if="cuenta.correo" class="truncate text-theme-xs text-gray-400">{{ cuenta.correo }}</p>
+                </div>
+              </div>
+            </td>
+            <td>{{ cuenta.empleadoNombre }}</td>
+            <td><span class="insignia-marca">{{ cuenta.rolNombre }}</span></td>
+            <td>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span :class="esVerdadero(cuenta.activo) ? 'insignia-exito' : 'insignia-neutra'">
+                  {{ esVerdadero(cuenta.activo) ? 'Activo' : 'Inactivo' }}
+                </span>
+                <!-- Contraseña temporal sin cambiar: conviene tenerlo a la vista. -->
+                <span v-if="!esVerdadero(cuenta.configurado)" class="insignia-alerta">
+                  <i class="fa-solid fa-key"></i> Clave temporal
+                </span>
+              </div>
+            </td>
+            <td class="text-right">
+              <button v-if="permisos.tienePermiso('usuarios', 'Editar')"
+                      type="button" @click="usuarios.abrir(cuenta)"
+                      class="boton-icono" aria-label="Editar usuario">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="usuarios"></paginacion-tabla>
+  </div>
+
+  <!-- ============================== ROLES ============================== -->
+  <div v-show="pestanaUsuarios === 'roles'" class="tarjeta">
+
+    <barra-catalogo :catalogo="roles" titulo="Roles" marcador="Nombre del rol">
+      <template #acciones>
+        <button v-if="permisos.tienePermiso('usuarios', 'Agregar')"
+                type="button" @click="roles.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo rol
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="roles.paginados.length === 0">
+      <estado-vacio icono="fa-user-tag" titulo="No hay roles definidos"
+                    :buscando="roles.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Rol</th>
+            <th>Usuarios con este rol</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="rol in roles.paginados" :key="rol.id">
+            <td>
+              <p class="tabla-celda-principal">{{ rol.nombre_rol }}</p>
+              <p class="truncate text-theme-xs text-gray-400">
+                {{ rol.descripcion || 'Sin descripción' }}
+              </p>
+            </td>
+            <td>{{ usuarios.lista.filter(u => u.rolId === rol.id).length }}</td>
+            <td>
+              <span :class="esVerdadero(rol.activo) ? 'insignia-exito' : 'insignia-neutra'">
+                {{ esVerdadero(rol.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <div class="flex items-center justify-end gap-1">
+                <button type="button"
+                        @click="permisos.cambiarRol(rol.id); cambiarVista('permisos')"
+                        class="boton-icono" aria-label="Configurar permisos de este rol">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </button>
+                <button v-if="permisos.tienePermiso('usuarios', 'Editar')"
+                        type="button" @click="roles.abrir(rol)"
+                        class="boton-icono" aria-label="Editar rol">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="roles"></paginacion-tabla>
+  </div>
+
+  <!-- Formulario de usuario -->
+  <div v-if="usuarios.modalAbierto" class="modal-fondo" @click.self="usuarios.cerrar()">
+    <div class="modal-panel max-w-lg">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">
+          {{ usuarios.formulario.id ? 'Editar usuario' : 'Nuevo usuario' }}
+        </h2>
+        <button type="button" @click="usuarios.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="usuarios.guardar(recargarCatalogos)">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+          <div class="sm:col-span-2">
+            <label class="etiqueta">Nombre de usuario *</label>
+            <input v-model="usuarios.formulario.usuario" type="text" class="campo"
+                   autocapitalize="none" spellcheck="false" required />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="etiqueta">
+              Contraseña {{ usuarios.formulario.id ? '' : '*' }}
+            </label>
+            <input v-model="usuarios.formulario.passwordPlano" type="text" class="campo"
+                   :placeholder="usuarios.formulario.id ? 'Déjalo vacío para no cambiarla' : 'Mínimo 8 caracteres'"
+                   autocomplete="new-password" />
+            <p class="texto-ayuda">
+              {{ usuarios.formulario.id
+                 ? 'Solo se cambia si escribes una nueva.'
+                 : 'La persona deberá cambiarla en su primer ingreso.' }}
+            </p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="etiqueta">Empleado vinculado</label>
+            <select v-model="usuarios.formulario.empleado" class="campo campo-select">
+              <option value="">Sin vincular</option>
+              <option v-for="persona in empleados.lista" :key="persona.id" :value="persona.id">
+                {{ nombreCompleto(persona) }} — {{ formatearDui(persona.dui) }}
+              </option>
+            </select>
+            <p class="texto-ayuda">Al vincularlo, el sistema muestra su nombre real.</p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Rol</label>
+            <select v-model="usuarios.formulario.rol" class="campo campo-select">
+              <option value="">Sin rol</option>
+              <option v-for="rol in roles.lista" :key="rol.id" :value="rol.id">{{ rol.nombre_rol }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="etiqueta">Correo</label>
+            <input v-model="usuarios.formulario.correo" type="email" class="campo" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Teléfono</label>
+            <input v-model="usuarios.formulario.telefono" type="tel" class="campo" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Estado</label>
+            <div class="flex h-11 items-center gap-3 rounded-lg border border-gray-300 px-4 dark:border-gray-700">
+              <interruptor-simple
+                :model-value="esVerdadero(usuarios.formulario.activo)"
+                @update:model-value="usuarios.formulario.activo = $event ? 'TRUE' : 'FALSE'"
+                etiqueta="Usuario activo"></interruptor-simple>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ esVerdadero(usuarios.formulario.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="usuarios.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ usuarios.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="usuarios.cerrar()" class="boton boton-secundario flex-1">Cancelar</button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="usuarios.guardando">
+            <i v-if="usuarios.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ usuarios.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Formulario de rol -->
+  <div v-if="roles.modalAbierto" class="modal-fondo" @click.self="roles.cerrar()">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">{{ roles.formulario.id ? 'Editar rol' : 'Nuevo rol' }}</h2>
+        <button type="button" @click="roles.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="roles.guardar(recargarCatalogos)">
+        <div class="space-y-4">
+          <div>
+            <label class="etiqueta">Nombre del rol *</label>
+            <input v-model="roles.formulario.nombreRol" type="text" class="campo"
+                   placeholder="LOGISTICA" required />
+            <p class="texto-ayuda">
+              Los roles llamados ADMIN o ADMINISTRADOR tienen acceso total, sin importar la matriz.
+            </p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Descripción</label>
+            <textarea v-model="roles.formulario.descripcion" class="campo campo-area"
+                      placeholder="Para qué sirve este rol y quién debería tenerlo"></textarea>
+            <p class="texto-ayuda">Se muestra en la tarjeta del rol, en Permisos.</p>
+          </div>
+
+          <div>
+            <label class="etiqueta">Estado</label>
+            <div class="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2.5 dark:border-gray-700">
+              <interruptor-simple
+                :model-value="esVerdadero(roles.formulario.activo)"
+                @update:model-value="roles.formulario.activo = $event ? 'TRUE' : 'FALSE'"
+                etiqueta="Rol activo"></interruptor-simple>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ esVerdadero(roles.formulario.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="roles.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ roles.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="roles.cerrar()" class="boton boton-secundario flex-1">Cancelar</button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="roles.guardando">
+            <i v-if="roles.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ roles.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

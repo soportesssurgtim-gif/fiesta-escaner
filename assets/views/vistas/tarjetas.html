@@ -1,0 +1,221 @@
+<!--
+  Diseño y generación de tarjetas de invitación.
+
+  Izquierda: el lienzo donde se arrastra el QR sobre la plantilla.
+  Derecha: los controles y la lista de plantillas ya guardadas.
+-->
+<section v-show="vista === 'tarjetas'" class="animar-aparecer">
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+
+    <!-- Lienzo -->
+    <div class="tarjeta xl:col-span-2">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo">Diseño de la tarjeta</h2>
+          <p class="tarjeta-subtitulo">Arrastra el QR; con la rueda del ratón cambias su tamaño</p>
+        </div>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div v-if="!hayPlantillaCargada"
+             class="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-300 py-16 text-center dark:border-gray-700">
+          <i class="fa-solid fa-image mb-4 text-4xl text-gray-300 dark:text-gray-700"></i>
+          <p class="mb-1 text-theme-sm font-medium text-gray-600 dark:text-gray-400">
+            Sube la plantilla de fondo
+          </p>
+          <p class="mb-5 max-w-sm text-theme-sm text-gray-400">
+            Un PNG con fondo transparente en la zona donde irá el código QR.
+            Mínimo 800 × 600 px.
+          </p>
+          <label class="boton boton-primario cursor-pointer">
+            <i class="fa-solid fa-upload"></i> Elegir archivo PNG
+            <input type="file" accept="image/png" class="hidden" @change="subirPlantilla($event)" />
+          </label>
+        </div>
+
+        <div v-show="hayPlantillaCargada">
+          <div class="overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+            <canvas id="canvasTarjeta"
+                    class="mx-auto block max-w-full cursor-move rounded-lg"
+                    aria-label="Vista previa de la tarjeta"></canvas>
+          </div>
+
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <label class="boton boton-secundario cursor-pointer">
+              <i class="fa-solid fa-rotate"></i> Cambiar plantilla
+              <input type="file" accept="image/png" class="hidden" @change="subirPlantilla($event)" />
+            </label>
+
+            <select @change="aplicarZona($event.target.value)"
+                    class="campo campo-select w-auto" aria-label="Posición rápida del QR">
+              <option value="">Posición rápida…</option>
+              <option v-for="(zona, nombre) in ZONAS_PREDEFINIDAS" :key="nombre" :value="nombre">
+                {{ nombre }}
+              </option>
+            </select>
+
+            <select :value="campoQr" @change="cambiarCampoQr($event.target.value)"
+                    class="campo campo-select w-auto" aria-label="Dato que codifica el QR">
+              <option value="dui">El QR lleva el DUI</option>
+              <option value="codigo">El QR lleva el código interno</option>
+              <option value="url">El QR lleva un enlace al portal</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Controles -->
+    <div class="space-y-6">
+
+      <div class="tarjeta">
+        <div class="tarjeta-encabezado">
+          <h2 class="tarjeta-titulo">Guardar diseño</h2>
+        </div>
+        <div class="tarjeta-cuerpo space-y-4">
+          <div>
+            <label class="etiqueta">Nombre de la plantilla</label>
+            <input v-model="nombrePlantilla" type="text" class="campo"
+                   placeholder="Fiesta 2026 — versión final" />
+          </div>
+
+          <button type="button" @click="guardarPlantilla()" class="boton boton-primario w-full"
+                  :disabled="!hayPlantillaCargada || guardandoPlantilla">
+            <i v-if="guardandoPlantilla" class="fa-solid fa-circle-notch animar-girar"></i>
+            <i v-else class="fa-solid fa-floppy-disk"></i>
+            {{ guardandoPlantilla ? 'Guardando…' : 'Guardar plantilla' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <div class="tarjeta-encabezado">
+          <div>
+            <h2 class="tarjeta-titulo">Plantillas guardadas</h2>
+            <p class="tarjeta-subtitulo">{{ plantillas.length }} disponibles</p>
+          </div>
+        </div>
+
+        <div class="tarjeta-cuerpo">
+          <div v-if="plantillas.length === 0" class="py-6 text-center">
+            <i class="fa-solid fa-folder-open mb-2 block text-3xl text-gray-300 dark:text-gray-700"></i>
+            <p class="text-theme-sm text-gray-400">Todavía no hay plantillas guardadas</p>
+          </div>
+
+          <div v-else class="space-y-2">
+            <label v-for="plantilla in plantillas" :key="plantilla.id"
+                   class="flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition"
+                   :class="plantillaElegida === plantilla.id
+                           ? 'border-brand-400 bg-brand-25 dark:border-brand-500/50 dark:bg-brand-500/10'
+                           : 'border-gray-200 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5'">
+              <input type="radio" :value="plantilla.id" v-model="plantillaElegida"
+                     class="h-4 w-4 shrink-0 accent-brand-500" />
+
+              <img v-if="plantilla.imagen_publica" :src="plantilla.imagen_publica"
+                   :alt="'Vista previa de ' + plantilla.nombre"
+                   class="h-12 w-9 shrink-0 rounded border border-gray-200 object-cover dark:border-gray-700"
+                   loading="lazy" />
+
+              <div class="min-w-0 flex-1">
+                <p class="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                  {{ plantilla.nombre }}
+                </p>
+                <p class="text-theme-xs text-gray-400">QR con {{ plantilla.campo_qr }}</p>
+              </div>
+
+              <button v-if="permisos.tienePermiso('tarjetas', 'Eliminar')"
+                      type="button" @click.prevent="eliminarPlantilla(plantilla.id)"
+                      class="boton-icono boton-icono-peligro shrink-0" aria-label="Eliminar plantilla">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </label>
+          </div>
+
+          <button type="button" @click="abrirGeneracionMasiva()"
+                  class="boton boton-exito mt-4 w-full"
+                  :disabled="!plantillaElegida">
+            <i class="fa-solid fa-file-zipper"></i> Generar invitaciones
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selección de personal y generación en lote -->
+  <div v-if="modalGenerarAbierto" class="modal-fondo" @click.self="modalGenerarAbierto = false">
+    <div class="modal-panel max-w-2xl">
+
+      <div class="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h2 class="modal-titulo">Generar invitaciones</h2>
+          <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+            Hasta {{ MAXIMO_POR_LOTE }} tarjetas por archivo ZIP
+          </p>
+        </div>
+        <button type="button" @click="modalGenerarAbierto = false" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="mb-4 flex flex-col gap-2 sm:flex-row">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
+          <input v-model="busquedaTarjetas" type="search" class="campo w-full pl-10"
+                 placeholder="Buscar por nombre o DUI" />
+        </div>
+        <button type="button" @click="seleccionarTodosVisibles()" class="boton boton-secundario">
+          <i class="fa-solid fa-check-double"></i> Marcar visibles
+        </button>
+      </div>
+
+      <p class="mb-3 text-theme-sm text-gray-500 dark:text-gray-400">
+        {{ seleccionEmpleados.length }} seleccionados de {{ empleadosParaTarjetas.length }}
+      </p>
+
+      <div class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800">
+        <label v-for="persona in empleadosParaTarjetas" :key="persona.id"
+               class="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-2.5 transition last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+          <input type="checkbox"
+                 :checked="seleccionEmpleados.includes(persona.id)"
+                 @change="alternarSeleccion(persona.id)"
+                 class="h-4 w-4 shrink-0 rounded accent-brand-500" />
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ nombreCompleto(persona) }}
+            </p>
+            <p class="text-theme-xs text-gray-400">{{ formatearDui(persona.dui) }}</p>
+          </div>
+          <button type="button" @click.prevent="generarUna(persona)"
+                  class="boton-icono shrink-0" aria-label="Generar solo esta tarjeta">
+            <i class="fa-solid fa-download"></i>
+          </button>
+        </label>
+      </div>
+
+      <!-- Progreso del lote -->
+      <div v-if="generando" class="mt-4">
+        <div class="mb-2 flex items-center justify-between text-theme-xs text-gray-500 dark:text-gray-400">
+          <span>Generando tarjetas…</span>
+          <span class="font-medium">{{ progresoTarjetas.hechas }} / {{ progresoTarjetas.total }}</span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
+          <div class="h-full rounded-full bg-brand-500 transition-all"
+               :style="{ width: progresoTarjetas.porcentaje + '%' }"></div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex gap-3">
+        <button type="button" @click="modalGenerarAbierto = false"
+                class="boton boton-secundario flex-1" :disabled="generando">
+          Cancelar
+        </button>
+        <button type="button" @click="generarLote()" class="boton boton-primario flex-1"
+                :disabled="generando || seleccionEmpleados.length === 0">
+          <i v-if="generando" class="fa-solid fa-circle-notch animar-girar"></i>
+          <i v-else class="fa-solid fa-file-zipper"></i>
+          {{ generando ? 'Generando…' : 'Descargar ZIP' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</section>

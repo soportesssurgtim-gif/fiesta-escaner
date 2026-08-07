@@ -1,0 +1,103 @@
+<!-- Listado de quienes ya marcaron asistencia en el evento activo. -->
+<section v-show="vista === 'asistentes'" class="animar-aparecer">
+
+  <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="tarjeta p-5">
+      <div class="metrica-icono bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
+        <i class="fa-solid fa-user-check"></i>
+      </div>
+      <p class="metrica-valor">{{ asistencias.length }}</p>
+      <p class="metrica-etiqueta">Personas presentes</p>
+    </div>
+
+    <div class="tarjeta p-5">
+      <div class="metrica-icono bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+        <i class="fa-solid fa-users"></i>
+      </div>
+      <p class="metrica-valor">{{ empleados.lista.length }}</p>
+      <p class="metrica-etiqueta">Convocados</p>
+    </div>
+
+    <div class="tarjeta p-5">
+      <div class="metrica-icono bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+        <i class="fa-solid fa-chart-simple"></i>
+      </div>
+      <p class="metrica-valor">
+        {{ empleados.lista.length ? Math.round((asistencias.length / empleados.lista.length) * 100) : 0 }}%
+      </p>
+      <p class="metrica-etiqueta">Nivel de asistencia</p>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <div class="tarjeta-encabezado">
+      <div>
+        <h2 class="tarjeta-titulo">Registro de asistencias</h2>
+        <p class="tarjeta-subtitulo">
+          {{ eventoActivo ? eventoActivo.nombre : 'Sin evento activo' }}
+        </p>
+      </div>
+
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
+          <input v-model="busquedaAsistencias" type="search"
+                 class="campo w-full pl-10 sm:w-64" placeholder="Buscar por nombre o DUI" />
+        </div>
+
+        <button v-if="escaner.estadoRed.pendientes > 0"
+                type="button"
+                @click="escaner.sincronizarPendientes()"
+                :disabled="escaner.estadoRed.sincronizando"
+                class="boton boton-secundario">
+          <i class="fa-solid" :class="escaner.estadoRed.sincronizando ? 'fa-circle-notch animar-girar' : 'fa-cloud-arrow-up'"></i>
+          Subir {{ escaner.estadoRed.pendientes }} pendientes
+        </button>
+
+        <button type="button" @click="recargarCatalogos()" class="boton boton-secundario">
+          <i class="fa-solid fa-arrows-rotate"></i> Actualizar
+        </button>
+      </div>
+    </div>
+
+    <div v-if="asistenciasFiltradas.length === 0">
+      <estado-vacio icono="fa-clipboard-check"
+                    titulo="Todavía no hay asistencias registradas"
+                    descripcion="Los registros aparecerán aquí conforme se escaneen los códigos QR."
+                    :buscando="busquedaAsistencias.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Persona</th>
+            <th>DUI</th>
+            <th>Hora de ingreso</th>
+            <th>Origen</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="fila in asistenciasFiltradas" :key="fila.id">
+            <td>
+              <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                  {{ iniciales(fila.empleadoNombre) }}
+                </span>
+                <span class="tabla-celda-principal">{{ fila.empleadoNombre }}</span>
+              </div>
+            </td>
+            <td class="whitespace-nowrap">{{ formatearDui(fila.dui) }}</td>
+            <td class="whitespace-nowrap">{{ formatearFechaHora(fila.fechaHora) }}</td>
+            <td>
+              <span class="insignia-neutra">
+                <i class="fa-solid" :class="fila.fuente === 'qr' ? 'fa-qrcode' : 'fa-keyboard'"></i>
+                {{ fila.fuente === 'qr' ? 'Escaneo' : 'Manual' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

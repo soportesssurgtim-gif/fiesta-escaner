@@ -1,0 +1,225 @@
+<!--
+  Roles y permisos.
+
+  Maestro-detalle: la lista de roles a la izquierda, la matriz del rol elegido a
+  la derecha. Es mucho más legible que un desplegable sobre una tabla suelta,
+  porque de un vistazo se ve cuántos roles hay, cuánta gente usa cada uno, y en
+  qué se diferencian.
+
+  Regla que la interfaz aplica sola: "ver" es la base. Si se quita, se apagan
+  las otras tres; si se marca cualquiera de las otras, "ver" se enciende.
+-->
+<section v-show="vista === 'permisos'" class="animar-aparecer">
+
+  <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="text-title-sm font-bold text-gray-800 dark:text-white/90">Roles y permisos</h2>
+      <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+        Control de acceso por rol y módulo
+      </p>
+    </div>
+
+    <button v-if="permisos.tienePermiso('permisos', 'Agregar')"
+            type="button" @click="roles.abrir()" class="boton boton-primario self-start sm:self-auto">
+      <i class="fa-solid fa-plus"></i> Crear rol
+    </button>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+
+    <!-- ====================== Lista de roles ====================== -->
+    <div class="flex max-h-[calc(100vh-220px)] flex-col gap-3 overflow-y-auto pr-1">
+      <button v-for="rol in roles.lista"
+              :key="rol.id"
+              type="button"
+              @click="permisos.cambiarRol(rol.id)"
+              class="w-full rounded-2xl border p-4 text-left transition"
+              :class="permisos.rolSeleccionado === rol.id
+                      ? 'border-brand-500 bg-brand-25 ring-1 ring-brand-500 dark:border-brand-500 dark:bg-brand-500/10'
+                      : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]'">
+
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-2">
+            <i class="fa-solid fa-shield-halved shrink-0 text-theme-sm"
+               :class="permisos.esRolDeAccesoTotal(rol)
+                       ? 'text-brand-500'
+                       : (esVerdadero(rol.activo) ? 'text-gray-400' : 'text-gray-300 dark:text-gray-700')"></i>
+            <span class="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              {{ rol.nombre_rol }}
+            </span>
+          </div>
+
+          <span class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-theme-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+            {{ usuarios.lista.filter(u => u.rolId === rol.id).length }}
+            {{ usuarios.lista.filter(u => u.rolId === rol.id).length === 1 ? 'usuario' : 'usuarios' }}
+          </span>
+        </div>
+
+        <p class="mt-1.5 line-clamp-2 text-theme-xs text-gray-500 dark:text-gray-400">
+          {{ rol.descripcion || 'Sin descripción' }}
+        </p>
+
+        <span v-if="!esVerdadero(rol.activo)" class="insignia-neutra mt-2">Inactivo</span>
+      </button>
+
+      <div v-if="roles.lista.length === 0"
+           class="rounded-2xl border border-dashed border-gray-300 p-8 text-center dark:border-gray-700">
+        <i class="fa-solid fa-user-tag mb-2 block text-2xl text-gray-300 dark:text-gray-700"></i>
+        <p class="text-theme-sm text-gray-500 dark:text-gray-400">Todavía no hay roles</p>
+      </div>
+    </div>
+
+    <!-- ====================== Detalle del rol ====================== -->
+    <div v-if="!permisos.rolActual" class="tarjeta">
+      <estado-vacio icono="fa-hand-pointer"
+                    titulo="Elige un rol"
+                    descripcion="Selecciona uno de la lista para ver y editar sus permisos."></estado-vacio>
+    </div>
+
+    <div v-else class="tarjeta flex max-h-[calc(100vh-220px)] flex-col">
+
+      <!-- Encabezado del rol -->
+      <div class="flex shrink-0 flex-col gap-4 border-b border-gray-200 p-5 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-lg font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            {{ permisos.rolActual.nombre_rol.charAt(0).toUpperCase() }}
+          </span>
+          <div class="min-w-0">
+            <h3 class="truncate text-theme-xl font-semibold text-gray-800 dark:text-white/90">
+              {{ permisos.rolActual.nombre_rol }}
+            </h3>
+            <p class="truncate text-theme-sm text-gray-500 dark:text-gray-400">
+              {{ permisos.rolActual.descripcion || 'Sin descripción' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex shrink-0 items-center gap-2">
+          <span v-if="permisos.matrizEsSoloLectura" class="insignia-alerta">
+            <i class="fa-solid fa-eye"></i> Solo lectura
+          </span>
+
+          <button v-if="permisos.tienePermiso('permisos', 'Editar')"
+                  type="button" @click="roles.abrir(permisos.rolActual)"
+                  class="boton-icono" aria-label="Editar los datos del rol">
+            <i class="fa-solid fa-pen"></i>
+          </button>
+
+          <button v-if="!permisos.matrizEsSoloLectura && permisos.tienePermiso('permisos', 'Editar')"
+                  type="button"
+                  @click="permisos.guardar(recargarCatalogos)"
+                  class="boton boton-primario"
+                  :disabled="permisos.guardando">
+            <i v-if="permisos.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            <i v-else class="fa-solid fa-floppy-disk"></i>
+            Guardar
+          </button>
+        </div>
+      </div>
+
+      <!-- Aviso para los roles de acceso total -->
+      <div v-if="permisos.matrizEsSoloLectura"
+           class="mx-5 mt-5 flex shrink-0 gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+        <i class="fa-solid fa-circle-info mt-0.5 text-warning-500"></i>
+        <p class="text-theme-sm text-gray-700 dark:text-gray-300">
+          Este rol tiene acceso total por definición: el servidor lo autoriza sin
+          consultar esta matriz. Se muestra completa para que se entienda su alcance,
+          pero no se puede recortar desde aquí.
+        </p>
+      </div>
+
+      <!-- Barra de la matriz -->
+      <div class="flex shrink-0 flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-theme-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Matriz de acceso por módulo
+          </p>
+          <p class="mt-0.5 text-theme-xs text-gray-400">
+            {{ permisos.resumenMatriz.habilitados }} de {{ permisos.resumenMatriz.total }} módulos visibles para este rol
+          </p>
+        </div>
+
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
+          <input v-model="permisos.busqueda" type="search"
+                 class="campo w-full pl-10 sm:w-56" placeholder="Buscar módulo" />
+        </div>
+      </div>
+
+      <!-- Matriz -->
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div v-if="permisos.filtrados.length === 0">
+          <estado-vacio :buscando="permisos.busqueda.length > 0"></estado-vacio>
+        </div>
+
+        <table v-else class="w-full">
+          <thead class="sticky top-0 z-10 bg-white dark:bg-gray-dark">
+            <tr class="border-y border-gray-100 dark:border-gray-800">
+              <th class="px-5 py-3 text-left text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Módulo del sistema
+              </th>
+              <!-- El encabezado también sirve para marcar la columna entera. -->
+              <th v-for="columna in [
+                    { clave: 'puedeVer', etiqueta: 'Ver' },
+                    { clave: 'puedeAgregar', etiqueta: 'Agregar' },
+                    { clave: 'puedeEditar', etiqueta: 'Editar' },
+                    { clave: 'puedeEliminar', etiqueta: 'Eliminar' }
+                  ]"
+                  :key="columna.clave"
+                  class="px-3 py-3 text-center text-theme-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <button type="button"
+                        @click="permisos.alternarColumna(columna.clave)"
+                        :disabled="permisos.matrizEsSoloLectura"
+                        class="transition hover:text-brand-500 disabled:cursor-not-allowed disabled:hover:text-gray-500"
+                        :title="permisos.matrizEsSoloLectura ? '' : 'Marcar o desmarcar toda la columna'">
+                  {{ columna.etiqueta }}
+                </button>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr v-for="fila in permisos.filtrados"
+                :key="fila.modulo"
+                class="border-b border-gray-100 transition last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
+
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                    {{ fila.etiqueta }}
+                  </span>
+                  <!-- Si no puede ver, las demás acciones no tienen efecto. -->
+                  <span v-if="!fila.puedeVer && permisos.accionesActivas(fila) === 0"
+                        class="text-theme-xs text-gray-400">sin acceso</span>
+                </div>
+              </td>
+
+              <td v-for="accion in ['puedeVer', 'puedeAgregar', 'puedeEditar', 'puedeEliminar']"
+                  :key="accion"
+                  class="px-3 py-3.5 text-center">
+                <button type="button"
+                        role="switch"
+                        :aria-checked="permisos.matrizEsSoloLectura ? true : fila[accion]"
+                        :aria-label="accion + ' en ' + fila.etiqueta"
+                        :disabled="permisos.matrizEsSoloLectura"
+                        @click="permisos.alternar(fila, accion)"
+                        class="interruptor"
+                        :class="[
+                          { 'interruptor-activo': permisos.matrizEsSoloLectura || fila[accion] },
+                          permisos.matrizEsSoloLectura ? 'cursor-not-allowed opacity-60' : ''
+                        ]"></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="shrink-0 border-t border-gray-200 px-5 py-3 dark:border-gray-800">
+        <p class="text-theme-xs text-gray-400">
+          Los cambios se aplican la próxima vez que esa persona inicie sesión.
+          Ocultar un botón no es la única barrera: el servidor vuelve a validar cada operación.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

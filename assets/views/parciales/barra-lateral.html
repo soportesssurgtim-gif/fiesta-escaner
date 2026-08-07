@@ -1,0 +1,115 @@
+<!--
+  Barra lateral.
+
+  Tres comportamientos según el ancho:
+    · Escritorio abierto  → 290 px, con etiquetas
+    · Escritorio colapsado → 90 px, solo iconos con tooltip al pasar el ratón
+    · Móvil               → se desliza por encima del contenido
+
+  Las opciones salen de contenido/menu.js y se filtran por permisos, así que
+  cada persona ve únicamente lo suyo.
+-->
+<aside class="fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300 dark:border-gray-800 dark:bg-gray-dark"
+       :class="[
+         sidebarAbierto ? 'w-[290px]' : 'w-[90px]',
+         sidebarMovil ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+       ]">
+
+  <!-- Encabezado con el logo -->
+  <div class="flex h-[72px] shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800"
+       :class="{ 'justify-center px-0': !sidebarAbierto }">
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
+      <i class="fa-solid fa-qrcode"></i>
+    </div>
+    <div v-if="sidebarAbierto" class="min-w-0">
+      <p class="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">Asistencia SSSur</p>
+      <p class="truncate text-theme-xs text-gray-500 dark:text-gray-400">Gerencia de Tecnología</p>
+    </div>
+  </div>
+
+  <!-- Evento activo. Es la información más importante de la pantalla: si no
+       hay evento activo, el escáner no registra nada. -->
+  <div v-if="sidebarAbierto" class="shrink-0 px-4 py-4">
+    <div v-if="eventoActivo"
+         class="rounded-xl border border-success-200 bg-success-50 p-3 dark:border-success-500/30 dark:bg-success-500/10">
+      <div class="flex items-center gap-2">
+        <span class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-400 opacity-75"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-success-500"></span>
+        </span>
+        <p class="text-theme-xs font-semibold uppercase tracking-wide text-success-700 dark:text-success-400">
+          Evento activo
+        </p>
+      </div>
+      <p class="mt-1.5 truncate text-theme-sm font-medium text-gray-800 dark:text-white/90"
+         :title="eventoActivo.nombre">
+        {{ eventoActivo.nombre }}
+      </p>
+      <p v-if="eventoActivo.fecha_evento" class="text-theme-xs text-gray-500 dark:text-gray-400">
+        {{ formatearFechaLarga(eventoActivo.fecha_evento) }}
+      </p>
+    </div>
+
+    <div v-else
+         class="rounded-xl border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation text-warning-500"></i>
+        <p class="text-theme-xs font-semibold uppercase tracking-wide text-warning-700 dark:text-warning-400">
+          Sin evento activo
+        </p>
+      </div>
+      <p class="mt-1.5 text-theme-xs text-gray-600 dark:text-gray-400">
+        Activa un evento para poder registrar asistencias.
+      </p>
+    </div>
+  </div>
+
+  <!-- Menú -->
+  <nav class="flex-1 overflow-y-auto px-4 pb-6" :class="{ 'px-3': !sidebarAbierto }">
+    <div v-for="grupo in menuVisible" :key="grupo.titulo" class="mb-6">
+      <p v-if="sidebarAbierto" class="grupo-menu-titulo">{{ grupo.titulo }}</p>
+      <!-- Colapsado no hay espacio para el título del grupo, así que lo
+           reemplazamos por una línea divisoria. -->
+      <div v-else class="mb-3 border-t border-gray-200 dark:border-gray-800"></div>
+
+      <ul class="space-y-1">
+        <li v-for="item in grupo.items" :key="item.vista">
+          <button type="button"
+                  @click="cambiarVista(item.vista)"
+                  class="enlace-menu relative"
+                  :class="[
+                    { 'enlace-menu-activo': vista === item.vista },
+                    { 'justify-center': !sidebarAbierto }
+                  ]"
+                  :title="sidebarAbierto ? '' : item.etiqueta">
+            <span class="enlace-menu-icono"><i class="fa-solid" :class="item.icono"></i></span>
+            <span v-if="sidebarAbierto" class="truncate">{{ item.etiqueta }}</span>
+            <span v-if="!sidebarAbierto" class="menu-tooltip">{{ item.etiqueta }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Pie: estado de conexión y pendientes por sincronizar -->
+  <div class="shrink-0 border-t border-gray-200 p-4 dark:border-gray-800">
+    <div class="flex items-center gap-2" :class="{ 'justify-center': !sidebarAbierto }">
+      <span class="h-2 w-2 shrink-0 rounded-full"
+            :class="escaner.estadoRed.enLinea ? 'bg-success-500' : 'bg-error-500'"></span>
+      <span v-if="sidebarAbierto" class="text-theme-xs text-gray-500 dark:text-gray-400">
+        {{ escaner.estadoRed.enLinea ? 'En línea' : 'Sin conexión' }}
+      </span>
+    </div>
+
+    <button v-if="escaner.estadoRed.pendientes > 0"
+            type="button"
+            @click="escaner.sincronizarPendientes()"
+            :disabled="escaner.estadoRed.sincronizando"
+            class="mt-3 w-full rounded-lg border border-warning-300 bg-warning-50 px-3 py-2 text-theme-xs font-medium text-warning-700 transition hover:bg-warning-100 disabled:opacity-60 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+      <i class="fa-solid" :class="escaner.estadoRed.sincronizando ? 'fa-circle-notch animar-girar' : 'fa-cloud-arrow-up'"></i>
+      <span v-if="sidebarAbierto" class="ml-1.5">
+        {{ escaner.estadoRed.pendientes }} por subir
+      </span>
+    </button>
+  </div>
+</aside>

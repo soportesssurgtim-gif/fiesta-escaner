@@ -1,0 +1,124 @@
+<!-- Catálogo de departamentos / unidades organizativas. -->
+<section v-show="vista === 'departamentos'" class="animar-aparecer">
+  <div class="tarjeta">
+
+    <barra-catalogo :catalogo="departamentos" titulo="Departamentos"
+                    marcador="Nombre o código">
+      <template #acciones>
+        <button type="button" @click="exportar('departamentos')" class="boton boton-secundario">
+          <i class="fa-solid fa-file-arrow-down"></i> Exportar
+        </button>
+
+        <label v-if="permisos.tienePermiso('departamentos', 'Agregar')"
+               class="boton boton-secundario cursor-pointer">
+          <i class="fa-solid fa-file-arrow-up"></i> Importar
+          <input type="file" accept=".csv,text/csv" class="hidden" @change="importarDepartamentos($event)" />
+        </label>
+
+        <button v-if="permisos.tienePermiso('departamentos', 'Agregar')"
+                type="button" @click="departamentos.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="departamentos.paginados.length === 0">
+      <estado-vacio icono="fa-building"
+                    titulo="No hay departamentos registrados"
+                    descripcion="Los departamentos sirven para clasificar al personal."
+                    :buscando="departamentos.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Departamento</th>
+            <th>Código</th>
+            <th>Personal asignado</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="dep in departamentos.paginados" :key="dep.id">
+            <td class="tabla-celda-principal">{{ dep.nombre_dpto }}</td>
+            <td>{{ dep.cod_dpto || '—' }}</td>
+            <td>{{ empleados.lista.filter(e => e.dpto === dep.id).length }}</td>
+            <td>
+              <span :class="esVerdadero(dep.activo) ? 'insignia-exito' : 'insignia-neutra'">
+                {{ esVerdadero(dep.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <button v-if="permisos.tienePermiso('departamentos', 'Editar')"
+                      type="button" @click="departamentos.abrir(dep)"
+                      class="boton-icono" aria-label="Editar departamento">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="departamentos"></paginacion-tabla>
+  </div>
+
+  <div v-if="departamentos.modalAbierto" class="modal-fondo" @click.self="departamentos.cerrar()">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">
+          {{ departamentos.formulario.id ? 'Editar departamento' : 'Nuevo departamento' }}
+        </h2>
+        <button type="button" @click="departamentos.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="departamentos.guardar(recargarCatalogos)">
+        <div class="space-y-4">
+          <div>
+            <label class="etiqueta">Nombre *</label>
+            <input v-model="departamentos.formulario.nombreDpto" type="text" class="campo" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">Código</label>
+            <input v-model="departamentos.formulario.codDpto" type="text" class="campo" placeholder="Opcional" />
+          </div>
+
+          <div>
+            <label class="etiqueta">Estado</label>
+            <div class="flex items-center gap-3 rounded-lg border border-gray-300 px-4 py-2.5 dark:border-gray-700">
+              <interruptor-simple
+                :model-value="esVerdadero(departamentos.formulario.activo)"
+                @update:model-value="departamentos.formulario.activo = $event ? 'TRUE' : 'FALSE'"
+                etiqueta="Departamento activo"></interruptor-simple>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">
+                {{ esVerdadero(departamentos.formulario.activo) ? 'Activo' : 'Inactivo' }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="departamentos.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ departamentos.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="departamentos.cerrar()" class="boton boton-secundario flex-1">
+            Cancelar
+          </button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="departamentos.guardando">
+            <i v-if="departamentos.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ departamentos.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

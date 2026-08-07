@@ -1,0 +1,119 @@
+<!--
+  Administración de sorteos.
+
+  Acá se configuran; la extracción en vivo frente al público ocurre en la vista
+  de rifas, que está pensada para proyectarse.
+-->
+<section v-show="vista === 'sorteos'" class="animar-aparecer">
+  <div class="tarjeta">
+
+    <barra-catalogo :catalogo="sorteos" titulo="Administrar sorteos" marcador="Nombre del sorteo">
+      <template #acciones>
+        <button v-if="permisos.tienePermiso('sorteos', 'Agregar')"
+                type="button" @click="sorteos.abrir()" class="boton boton-primario">
+          <i class="fa-solid fa-plus"></i> Nuevo sorteo
+        </button>
+      </template>
+    </barra-catalogo>
+
+    <div v-if="sorteos.paginados.length === 0">
+      <estado-vacio icono="fa-ticket"
+                    titulo="No hay sorteos configurados"
+                    descripcion="Crea un sorteo y vincúlalo a un premio."
+                    :buscando="sorteos.busqueda.length > 0"></estado-vacio>
+    </div>
+
+    <div v-else class="tabla-contenedor">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Sorteo</th>
+            <th>Premio</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="sorteo in sorteos.paginados" :key="sorteo.id">
+            <td class="tabla-celda-principal">{{ sorteo.nombre }}</td>
+            <td>
+              {{ (premios.lista.find(p => p.id === sorteo.premio) || {}).nombre || 'Sin premio asignado' }}
+            </td>
+            <td>
+              <span :class="esVerdadero(sorteo.realizado) ? 'insignia-neutra' : 'insignia-exito'">
+                <i class="fa-solid" :class="esVerdadero(sorteo.realizado) ? 'fa-flag-checkered' : 'fa-hourglass-half'"></i>
+                {{ esVerdadero(sorteo.realizado) ? 'Finalizado' : 'Pendiente' }}
+              </span>
+            </td>
+            <td class="text-right">
+              <div class="flex items-center justify-end gap-1">
+                <button v-if="!esVerdadero(sorteo.realizado) && permisos.tienePermiso('sorteos', 'Editar')"
+                        type="button"
+                        @click="sorteoElegido = sorteo.id; cambiarVista('rifa')"
+                        class="boton-icono" aria-label="Ir a sortear">
+                  <i class="fa-solid fa-dice"></i>
+                </button>
+                <button v-if="permisos.tienePermiso('sorteos', 'Editar')"
+                        type="button" @click="sorteos.abrir(sorteo)"
+                        class="boton-icono" aria-label="Editar sorteo">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <paginacion-tabla :catalogo="sorteos"></paginacion-tabla>
+  </div>
+
+  <div v-if="sorteos.modalAbierto" class="modal-fondo" @click.self="sorteos.cerrar()">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-6 flex items-start justify-between gap-4">
+        <h2 class="modal-titulo">
+          {{ sorteos.formulario.id ? 'Editar sorteo' : 'Nuevo sorteo' }}
+        </h2>
+        <button type="button" @click="sorteos.cerrar()" class="boton-icono" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form @submit.prevent="sorteos.guardar(recargarCatalogos)">
+        <div class="space-y-4">
+          <div>
+            <label class="etiqueta">Nombre del sorteo *</label>
+            <input v-model="sorteos.formulario.nombre" type="text" class="campo"
+                   placeholder="Rifa principal" required />
+          </div>
+
+          <div>
+            <label class="etiqueta">Premio</label>
+            <select v-model="sorteos.formulario.premio" class="campo campo-select">
+              <option value="">Sin premio asignado</option>
+              <option v-for="premio in premios.lista" :key="premio.id" :value="premio.id">
+                {{ premio.nombre }} ({{ premio.cantidad }} disponibles)
+              </option>
+            </select>
+            <p class="texto-ayuda">Al extraer un ganador se descuenta una unidad.</p>
+          </div>
+        </div>
+
+        <div v-if="sorteos.error"
+             class="mt-5 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ sorteos.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="sorteos.cerrar()" class="boton boton-secundario flex-1">Cancelar</button>
+          <button type="submit" class="boton boton-primario flex-1" :disabled="sorteos.guardando">
+            <i v-if="sorteos.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ sorteos.guardando ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

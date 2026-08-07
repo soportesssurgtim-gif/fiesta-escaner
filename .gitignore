@@ -1,9 +1,104 @@
+# =====================================================================
+# Qué NO se sube al repositorio
+#
+# El criterio: se ignora lo que se puede regenerar, lo que es de una
+# máquina en particular, y lo que no debe salir de ella nunca.
+# Todo lo demás va versionado, incluidas las migraciones de la base.
+# =====================================================================
+
+
+# --- Dependencias ----------------------------------------------------
+# Se reinstalan con `npm install`. package.json y package-lock.json SÍ van
+# versionados: son los que fijan qué versiones instalar.
 node_modules/
+
+
+# --- Secretos y configuración de cada máquina ------------------------
+# configuracion.local.mjs lleva la llave service_role de Supabase, que salta
+# todas las políticas RLS. Si se filtra, cualquiera lee y escribe la base
+# completa. Nunca, bajo ninguna circunstancia, se sube.
+#
+# La plantilla configuracion.local.example.mjs SÍ va versionada: no tiene
+# credenciales y es la que le dice a quien clone qué necesita completar.
+configuracion.local.mjs
+configuracion.local.js
+
+# Variables de entorno, por si se usa `vercel dev` en vez del servidor local.
 .env
-.env.local
+.env.*
+!.env.example
+
+# Credenciales y caché de la CLI de Vercel.
 .vercel
-*.log
+
+
+# --- Salidas de herramientas -----------------------------------------
+# Se regeneran solas y ocupan bastante.
+graphify-out/
+dist/
+build/
+.cache/
+
+
+# --- Sistema operativo -----------------------------------------------
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS
 .DS_Store
-Code.gs
+.AppleDouble
+
+# Linux
+*~
+.directory
+
+
+# --- Editores --------------------------------------------------------
+.idea/
+*.swp
+*.swo
+
+# De VS Code solo se ignora lo personal. Si algún día se agregan ajustes
+# compartidos del equipo (tareas, extensiones recomendadas), se versionan
+# quitando la excepción que corresponda.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+
+# --- Registros y temporales ------------------------------------------
+*.log
+npm-debug.log*
+_prueba-*.mjs
+*.tmp
+
+
+# --- Notas personales ------------------------------------------------
 caveman.md
-supabase/
+
+
+# =====================================================================
+# LO QUE SÍ SE VERSIONA, aunque uno tienda a dudarlo
+# =====================================================================
+#
+#   supabase/migrations/   Son código fuente. Sin ellas, quien clone el
+#                          repositorio no puede levantar la base. Antes esta
+#                          carpeta estaba ignorada entera y solo la 001 había
+#                          quedado dentro (por haberse commiteado antes de la
+#                          regla): el repositorio tenía un schema incompleto.
+#
+#   supabase/*.sql         Guiones de mantenimiento, como el de restablecer
+#                          contraseñas. Son procedimientos, no secretos.
+#
+#   docs/                  La documentación técnica del sistema.
+#
+#   configuracion.local.example.mjs
+#                          Plantilla sin credenciales.
+#
+#   package-lock.json      Fija las versiones exactas de las dependencias.
+#                          Ignorarlo hace que cada máquina instale algo
+#                          distinto y aparezcan fallos que no se reproducen.
+# =====================================================================

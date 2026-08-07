@@ -1,0 +1,157 @@
+<!--
+  Configuración y diagnóstico.
+
+  Los interruptores de esta pantalla antes eran texto fijo en el HTML, sin nada
+  detrás. Ahora se guardan en la tabla `configuracion` y se leen de verdad.
+-->
+<section v-show="vista === 'configuracion'" class="animar-aparecer">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+    <!-- Interruptores -->
+    <div class="tarjeta">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo">Interruptores de módulo</h2>
+          <p class="tarjeta-subtitulo">Apaga una función durante el evento si hace falta</p>
+        </div>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div v-if="interruptores.length === 0" class="py-8 text-center text-theme-sm text-gray-400">
+          <i class="fa-solid fa-circle-notch animar-girar"></i> Cargando…
+        </div>
+
+        <div v-else class="space-y-3">
+          <div v-for="interruptor in interruptores" :key="interruptor.clave"
+               class="flex items-start gap-4 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <interruptor-simple
+              :model-value="interruptor.activo"
+              @update:model-value="alternarInterruptor(interruptor)"
+              :etiqueta="interruptor.etiqueta"></interruptor-simple>
+
+            <div class="min-w-0 flex-1">
+              <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                {{ interruptor.etiqueta }}
+              </p>
+              <p class="mt-0.5 text-theme-sm text-gray-500 dark:text-gray-400">
+                {{ interruptor.descripcion }}
+              </p>
+            </div>
+
+            <span :class="interruptor.activo ? 'insignia-exito' : 'insignia-neutra'">
+              {{ interruptor.activo ? 'Activo' : 'Apagado' }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diagnóstico -->
+    <div class="tarjeta">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo">Revisión previa</h2>
+          <p class="tarjeta-subtitulo">Ejecútala antes de abrir las puertas</p>
+        </div>
+        <button type="button" @click="revisarSistema()" class="boton boton-secundario"
+                :disabled="revisandoSistema">
+          <i class="fa-solid" :class="revisandoSistema ? 'fa-circle-notch animar-girar' : 'fa-heart-pulse'"></i>
+          Revisar
+        </button>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div v-if="!diagnostico" class="py-8 text-center">
+          <i class="fa-solid fa-heart-pulse mb-3 block text-4xl text-gray-300 dark:text-gray-700"></i>
+          <p class="text-theme-sm text-gray-400">
+            Pulsa «Revisar» para comprobar que todo esté listo.
+          </p>
+        </div>
+
+        <div v-else class="space-y-4">
+          <div class="flex items-center gap-3 rounded-xl p-4"
+               :class="diagnostico.ok
+                       ? 'bg-success-50 dark:bg-success-500/10'
+                       : 'bg-warning-50 dark:bg-warning-500/10'">
+            <i class="fa-solid text-2xl"
+               :class="diagnostico.ok ? 'fa-circle-check text-success-500' : 'fa-triangle-exclamation text-warning-500'"></i>
+            <div>
+              <p class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+                {{ diagnostico.ok ? 'Todo en orden' : 'Hay algo que revisar' }}
+              </p>
+              <p class="text-theme-xs text-gray-500 dark:text-gray-400">
+                Respondió en {{ diagnostico.latenciaMs }} ms
+              </p>
+            </div>
+          </div>
+
+          <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Evento activo</dt>
+              <dd class="mt-1 truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                {{ diagnostico.eventoActivo || 'Ninguno' }}
+              </dd>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Empleados activos</dt>
+              <dd class="mt-1 text-theme-xl font-bold text-gray-800 dark:text-white/90">
+                {{ diagnostico.empleadosActivos }}
+              </dd>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Ya ingresaron</dt>
+              <dd class="mt-1 text-theme-xl font-bold text-gray-800 dark:text-white/90">
+                {{ diagnostico.asistentesRegistrados }}
+              </dd>
+            </div>
+          </dl>
+
+          <ul v-if="diagnostico.alertas && diagnostico.alertas.length" class="space-y-2">
+            <li v-for="(alerta, indice) in diagnostico.alertas" :key="indice"
+                class="flex gap-3 rounded-lg border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10">
+              <i class="fa-solid fa-triangle-exclamation mt-0.5 text-warning-500"></i>
+              <span class="text-theme-sm text-gray-700 dark:text-gray-300">{{ alerta }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del entorno -->
+    <div class="tarjeta lg:col-span-2">
+      <div class="tarjeta-encabezado">
+        <h2 class="tarjeta-titulo">Este dispositivo</h2>
+      </div>
+      <div class="tarjeta-cuerpo">
+        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Conexión</dt>
+            <dd class="mt-1 flex items-center gap-2 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              <span class="h-2 w-2 rounded-full"
+                    :class="escaner.estadoRed.enLinea ? 'bg-success-500' : 'bg-error-500'"></span>
+              {{ escaner.estadoRed.enLinea ? 'En línea' : 'Sin conexión' }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Pendientes locales</dt>
+            <dd class="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ escaner.estadoRed.pendientes }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Sesión</dt>
+            <dd class="mt-1 truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ sesion.usuario }} ({{ sesion.rol }})
+            </dd>
+          </div>
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Apariencia</dt>
+            <dd class="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ modoOscuro ? 'Modo oscuro' : 'Modo claro' }}
+            </dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>

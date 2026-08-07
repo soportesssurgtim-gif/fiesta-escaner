@@ -1,0 +1,21 @@
+<!--
+  Pila de notificaciones.
+
+  Se apilan en vez de pisarse: escaneando en fila llegan varias por segundo y
+  antes solo se alcanzaba a ver la última.
+-->
+<div class="pila-notificaciones" role="status" aria-live="polite">
+  <div v-for="aviso in notificaciones"
+       :key="aviso.id"
+       class="notificacion"
+       :class="['notificacion-' + aviso.tipo, { 'notificacion-saliendo': aviso.saliendo }]">
+    <i class="fa-solid shrink-0" :class="aviso.icono"></i>
+    <span class="flex-1">{{ aviso.mensaje }}</span>
+    <button type="button"
+            @click="cerrarNotificacion(aviso.id)"
+            class="shrink-0 opacity-70 transition hover:opacity-100"
+            aria-label="Cerrar aviso">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+</div>
