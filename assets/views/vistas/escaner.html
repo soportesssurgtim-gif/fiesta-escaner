@@ -4,17 +4,30 @@
   Prioridad de diseño: que el resultado del último escaneo se lea de lejos y de
   un vistazo. Quien opera esto tiene gente esperando y no puede detenerse a leer
   texto chico.
+
+  En el teléfono manda otra regla: la cámara y el resultado tienen que caber sin
+  desplazarse. Por eso las métricas se aplastan en una fila (.metricas-compactas)
+  y el orden cambia. En móvil es una columna con `order`:
+
+      cámara → último registro → registrar a mano
+
+  porque después de cada escaneo lo primero que se necesita ver es a quién se
+  registró, no el campo de ingreso manual, que es el plan B.
+
+  Desde 1024 px se pasa a la retícula de dos columnas de siempre, con posiciones
+  explícitas (col-start / row-start) para que el orden de móvil no la altere.
 -->
 <section v-show="vista === 'scanner'" class="animar-aparecer">
 
-  <!-- Métricas de arriba -->
-  <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+  <!-- Métricas. En móvil quedan en una sola fila y bien chicas: siguen a la
+       vista pero dejan la cámara arriba del doblez. -->
+  <div class="metricas-compactas mb-4 sm:mb-6">
     <div class="tarjeta p-5">
       <div class="metrica-icono bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
         <i class="fa-solid fa-user-check"></i>
       </div>
       <p class="metrica-valor">{{ resumen.total }}</p>
-      <p class="metrica-etiqueta">Asistencias registradas</p>
+      <p class="metrica-etiqueta">Asistencias</p>
     </div>
 
     <div class="tarjeta p-5">
@@ -22,7 +35,7 @@
         <i class="fa-solid fa-users"></i>
       </div>
       <p class="metrica-valor">{{ empleados.lista.length }}</p>
-      <p class="metrica-etiqueta">Personas en el padrón</p>
+      <p class="metrica-etiqueta">En el padrón</p>
     </div>
 
     <div class="tarjeta p-5">
@@ -33,18 +46,18 @@
         <i class="fa-solid fa-cloud-arrow-up"></i>
       </div>
       <p class="metrica-valor">{{ escaner.estadoRed.pendientes }}</p>
-      <p class="metrica-etiqueta">Pendientes de subir</p>
+      <p class="metrica-etiqueta">Por subir</p>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+  <div class="flex flex-col gap-4 lg:grid lg:grid-cols-5 lg:gap-6">
 
     <!-- Cámara -->
-    <div class="tarjeta lg:col-span-3">
-      <div class="tarjeta-encabezado">
+    <div class="tarjeta order-1 lg:col-span-3 lg:col-start-1 lg:row-start-1">
+      <div class="tarjeta-encabezado tarjeta-encabezado-compacto">
         <div>
           <h2 class="tarjeta-titulo">Lector de códigos</h2>
-          <p class="tarjeta-subtitulo">Apunta la cámara al QR de la invitación</p>
+          <p class="tarjeta-subtitulo hidden sm:block">Apunta la cámara al QR de la invitación</p>
         </div>
         <span class="insignia" :class="escaner.escaneando ? 'insignia-exito' : 'insignia-neutra'">
           <span class="h-1.5 w-1.5 rounded-full"
@@ -106,33 +119,42 @@
             <input type="file" accept="image/*" class="hidden" @change="escaner.leerDesdeFoto($event)" />
           </label>
         </div>
+      </div>
+    </div>
 
-        <!-- Ingreso manual: el plan B cuando el QR está rayado o borroso. -->
-        <div class="mt-5 border-t border-gray-200 pt-5 dark:border-gray-800">
-          <label for="dui-manual" class="etiqueta">Registrar a mano</label>
-          <div class="flex gap-2">
-            <input id="dui-manual"
-                   v-model="escaner.identificadorManual"
-                   @keyup.enter="escaner.registrarManual()"
-                   type="text"
-                   inputmode="numeric"
-                   class="campo flex-1"
-                   placeholder="DUI, código de empleado o ID" />
-            <button type="button"
-                    @click="escaner.registrarManual()"
-                    class="boton boton-primario"
-                    :disabled="escaner.procesando">
-              <i class="fa-solid fa-arrow-right"></i>
-            </button>
-          </div>
-          <p class="texto-ayuda">Sirve el DUI con o sin guion.</p>
+    <!--
+      Ingreso manual: el plan B cuando el QR está rayado o borroso.
+
+      Vive en su propia tarjeta y no dentro de la de la cámara porque en el
+      teléfono tiene que quedar POR DEBAJO del último registro. Cuando estaba
+      adentro, después de cada escaneo había que pasar de largo el campo de
+      ingreso manual para ver a quién se acababa de registrar.
+    -->
+    <div class="tarjeta order-3 lg:order-none lg:col-span-3 lg:col-start-1 lg:row-start-2">
+      <div class="tarjeta-cuerpo">
+        <label for="dui-manual" class="etiqueta">Registrar a mano</label>
+        <div class="flex gap-2">
+          <input id="dui-manual"
+                 v-model="escaner.identificadorManual"
+                 @keyup.enter="escaner.registrarManual()"
+                 type="text"
+                 inputmode="numeric"
+                 class="campo flex-1"
+                 placeholder="DUI, código de empleado o ID" />
+          <button type="button"
+                  @click="escaner.registrarManual()"
+                  class="boton boton-primario"
+                  :disabled="escaner.procesando">
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
         </div>
+        <p class="texto-ayuda">Sirve el DUI con o sin guion.</p>
       </div>
     </div>
 
     <!-- Último resultado -->
-    <div class="lg:col-span-2">
-      <div class="tarjeta sticky top-[88px]">
+    <div class="order-2 lg:order-none lg:col-span-2 lg:col-start-4 lg:row-start-1 lg:row-span-2">
+      <div class="tarjeta lg:sticky lg:top-[88px]">
         <div class="tarjeta-encabezado">
           <h2 class="tarjeta-titulo">Último registro</h2>
         </div>

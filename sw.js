@@ -17,7 +17,7 @@
  * peticiones a la API pasan derecho a la red y, si fallan, fallan de verdad.
  */
 
-const VERSION_CACHE = 'v2.2.0';
+const VERSION_CACHE = 'v2.2.1';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
