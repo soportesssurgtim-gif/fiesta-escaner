@@ -1,0 +1,55 @@
+<!--
+  Instrucciones para instalar a mano.
+
+  Solo aparece cuando el navegador no expone el diálogo nativo: en iPhone nunca
+  lo hace, y Chrome tarda en emitirlo. Sin esta pantalla, tocar "Instalar" en
+  esos casos no haría absolutamente nada y parecería un botón roto.
+-->
+<div v-if="pwa.instruccionesAbiertas" class="modal-fondo" @click.self="pwa.cerrarInstrucciones()">
+  <div class="modal-panel max-w-md">
+
+    <div class="mb-5 flex items-start justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+          <i class="fa-solid fa-mobile-screen-button text-theme-xl"></i>
+        </span>
+        <div class="min-w-0">
+          <h2 class="modal-titulo">{{ pwa.instrucciones.titulo }}</h2>
+          <p class="text-theme-xs text-gray-500 dark:text-gray-400">
+            Queda como una aplicación más, con su ícono y a pantalla completa.
+          </p>
+        </div>
+      </div>
+      <button type="button" @click="pwa.cerrarInstrucciones()" class="boton-icono" aria-label="Cerrar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div v-if="pwa.instrucciones.aviso"
+         class="mb-4 flex gap-3 rounded-xl border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10">
+      <i class="fa-solid fa-circle-info mt-0.5 text-warning-500"></i>
+      <p class="text-theme-xs text-warning-700 dark:text-warning-400">{{ pwa.instrucciones.aviso }}</p>
+    </div>
+
+    <ol class="space-y-3">
+      <li v-for="(paso, indice) in pwa.instrucciones.pasos" :key="indice" class="flex gap-3">
+        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-theme-xs font-semibold text-white">
+          {{ indice + 1 }}
+        </span>
+        <p class="text-theme-sm text-gray-700 dark:text-gray-300">{{ paso }}</p>
+      </li>
+    </ol>
+
+    <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-white/5">
+      <p class="text-theme-xs text-gray-600 dark:text-gray-400">
+        <i class="fa-solid fa-wifi mr-1"></i>
+        Instalada sirve para escanear sin señal: las asistencias se guardan en el
+        teléfono y suben solas cuando vuelve la conexión.
+      </p>
+    </div>
+
+    <button type="button" @click="pwa.cerrarInstrucciones()" class="boton boton-primario mt-6 w-full">
+      Entendido
+    </button>
+  </div>
+</div>

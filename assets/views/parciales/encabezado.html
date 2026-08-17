@@ -28,6 +28,23 @@
     <span class="text-theme-xs font-medium text-error-700 dark:text-error-400">Sin conexión</span>
   </div>
 
+  <!--
+    Instalar la aplicación. Está siempre visible a propósito: el navegador
+    decide por su cuenta si ofrece instalar (y en iPhone no lo ofrece nunca),
+    así que dejarlo librado a eso significa que en la mayoría de los teléfonos
+    la opción no aparece. Si no hay diálogo nativo, el botón explica los pasos.
+  -->
+  <button type="button"
+          @click="pwa.instalar()"
+          :disabled="pwa.instalando"
+          class="boton-icono shrink-0"
+          :class="{ 'text-brand-500': pwa.instalacionDirecta && !pwa.instalada }"
+          :title="pwa.instalada ? 'La aplicación ya está instalada' : 'Instalar la aplicación en este dispositivo'"
+          :aria-label="pwa.instalada ? 'La aplicación ya está instalada' : 'Instalar la aplicación en este dispositivo'">
+    <i class="fa-solid"
+       :class="pwa.instalando ? 'fa-circle-notch animar-girar' : (pwa.instalada ? 'fa-circle-check' : 'fa-download')"></i>
+  </button>
+
   <button type="button" @click="abrirGuia" class="boton-icono shrink-0" aria-label="Ver la guía de esta pantalla">
     <i class="fa-solid fa-circle-question"></i>
   </button>

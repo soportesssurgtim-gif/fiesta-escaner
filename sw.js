@@ -17,7 +17,7 @@
  * peticiones a la API pasan derecho a la red y, si fallan, fallan de verdad.
  */
 
-const VERSION_CACHE = 'v2.1.0';
+const VERSION_CACHE = 'v2.2.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -32,6 +32,13 @@ const ARCHIVOS_BASE = [
   '/index.html',
   '/manifest.json',
   '/assets/css/sistema-diseno.css',
+
+  // Iconos de la aplicación instalada. Van cacheados porque el sistema los
+  // vuelve a pedir al instalar y al mostrar la pantalla de inicio.
+  '/assets/iconos/icono-192.png',
+  '/assets/iconos/icono-512.png',
+  '/assets/iconos/icono-192-maskable.png',
+  '/assets/iconos/icono-512-maskable.png',
 
   // Punto de entrada y núcleo
   '/assets/js/app.js',
@@ -51,6 +58,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarEscanerQr.js',
   '/assets/js/composables/usarImportacionCsv.js',
   '/assets/js/composables/usarNotificaciones.js',
+  '/assets/js/composables/usarInstalacionPwa.js',
   '/assets/js/composables/usarPermisos.js',
 
   // Componentes y contenido
@@ -63,9 +71,11 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/barra-lateral.html',
   '/assets/views/parciales/encabezado.html',
   '/assets/views/parciales/login.html',
+  '/assets/views/parciales/modal-cambiar-clave.html',
   '/assets/views/parciales/modal-cierre-sesion.html',
   '/assets/views/parciales/modal-guia.html',
   '/assets/views/parciales/modal-importacion.html',
+  '/assets/views/parciales/modal-instalar.html',
   '/assets/views/parciales/notificaciones.html',
   '/assets/views/vistas/asistencias.html',
   '/assets/views/vistas/configuracion.html',

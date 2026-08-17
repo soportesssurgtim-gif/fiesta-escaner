@@ -27,6 +27,7 @@ import { usarCatalogo } from './composables/usarCatalogo.js';
 import { usarPermisos } from './composables/usarPermisos.js';
 import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
+import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 
 import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -99,6 +100,18 @@ async function iniciar() {
       const esMovil = computed(() => anchoVentana.value < 1024);
       const haySesion = computed(() => Boolean(sesion.token));
 
+      /**
+       * ¿La barra lateral muestra las etiquetas de las vistas?
+       *
+       * En móvil el estado "colapsado a iconos" no tiene sentido: el panel se
+       * desliza por encima de todo, así que o se ve entero o no se ve. Como
+       * `sidebarAbierto` arranca en false debajo de 1024 px, el panel se abría
+       * con 90 px de ancho y solo los iconos, y los tooltips (que se posicionan
+       * por fuera del panel) empujaban el ancho del documento y provocaban
+       * scroll horizontal con los nombres fuera de la pantalla.
+       */
+      const sidebarExpandido = computed(() => esMovil.value || sidebarAbierto.value);
+
       // ---- Notificaciones ----
       const {
         notificaciones, cerrarNotificacion, notificar,
@@ -110,6 +123,9 @@ async function iniciar() {
       function alternarTema() {
         modoOscuro.value = tema.alternar() === 'oscuro';
       }
+
+      // ---- Instalación en el dispositivo ----
+      const pwa = usarInstalacionPwa({ notificar });
 
       // ---- Catálogos que llegan en el bundle inicial ----
       const asistencias = ref([]);
@@ -959,9 +975,13 @@ async function iniciar() {
       return {
         // General
         cargando, vista, modoPublico, esMovil, haySesion, anchoVentana,
-        sesion, sidebarAbierto, sidebarMovil, menuUsuarioAbierto, pestanaUsuarios,
+        sesion, sidebarAbierto, sidebarMovil, sidebarExpandido,
+        menuUsuarioAbierto, pestanaUsuarios,
         modoOscuro, alternarTema,
         menuVisible, tituloVista, cambiarVista,
+
+        // Instalación en el dispositivo
+        pwa,
 
         // Notificaciones
         notificaciones, cerrarNotificacion,

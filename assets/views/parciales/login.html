@@ -77,6 +77,19 @@
         </button>
       </form>
 
+      <!-- Instalar en el dispositivo. Va acá y no solo dentro del sistema
+           porque este es el momento en que el operador abre la aplicación por
+           primera vez en el teléfono del evento, que es cuando conviene
+           dejarla instalada para poder escanear sin señal. -->
+      <button v-if="!pwa.instalada"
+              type="button"
+              @click="pwa.instalar()"
+              :disabled="pwa.instalando"
+              class="boton boton-secundario mt-6 w-full">
+        <i class="fa-solid" :class="pwa.instalando ? 'fa-circle-notch animar-girar' : 'fa-download'"></i>
+        Instalar en este dispositivo
+      </button>
+
       <p class="mt-8 text-center text-theme-xs text-gray-400">
         ¿Vienes por tu invitación?
         <a href="/?invitacion=1" class="font-medium text-brand-500 hover:text-brand-600">

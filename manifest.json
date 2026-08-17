@@ -1,18 +1,55 @@
 {
-  "name": "Fiesta de Empleados - SSSur",
-  "short_name": "Fiesta SSSur",
-  "description": "Sistema de control de asistencia y generación de tarjetas de invitación para la Alcaldía de San Salvador Sur",
+  "id": "/",
+  "name": "Control de Asistencia - Alcaldía SSSur",
+  "short_name": "Asistencia SSSur",
+  "description": "Sistema de control de asistencia y generación de tarjetas de invitación para la Alcaldía Municipal de San Salvador Sur",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#f2f2f7",
-  "theme_color": "#000060",
+  "background_color": "#ffffff",
+  "theme_color": "#465fff",
   "orientation": "portrait-primary",
+  "lang": "es-SV",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
   "icons": [
     {
-      "src": "https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png",
+      "src": "/assets/iconos/icono-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/iconos/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/iconos/icono-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/iconos/icono-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Escáner QR",
+      "short_name": "Escáner",
+      "url": "/",
+      "icons": [{ "src": "/assets/iconos/icono-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mi invitación",
+      "short_name": "Invitación",
+      "url": "/?invitacion=1",
+      "icons": [{ "src": "/assets/iconos/icono-192.png", "sizes": "192x192" }]
     }
   ]
 }

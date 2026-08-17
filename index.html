@@ -9,7 +9,20 @@
   <title>Control de Asistencia · Alcaldía SSSur</title>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" type="image/png" href="https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/iconos/icono-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/assets/iconos/icono-512.png" />
+
+  <!--
+    iOS no lee el manifest para instalar: usa estas etiquetas. Sin
+    apple-touch-icon, "Agregar a inicio" guarda una captura de la página en vez
+    del logo, y sin apple-mobile-web-app-capable abre dentro de Safari con toda
+    su barra en lugar de a pantalla completa.
+  -->
+  <link rel="apple-touch-icon" href="/assets/iconos/icono-192-maskable.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Asistencia SSSur" />
+  <meta name="mobile-web-app-capable" content="yes" />
 
   <!--
     Modo claro/oscuro antes de pintar nada.
