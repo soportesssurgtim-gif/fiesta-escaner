@@ -17,7 +17,10 @@ import { tema } from './nucleo/tema.js';
 import * as formato from './nucleo/formato.js';
 
 import { api } from './servicios/servicioApi.js';
-import { disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE } from './servicios/servicioTarjetas.js';
+import {
+  disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
+  urlQr, descargarQr, enlaceInvitacion
+} from './servicios/servicioTarjetas.js';
 
 import { usarNotificaciones } from './composables/usarNotificaciones.js';
 import { usarCatalogo } from './composables/usarCatalogo.js';
@@ -430,6 +433,7 @@ async function iniciar() {
           asistencias.value.unshift({
             id: `local-${Date.now()}`,
             fechaHora: new Date().toISOString(),
+            evento: eventoActivo.value?.id || null,
             empleadoNombre: formato.nombreCompleto(respuesta.empleado),
             dui: respuesta.empleado?.dui || identificador,
             fuente: 'qr'
@@ -662,6 +666,120 @@ async function iniciar() {
       }
 
       // =====================================================================
+      // Detalle de un empleado
+      //
+      // Se abre al hacer clic en la fila del padrón. Junta la ficha completa y
+      // el QR de la persona en un solo lugar: antes, para ver el código de
+      // alguien había que irse a Tarjetas, buscarlo de nuevo y generar un lote
+      // de uno solo.
+      // =====================================================================
+
+      const detalle = reactive({
+        abierto: false,
+        persona: null,
+        campoQr: 'dui',
+        generando: false
+      });
+
+      // El QR no se pide al backend: es una URL de QuickChart que se arma acá,
+      // así que cambiar de contenido no cuesta ninguna petición propia.
+      const qrDetalle = computed(() =>
+        detalle.persona ? urlQr(detalle.persona, detalle.campoQr) : ''
+      );
+
+      const enlaceDetalle = computed(() =>
+        detalle.persona ? enlaceInvitacion(detalle.persona) : ''
+      );
+
+      const departamentoDetalle = computed(() => {
+        if (!detalle.persona) return '';
+        const encontrado = departamentos.lista.find((fila) => fila.id === detalle.persona.dpto);
+        return encontrado ? encontrado.nombre_dpto : '';
+      });
+
+      /**
+       * ¿Ya marcó en el evento activo? Se resuelve con lo que ya está cargado,
+       * sin pedirle nada al servidor.
+       *
+       * El filtro por evento importa: la lista trae el histórico completo, y
+       * sin él alguien que asistió a la fiesta del año pasado aparecería como
+       * presente en la de hoy.
+       */
+      const asistenciaDetalle = computed(() => {
+        if (!detalle.persona || !eventoActivo.value) return null;
+        const dui = formato.duiPlano(detalle.persona.dui);
+        if (!dui) return null;
+
+        return asistencias.value.find(
+          (fila) =>
+            fila.evento === eventoActivo.value.id &&
+            formato.duiPlano(fila.dui) === dui
+        ) || null;
+      });
+
+      function abrirDetalle(persona) {
+        detalle.persona = persona;
+        detalle.campoQr = 'dui';
+        detalle.abierto = true;
+        // Saber si hay plantillas define si se puede ofrecer la tarjeta
+        // completa o solamente el QR suelto.
+        if (plantillas.value.length === 0) cargarPlantillas();
+      }
+
+      function cerrarDetalle() {
+        detalle.abierto = false;
+        detalle.persona = null;
+      }
+
+      /** Pasa al formulario de edición sin dejar los dos modales encimados. */
+      function editarDesdeDetalle() {
+        const persona = detalle.persona;
+        cerrarDetalle();
+        empleados.abrir(persona);
+      }
+
+      async function descargarQrDetalle() {
+        try {
+          await descargarQr(detalle.persona, detalle.campoQr);
+          notificarExito('El QR se descargó.');
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo descargar el QR.');
+        }
+      }
+
+      async function copiarEnlaceDetalle() {
+        try {
+          await navigator.clipboard.writeText(enlaceDetalle.value);
+          notificarExito('Enlace copiado.');
+        } catch {
+          // El portapapeles exige HTTPS y permiso. Si no se puede, al menos que
+          // el enlace quede a la vista para copiarlo a mano.
+          notificarAlerta(enlaceDetalle.value);
+        }
+      }
+
+      /**
+       * Genera la tarjeta completa de esta persona.
+       * Si todavía no se eligió plantilla en la vista de Tarjetas, toma la
+       * primera guardada: desde acá no hay dónde elegirla y no hacer nada
+       * sería peor que decidir por el usuario.
+       */
+      async function generarTarjetaDetalle() {
+        if (plantillas.value.length === 0) {
+          notificarError('No hay ninguna plantilla guardada. Crea una en la vista de Tarjetas.');
+          return;
+        }
+        if (!plantillaElegida.value) plantillaElegida.value = plantillas.value[0].id;
+
+        detalle.generando = true;
+        try {
+          await generarUna(detalle.persona);
+        } finally {
+          detalle.generando = false;
+        }
+      }
+
+      // =====================================================================
       // Configuración
       // =====================================================================
 
@@ -886,6 +1004,11 @@ async function iniciar() {
         ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
         aplicarZona: (nombre) => disenador.aplicarZona(nombre),
         cambiarCampoQr: (campo) => { campoQr.value = campo; disenador.establecerCampoQr(campo); },
+
+        // Detalle de un empleado
+        detalle, qrDetalle, enlaceDetalle, departamentoDetalle, asistenciaDetalle,
+        abrirDetalle, cerrarDetalle, editarDesdeDetalle,
+        descargarQrDetalle, copiarEnlaceDetalle, generarTarjetaDetalle,
 
         // Configuración
         interruptores, diagnostico, revisandoSistema,

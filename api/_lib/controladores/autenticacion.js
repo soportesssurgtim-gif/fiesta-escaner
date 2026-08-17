@@ -91,7 +91,9 @@ export async function armarBundleInicial() {
     listarUsuariosConDetalle(),
     supabase
       .from(TABLAS.asistencias)
-      .select('id, fecha_hora_asistencia, fuente, empleado')
+      // `evento` viaja para poder decir si alguien ya marcó en el evento
+      // activo: sin él, todas las asistencias del histórico se ven iguales.
+      .select('id, fecha_hora_asistencia, fuente, empleado, evento')
       .order('fecha_hora_asistencia', { ascending: false })
       .then(({ data }) => data || [])
   ]);
@@ -105,6 +107,7 @@ export async function armarBundleInicial() {
     return {
       id: registro.id,
       fechaHora: registro.fecha_hora_asistencia || '',
+      evento: registro.evento || null,
       empleadoNombre: empleado
         ? `${empleado.nombres} ${empleado.apellidos}`.trim()
         : 'Desconocido',

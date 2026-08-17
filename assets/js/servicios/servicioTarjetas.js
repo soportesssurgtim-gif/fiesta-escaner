@@ -30,11 +30,16 @@ export const ZONAS_PREDEFINIDAS = {
   'Centro': { x: 450, y: 700, ancho: 300 }
 };
 
+/** Enlace del portal público con el DUI ya precargado en el formulario. */
+export function enlaceInvitacion(empleado) {
+  return `${window.location.origin}/?invitacion=1&dui=${(empleado && empleado.dui) || ''}`;
+}
+
 /** Arma la URL del QR de QuickChart para un empleado. */
 export function urlQr(empleado, campo = 'dui') {
   let contenido;
   if (campo === 'codigo') contenido = empleado.codigo || empleado.dui || '';
-  else if (campo === 'url') contenido = `${window.location.origin}/?invitacion=1&dui=${empleado.dui || ''}`;
+  else if (campo === 'url') contenido = enlaceInvitacion(empleado);
   else contenido = String(empleado.dui || '').replace(/[^0-9]/g, '');
 
   const parametros = new URLSearchParams({
@@ -47,6 +52,27 @@ export function urlQr(empleado, campo = 'dui') {
   });
 
   return `https://quickchart.io/qr?${parametros.toString()}`;
+}
+
+/**
+ * Descarga el QR suelto de una persona, sin plantilla de por medio.
+ *
+ * Va por fetch y no por canvas a propósito: así se conserva el PNG tal como lo
+ * devuelve QuickChart, sin recomprimirlo ni depender de que el lienzo no quede
+ * "manchado" por la imagen de otro dominio.
+ */
+export async function descargarQr(empleado, campo = 'dui') {
+  const respuesta = await fetch(urlQr(empleado, campo));
+  if (!respuesta.ok) {
+    throw new Error('No se pudo obtener el código. Revisa la conexión.');
+  }
+
+  const url = URL.createObjectURL(await respuesta.blob());
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = `qr-${empleado.codigo || empleado.dui || empleado.id}.png`;
+  enlace.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Carga una imagen y espera a que esté lista para dibujarse. */
