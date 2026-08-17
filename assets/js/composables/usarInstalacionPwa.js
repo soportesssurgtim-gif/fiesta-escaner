@@ -14,7 +14,7 @@
  *   · Ya está instalada    → se avisa, no hay nada que hacer
  */
 
-const { ref, computed, onMounted, onBeforeUnmount } = Vue;
+const { ref, reactive, computed, onMounted, onBeforeUnmount } = Vue;
 
 /** ¿La página se está viendo desde la aplicación instalada y no desde el navegador? */
 function estaInstalada() {
@@ -128,6 +128,10 @@ export function usarInstalacionPwa({ notificar } = {}) {
     () => INSTRUCCIONES[navegador.value] || INSTRUCCIONES.escritorio
   );
 
+  function cerrarInstrucciones() {
+    instruccionesAbiertas.value = false;
+  }
+
   function alPoderInstalar(evento) {
     // Sin esto, Chrome muestra su propia barra flotante además de nuestro
     // botón, y el usuario ve dos invitaciones a lo mismo.
@@ -178,9 +182,16 @@ export function usarInstalacionPwa({ notificar } = {}) {
   const modoPantalla = window.matchMedia('(display-mode: standalone)');
   const alCambiarModo = (evento) => { instalada.value = evento.matches; };
 
+  // Instalar nunca es urgente: si alguien abrió las instrucciones sin querer,
+  // Escape tiene que sacarlo de ahí igual que en cualquier otro diálogo.
+  const alPresionarTecla = (evento) => {
+    if (evento.key === 'Escape' && instruccionesAbiertas.value) cerrarInstrucciones();
+  };
+
   onMounted(() => {
     window.addEventListener('beforeinstallprompt', alPoderInstalar);
     window.addEventListener('appinstalled', alInstalar);
+    document.addEventListener('keydown', alPresionarTecla);
     // addEventListener sobre un MediaQueryList no existe en Safari viejo.
     if (modoPantalla.addEventListener) modoPantalla.addEventListener('change', alCambiarModo);
   });
@@ -188,16 +199,32 @@ export function usarInstalacionPwa({ notificar } = {}) {
   onBeforeUnmount(() => {
     window.removeEventListener('beforeinstallprompt', alPoderInstalar);
     window.removeEventListener('appinstalled', alInstalar);
+    document.removeEventListener('keydown', alPresionarTecla);
     if (modoPantalla.removeEventListener) modoPantalla.removeEventListener('change', alCambiarModo);
   });
 
-  return {
+  /*
+   * El retorno va envuelto en reactive() por el mismo motivo que en
+   * usarCatalogo: setup() solo desenvuelve los refs que quedan en el primer
+   * nivel de lo que devuelve. Este composable se expone agrupado como `pwa`,
+   * así que dentro de un objeto plano las plantillas recibirían el ref en
+   * bruto en vez de su valor.
+   *
+   * No es cosmético. Con un objeto plano, `v-if="pwa.instruccionesAbiertas"`
+   * evalúa el ref, que es un objeto y por lo tanto siempre verdadero: el modal
+   * de instalación aparecía solo al cargar la página y no se cerraba ni con la
+   * X ni con "Entendido", porque cerrarlo cambia el .value pero el v-if sigue
+   * viendo el mismo objeto. Por lo mismo el botón quedaba siempre deshabilitado
+   * (`:disabled="pwa.instalando"`) y el del login nunca aparecía
+   * (`v-if="!pwa.instalada"`).
+   */
+  return reactive({
     instalada,
     instalando,
     instalacionDirecta,
     instruccionesAbiertas,
     instrucciones,
     instalar,
-    cerrarInstrucciones: () => { instruccionesAbiertas.value = false; }
-  };
+    cerrarInstrucciones
+  });
 }
