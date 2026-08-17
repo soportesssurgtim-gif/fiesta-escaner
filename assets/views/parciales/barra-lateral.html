@@ -116,5 +116,21 @@
         {{ escaner.estadoRed.pendientes }} por subir
       </span>
     </button>
+
+    <!--
+      Versión que está sirviendo el service worker.
+
+      Solo debajo de 1024 px: en escritorio ya está en el encabezado, y
+      repetirla en los dos lados sería ruido. Acá abajo es donde queda a mano
+      en el teléfono, que es donde más cuesta saber si la aplicación instalada
+      ya se actualizó.
+    -->
+    <button v-if="sidebarExpandido && pwa.version"
+            type="button"
+            @click="pwa.consultarVersion()"
+            class="mt-3 w-full text-left font-mono text-theme-xs text-gray-400 transition hover:text-gray-600 lg:hidden dark:text-gray-500 dark:hover:text-gray-300"
+            title="Versión instalada. Toca para volver a consultarla.">
+      <i class="fa-solid fa-code-branch mr-1.5"></i>{{ pwa.version }}
+    </button>
   </div>
 </aside>

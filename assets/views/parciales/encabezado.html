@@ -21,6 +21,21 @@
     </h1>
   </div>
 
+  <!--
+    Versión que está sirviendo el service worker.
+
+    Solo en escritorio: en el teléfono no hay ancho para esto y va al pie de la
+    barra lateral. Sirve para confirmar de un vistazo, sin abrir Configuración,
+    que este equipo ya recibió el último despliegue.
+  -->
+  <button v-if="pwa.version"
+          type="button"
+          @click="pwa.consultarVersion()"
+          class="hidden shrink-0 rounded-lg border border-gray-200 px-2.5 py-1 font-mono text-theme-xs text-gray-500 transition hover:border-gray-300 hover:text-gray-700 lg:block dark:border-gray-800 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:text-gray-300"
+          title="Versión instalada. Pulsa para volver a consultarla.">
+    {{ pwa.version }}
+  </button>
+
   <!-- Aviso de trabajo sin conexión. Solo aparece cuando hace falta. -->
   <div v-if="!escaner.estadoRed.enLinea"
        class="hidden items-center gap-2 rounded-lg bg-error-50 px-3 py-1.5 sm:flex dark:bg-error-500/10">

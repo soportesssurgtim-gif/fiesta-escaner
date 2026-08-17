@@ -45,6 +45,38 @@ function detectarNavegador() {
   return 'escritorio';
 }
 
+/** ¿Estamos en la máquina de desarrollo? Ahí no hay service worker a propósito. */
+function esEntornoLocal() {
+  return ['localhost', '127.0.0.1', ''].indexOf(location.hostname) !== -1;
+}
+
+/**
+ * Deja la versión anotada en la consola del navegador.
+ *
+ * Sirve para soporte: cuando alguien reporta que "le sale raro", lo primero es
+ * saber qué versión tiene delante, y pedirle que abra la consola y lea una
+ * línea es mucho más rápido que hacerlo navegar hasta Configuración.
+ *
+ * Se anuncia solo cuando el valor cambia: la versión se consulta también al
+ * entrar a Configuración y al tocar el botón de recargar, y no tiene sentido
+ * repetir la misma línea cada vez.
+ */
+let versionAnunciada = null;
+
+function anunciarEnConsola(valor) {
+  // "iniciando…" es el hueco entre que carga la página y que el service worker
+  // toma el control. Dura un instante y anunciarlo solo ensucia la consola con
+  // una línea que se contradice medio segundo después.
+  if (!valor || valor === 'iniciando…' || valor === versionAnunciada) return;
+  versionAnunciada = valor;
+
+  console.info(
+    `%c Asistencia SSSur %c ${valor} `,
+    'background:#465fff;color:#fff;font-weight:600;border-radius:4px 0 0 4px;padding:2px 6px',
+    'background:#101828;color:#fff;border-radius:0 4px 4px 0;padding:2px 6px'
+  );
+}
+
 /** Pasos manuales por navegador, para cuando no hay diálogo nativo. */
 const INSTRUCCIONES = {
   ios: {
@@ -141,14 +173,21 @@ export function usarInstalacionPwa({ notificar } = {}) {
    * teléfono todavía está corriendo lo viejo.
    */
   async function consultarVersion() {
-    const controlador = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!('serviceWorker' in navigator)) {
+      establecerVersion('no disponible');
+      return;
+    }
+
+    const controlador = navigator.serviceWorker.controller;
     if (!controlador) {
-      version.value = 'sin service worker';
+      // En local el service worker se da de baja a propósito (ver index.html),
+      // así que acá no hay nada que preguntar y no es un problema.
+      establecerVersion(esEntornoLocal() ? 'desarrollo' : 'iniciando…');
       return;
     }
 
     try {
-      version.value = await new Promise((resolver, rechazar) => {
+      const respondida = await new Promise((resolver, rechazar) => {
         const canal = new MessageChannel();
         // Si el service worker no contesta no dejamos la promesa colgada:
         // esta consulta es informativa y no debe bloquear la pantalla.
@@ -161,9 +200,19 @@ export function usarInstalacionPwa({ notificar } = {}) {
 
         controlador.postMessage({ type: 'VERSION' }, [canal.port2]);
       });
+
+      establecerVersion(respondida);
     } catch {
-      version.value = 'desconocida';
+      // Un service worker de una versión anterior a este cambio no entiende el
+      // mensaje 'VERSION' y nunca responde. No es un fallo: es exactamente lo
+      // que se ve la primera vez que alguien actualiza desde una versión vieja.
+      establecerVersion('anterior');
     }
+  }
+
+  function establecerVersion(valor) {
+    version.value = valor;
+    anunciarEnConsola(valor);
   }
 
   function alPoderInstalar(evento) {
@@ -222,10 +271,18 @@ export function usarInstalacionPwa({ notificar } = {}) {
     if (evento.key === 'Escape' && instruccionesAbiertas.value) cerrarInstrucciones();
   };
 
+  // En la primera visita la página carga ANTES de que el service worker tome
+  // el control, así que la primera consulta no encuentra controlador. Cuando
+  // aparece, volvemos a preguntar para que la versión deje de decir "iniciando".
+  const alCambiarControlador = () => { consultarVersion(); };
+
   onMounted(() => {
     window.addEventListener('beforeinstallprompt', alPoderInstalar);
     window.addEventListener('appinstalled', alInstalar);
     document.addEventListener('keydown', alPresionarTecla);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', alCambiarControlador);
+    }
     consultarVersion();
     // addEventListener sobre un MediaQueryList no existe en Safari viejo.
     if (modoPantalla.addEventListener) modoPantalla.addEventListener('change', alCambiarModo);
@@ -235,6 +292,9 @@ export function usarInstalacionPwa({ notificar } = {}) {
     window.removeEventListener('beforeinstallprompt', alPoderInstalar);
     window.removeEventListener('appinstalled', alInstalar);
     document.removeEventListener('keydown', alPresionarTecla);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.removeEventListener('controllerchange', alCambiarControlador);
+    }
     if (modoPantalla.removeEventListener) modoPantalla.removeEventListener('change', alCambiarModo);
   });
 
