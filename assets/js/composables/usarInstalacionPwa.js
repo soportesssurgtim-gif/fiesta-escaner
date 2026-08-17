@@ -120,6 +120,7 @@ export function usarInstalacionPwa({ notificar } = {}) {
   const instalando = ref(false);
   const instruccionesAbiertas = ref(false);
   const navegador = ref(detectarNavegador());
+  const version = ref('');
 
   /** ¿Se puede instalar de un toque, sin explicarle nada al usuario? */
   const instalacionDirecta = computed(() => Boolean(eventoDiferido.value));
@@ -130,6 +131,39 @@ export function usarInstalacionPwa({ notificar } = {}) {
 
   function cerrarInstrucciones() {
     instruccionesAbiertas.value = false;
+  }
+
+  /**
+   * Le pregunta al service worker qué versión está sirviendo.
+   *
+   * Se usa para confirmar de un vistazo que un dispositivo ya recibió el
+   * despliegue: si el número no coincide con el que se acaba de publicar, ese
+   * teléfono todavía está corriendo lo viejo.
+   */
+  async function consultarVersion() {
+    const controlador = navigator.serviceWorker && navigator.serviceWorker.controller;
+    if (!controlador) {
+      version.value = 'sin service worker';
+      return;
+    }
+
+    try {
+      version.value = await new Promise((resolver, rechazar) => {
+        const canal = new MessageChannel();
+        // Si el service worker no contesta no dejamos la promesa colgada:
+        // esta consulta es informativa y no debe bloquear la pantalla.
+        const reloj = setTimeout(() => rechazar(new Error('sin respuesta')), 2000);
+
+        canal.port1.onmessage = (evento) => {
+          clearTimeout(reloj);
+          resolver((evento.data && evento.data.version) || 'desconocida');
+        };
+
+        controlador.postMessage({ type: 'VERSION' }, [canal.port2]);
+      });
+    } catch {
+      version.value = 'desconocida';
+    }
   }
 
   function alPoderInstalar(evento) {
@@ -192,6 +226,7 @@ export function usarInstalacionPwa({ notificar } = {}) {
     window.addEventListener('beforeinstallprompt', alPoderInstalar);
     window.addEventListener('appinstalled', alInstalar);
     document.addEventListener('keydown', alPresionarTecla);
+    consultarVersion();
     // addEventListener sobre un MediaQueryList no existe en Safari viejo.
     if (modoPantalla.addEventListener) modoPantalla.addEventListener('change', alCambiarModo);
   });
@@ -225,6 +260,8 @@ export function usarInstalacionPwa({ notificar } = {}) {
     instruccionesAbiertas,
     instrucciones,
     instalar,
-    cerrarInstrucciones
+    cerrarInstrucciones,
+    version,
+    consultarVersion
   });
 }

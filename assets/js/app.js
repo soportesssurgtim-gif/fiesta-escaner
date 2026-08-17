@@ -838,6 +838,84 @@ async function iniciar() {
         }
       }
 
+      // ---- Vaciado de registros ----
+      //
+      // Sirve para dejar la base limpia entre prueba y prueba sin entrar a
+      // Supabase. Es destructivo y no tiene vuelta atrás, así que además del
+      // permiso de administrador que valida el backend, hay que escribir el
+      // nombre del conjunto a mano.
+      const purga = reactive({
+        conjuntos: [],
+        cargando: false,
+        elegido: null,       // el conjunto que se está por vaciar
+        confirmacion: '',
+        ejecutando: false,
+        error: ''
+      });
+
+      /** ¿Lo escrito coincide con el nombre del conjunto? */
+      const confirmacionValida = computed(() => {
+        if (!purga.elegido) return false;
+        return purga.confirmacion.trim().toLowerCase() === purga.elegido.etiqueta.toLowerCase();
+      });
+
+      async function cargarPurgables() {
+        purga.cargando = true;
+        try {
+          const datos = await api.configuracion.purgables();
+          purga.conjuntos = datos.conjuntos || [];
+        } catch (fallo) {
+          // Sin permisos de administrador el backend responde 403. No es un
+          // error que haya que gritarle a quien solo vino a ver la pantalla.
+          purga.conjuntos = [];
+          if (!fallo.esSesionVencida) console.info('[configuracion]', fallo.message);
+        } finally {
+          purga.cargando = false;
+        }
+      }
+
+      function pedirPurga(conjunto) {
+        purga.elegido = conjunto;
+        purga.confirmacion = '';
+        purga.error = '';
+      }
+
+      function cancelarPurga() {
+        purga.elegido = null;
+        purga.confirmacion = '';
+        purga.error = '';
+      }
+
+      async function confirmarPurga() {
+        if (!purga.elegido || !confirmacionValida.value) return;
+
+        purga.ejecutando = true;
+        purga.error = '';
+
+        try {
+          const resultado = await api.configuracion.purgar(
+            purga.elegido.clave,
+            purga.confirmacion.trim()
+          );
+
+          notificarExito(
+            resultado.total === 0
+              ? `«${resultado.conjunto}» ya estaba vacío.`
+              : `Se borraron ${resultado.total} registros de «${resultado.conjunto}».`
+          );
+
+          cancelarPurga();
+          // Los catálogos en pantalla quedaron desactualizados: lo que se
+          // acaba de borrar sigue listado hasta que se vuelvan a pedir.
+          await Promise.all([recargarCatalogos(), cargarPurgables()]);
+          diagnostico.value = null;
+        } catch (fallo) {
+          purga.error = fallo.message || 'No se pudo vaciar.';
+        } finally {
+          purga.ejecutando = false;
+        }
+      }
+
       // =====================================================================
       // Portal público de invitaciones
       // =====================================================================
@@ -908,7 +986,9 @@ async function iniciar() {
       });
 
       watch(vista, (nueva) => {
-        if (nueva === 'configuracion') cargarConfiguracion();
+        if (nueva !== 'configuracion') return;
+        cargarConfiguracion();
+        cargarPurgables();
       });
 
       // =====================================================================
@@ -1033,6 +1113,10 @@ async function iniciar() {
         // Configuración
         interruptores, diagnostico, revisandoSistema,
         alternarInterruptor, revisarSistema, cargarConfiguracion,
+
+        // Vaciado de registros
+        purga, confirmacionValida, cargarPurgables,
+        pedirPurga, cancelarPurga, confirmarPurga,
 
         // Portal público
         invitacion, consultarInvitacion,

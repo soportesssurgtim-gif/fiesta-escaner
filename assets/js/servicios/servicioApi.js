@@ -177,6 +177,17 @@ export const api = {
     },
     guardar(clave, valor) {
       return http.enviar('configuracion', { clave, valor });
+    },
+    /** Conjuntos de datos que se pueden vaciar, con cuántas filas tiene cada uno. */
+    purgables() {
+      return http.obtener('configuracion', { accion: 'purgables' });
+    },
+    /**
+     * Vacía un conjunto. `confirmacion` debe ser la etiqueta exacta escrita a
+     * mano; el backend rechaza la petición si no coincide.
+     */
+    purgar(conjunto, confirmacion) {
+      return http.enviar('configuracion', { conjunto, confirmacion }, { accion: 'purgar' });
     }
   },
 

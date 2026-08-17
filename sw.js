@@ -17,7 +17,17 @@
  * peticiones a la API pasan derecho a la red y, si fallan, fallan de verdad.
  */
 
-const VERSION_CACHE = 'v2.2.2';
+/*
+ * VERSION_CACHE es lo que dispara la actualización en los dispositivos.
+ *
+ * SUBIRLA EN CADA DESPLIEGUE. El navegador compara el sw.js byte a byte; si el
+ * archivo no cambió, no instala nada y la gente se queda con la versión vieja
+ * hasta que borre el caché a mano. Cambiar este número cambia el archivo, y con
+ * eso arranca todo el ciclo: install → skipWaiting → activate → clients.claim,
+ * que junto con el recargador de index.html deja la versión nueva corriendo sin
+ * que nadie tenga que tocar nada.
+ */
+const VERSION_CACHE = 'v2.3.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -200,9 +210,18 @@ async function redPrimero(peticion) {
   }
 }
 
-// Permite que la aplicación fuerce la activación de una versión nueva.
 self.addEventListener('message', (evento) => {
-  if (evento.data && evento.data.type === 'ACTUALIZAR_AHORA') {
+  if (!evento.data) return;
+
+  // Permite que la aplicación fuerce la activación de una versión nueva.
+  if (evento.data.type === 'ACTUALIZAR_AHORA') {
     self.skipWaiting();
+    return;
+  }
+
+  // La pantalla de configuración pregunta qué versión está corriendo, para
+  // poder confirmar de un vistazo que el dispositivo ya recibió el despliegue.
+  if (evento.data.type === 'VERSION' && evento.ports && evento.ports[0]) {
+    evento.ports[0].postMessage({ version: VERSION_CACHE });
   }
 });

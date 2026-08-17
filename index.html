@@ -177,8 +177,50 @@
         return;
       }
 
+      /*
+        Actualización forzada.
+
+        Sin esto, un despliegue nuevo no llegaba a los teléfonos: la aplicación
+        instalada seguía sirviendo lo que tenía guardado y la única salida era
+        borrar el caché del sitio a mano, cosa que nadie va a hacer en medio de
+        un evento.
+
+        El mecanismo es este. El sw.js hace skipWaiting() al instalar y
+        clients.claim() al activar, así que la versión nueva toma el control
+        apenas se descarga, sin esperar a que se cierren las pestañas. Cuando
+        eso pasa, el navegador dispara 'controllerchange' y acá recargamos.
+
+        `teniaControlador` se lee ANTES de registrar nada: en la primera visita
+        no hay controlador, el primer claim también dispara el evento, y sin
+        esta guarda la página se recargaría sola la primera vez que alguien
+        entra, sin motivo.
+
+        Recargar es seguro: la sesión vive en localStorage y los escaneos
+        pendientes en IndexedDB. No se pierde nada en el camino.
+      */
+      var teniaControlador = Boolean(navigator.serviceWorker.controller);
+      var recargando = false;
+
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!teniaControlador || recargando) return;
+        recargando = true;
+        location.reload();
+      });
+
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js').catch(function (error) {
+        navigator.serviceWorker.register('/sw.js').then(function (registro) {
+          // El navegador solo revisa sw.js por su cuenta cada 24 horas. Para un
+          // sistema que se corrige durante el evento mismo eso es demasiado,
+          // así que preguntamos nosotros.
+          registro.update();
+          setInterval(function () { registro.update(); }, 15 * 60 * 1000);
+
+          // Y también al volver a la pestaña o a la aplicación, que es el
+          // momento en que alguien retoma el trabajo.
+          document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) registro.update();
+          });
+        }).catch(function (error) {
           console.warn('[sw] No se pudo registrar el service worker:', error);
         });
       });

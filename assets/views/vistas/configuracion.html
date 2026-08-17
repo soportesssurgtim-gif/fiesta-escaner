@@ -117,6 +117,135 @@
       </div>
     </div>
 
+    <!--
+      Vaciado de registros.
+
+      Existe para dejar la base limpia entre prueba y prueba sin entrar a
+      Supabase. Solo aparece para administradores: el backend responde 403 al
+      resto y la lista llega vacía.
+
+      Solo se ofrecen datos de operación, los que se generan durante un evento.
+      Empleados, departamentos, usuarios, roles y permisos no están y no deben
+      estar: son el padrón de la institución, no datos de una fiesta.
+    -->
+    <div v-if="purga.conjuntos.length > 0" class="tarjeta border-error-200 lg:col-span-2 dark:border-error-500/30">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo text-error-600 dark:text-error-400">
+            <i class="fa-solid fa-eraser"></i> Vaciar registros
+          </h2>
+          <p class="tarjeta-subtitulo">
+            Borra todos los registros del conjunto que elijas. No se puede deshacer.
+          </p>
+        </div>
+        <button type="button" @click="cargarPurgables()" class="boton boton-secundario"
+                :disabled="purga.cargando">
+          <i class="fa-solid" :class="purga.cargando ? 'fa-circle-notch animar-girar' : 'fa-rotate'"></i>
+          Actualizar conteos
+        </button>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div class="mb-5 flex gap-3 rounded-xl border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-warning-500"></i>
+          <p class="text-theme-xs text-warning-700 dark:text-warning-400">
+            Esto borra en la base de datos, no solo en pantalla. No hay papelera
+            ni deshacer. El padrón de empleados, los departamentos, los usuarios
+            y los permisos nunca se tocan desde aquí.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div v-for="conjunto in purga.conjuntos" :key="conjunto.clave"
+               class="flex flex-col rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <div class="mb-1 flex items-start justify-between gap-3">
+              <p class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+                {{ conjunto.etiqueta }}
+              </p>
+              <span class="insignia shrink-0"
+                    :class="conjunto.total > 0 ? 'insignia-marca' : 'insignia-neutra'">
+                {{ conjunto.total }}
+              </span>
+            </div>
+
+            <p class="mb-3 flex-1 text-theme-xs text-gray-500 dark:text-gray-400">
+              {{ conjunto.descripcion }}
+            </p>
+
+            <button type="button"
+                    @click="pedirPurga(conjunto)"
+                    class="boton boton-secundario w-full text-error-600 dark:text-error-400"
+                    :disabled="conjunto.total === 0">
+              <i class="fa-solid fa-trash"></i>
+              {{ conjunto.total === 0 ? 'Ya está vacío' : 'Vaciar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmación del vaciado -->
+    <div v-if="purga.elegido" class="modal-fondo" @click.self="cancelarPurga()">
+      <div class="modal-panel max-w-md">
+        <div class="mb-5 flex items-start gap-3">
+          <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-50 text-error-500 dark:bg-error-500/15">
+            <i class="fa-solid fa-triangle-exclamation text-theme-xl"></i>
+          </span>
+          <div class="min-w-0">
+            <h2 class="modal-titulo">Vaciar «{{ purga.elegido.etiqueta }}»</h2>
+            <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+              Se borrarán {{ purga.elegido.total }} registros. Esta acción no se puede deshacer.
+            </p>
+          </div>
+        </div>
+
+        <!-- Si el conjunto arrastra otras tablas hay que decirlo ANTES, no
+             después: alguien que vacía "Eventos" quizá no sepa que con eso se
+             van también todas las asistencias. -->
+        <div v-if="purga.elegido.arrastra && purga.elegido.arrastra.length"
+             class="mb-4 rounded-xl border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10">
+          <p class="text-theme-xs font-semibold text-warning-700 dark:text-warning-400">
+            Se borrará también, por depender de esto:
+          </p>
+          <p class="mt-1 text-theme-xs text-warning-700 dark:text-warning-400">
+            {{ purga.elegido.arrastra.join(' · ') }}
+          </p>
+        </div>
+
+        <label for="confirmar-purga" class="etiqueta">
+          Escribe <span class="font-semibold text-gray-800 dark:text-white/90">{{ purga.elegido.etiqueta }}</span> para confirmar
+        </label>
+        <input id="confirmar-purga"
+               v-model="purga.confirmacion"
+               @keyup.enter="confirmarPurga()"
+               type="text"
+               autocomplete="off"
+               autocapitalize="none"
+               spellcheck="false"
+               class="campo"
+               :placeholder="purga.elegido.etiqueta" />
+
+        <div v-if="purga.error"
+             class="mt-4 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <i class="fa-solid fa-circle-exclamation mt-0.5 text-error-500"></i>
+          <p class="text-theme-sm text-error-700 dark:text-error-400">{{ purga.error }}</p>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button type="button" @click="cancelarPurga()" class="boton boton-secundario flex-1"
+                  :disabled="purga.ejecutando">
+            Cancelar
+          </button>
+          <button type="button" @click="confirmarPurga()" class="boton boton-peligro flex-1"
+                  :disabled="!confirmacionValida || purga.ejecutando">
+            <i v-if="purga.ejecutando" class="fa-solid fa-circle-notch animar-girar"></i>
+            <i v-else class="fa-solid fa-trash"></i>
+            {{ purga.ejecutando ? 'Borrando…' : 'Borrar todo' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Información del entorno -->
     <div class="tarjeta lg:col-span-2">
       <div class="tarjeta-encabezado">
@@ -148,6 +277,25 @@
             <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Apariencia</dt>
             <dd class="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white/90">
               {{ modoOscuro ? 'Modo oscuro' : 'Modo claro' }}
+            </dd>
+          </div>
+          <!-- Sirve para confirmar que este dispositivo ya recibió el último
+               despliegue: si el número no es el publicado, sigue con lo viejo. -->
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Versión instalada</dt>
+            <dd class="mt-1 flex items-center gap-2 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ pwa.version || '—' }}
+              <button type="button" @click="pwa.consultarVersion()"
+                      class="text-theme-xs text-brand-500 hover:text-brand-600"
+                      aria-label="Volver a consultar la versión">
+                <i class="fa-solid fa-rotate"></i>
+              </button>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-theme-xs uppercase tracking-wide text-gray-400">Instalada como app</dt>
+            <dd class="mt-1 text-theme-sm font-medium text-gray-800 dark:text-white/90">
+              {{ pwa.instalada ? 'Sí' : 'No' }}
             </dd>
           </div>
         </dl>
