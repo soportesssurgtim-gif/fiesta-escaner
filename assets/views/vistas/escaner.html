@@ -38,7 +38,13 @@
       <p class="metrica-etiqueta">En el padrón</p>
     </div>
 
-    <div class="tarjeta p-5">
+    <!-- Esta métrica es pulsable: es el acceso más directo a la gestión de lo
+         que quedó sin subir, desde la pantalla donde se genera. -->
+    <button type="button"
+            @click="pendientes.abrir()"
+            class="tarjeta p-5 text-left transition hover:border-brand-300 dark:hover:border-brand-500/40"
+            :class="{ 'cursor-default': escaner.estadoRed.pendientes === 0 }"
+            title="Ver y gestionar los registros sin subir">
       <div class="metrica-icono"
            :class="escaner.estadoRed.pendientes > 0
                    ? 'bg-warning-50 text-warning-600 dark:bg-warning-500/15 dark:text-warning-400'
@@ -47,7 +53,7 @@
       </div>
       <p class="metrica-valor">{{ escaner.estadoRed.pendientes }}</p>
       <p class="metrica-etiqueta">Por subir</p>
-    </div>
+    </button>
   </div>
 
   <div class="flex flex-col gap-4 lg:grid lg:grid-cols-5 lg:gap-6">

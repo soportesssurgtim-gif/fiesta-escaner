@@ -28,6 +28,7 @@ import { usarPermisos } from './composables/usarPermisos.js';
 import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
+import { usarPendientes } from './composables/usarPendientes.js';
 
 import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -455,6 +456,19 @@ async function iniciar() {
             fuente: 'qr'
           });
         }
+      });
+
+      // =====================================================================
+      // Registros pendientes en el dispositivo
+      // =====================================================================
+
+      const pendientes = usarPendientes({
+        notificar,
+        obtenerEmpleados: () => empleados.lista,
+        // Después de subir o descartar, el contador de la barra lateral tiene
+        // que reflejar la realidad; si no, sigue diciendo que hay cosas por
+        // subir cuando ya no queda ninguna.
+        alCambiar: () => escaner.actualizarPendientes()
       });
 
       // =====================================================================
@@ -1088,6 +1102,9 @@ async function iniciar() {
 
         // Escáner
         escaner,
+
+        // Registros pendientes en el dispositivo
+        pendientes,
 
         // Importar / exportar
         importacion, importarEmpleados, importarDepartamentos, exportar,

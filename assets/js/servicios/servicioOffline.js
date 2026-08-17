@@ -143,12 +143,57 @@ export const servicioOffline = {
     });
   },
 
+  /** Borra registros concretos del dispositivo. No se puede deshacer. */
+  async eliminar(idsCliente) {
+    const ids = [].concat(idsCliente || []).filter(Boolean);
+    if (ids.length === 0) return 0;
+
+    await transaccion('readwrite', (almacen) => {
+      for (const id of ids) almacen.delete(id);
+    });
+    return ids.length;
+  },
+
   /**
-   * Sube todo lo pendiente.
+   * Anota por qué falló un intento.
+   *
+   * Sin esto, un registro que el servidor rechaza una y otra vez (un DUI que no
+   * está en el padrón, por ejemplo) se queda en la cola para siempre sin que
+   * nadie sepa el motivo, y cada sincronización lo vuelve a intentar en vano.
+   */
+  async anotarFallos(fallos) {
+    if (!fallos || fallos.length === 0) return;
+
+    await transaccion('readwrite', (almacen) => {
+      for (const { idCliente, mensaje } of fallos) {
+        const solicitud = almacen.get(idCliente);
+        solicitud.onsuccess = () => {
+          const registro = solicitud.result;
+          if (!registro) return;
+          registro.intentos = (registro.intentos || 0) + 1;
+          registro.ultimoError = mensaje || 'Sin detalle.';
+          registro.ultimoIntento = Date.now();
+          almacen.put(registro);
+        };
+      }
+    });
+  },
+
+  /**
+   * Sube lo pendiente.
+   *
+   * `soloEstos` limita el envío a ciertos idCliente, para poder reintentar un
+   * registro suelto desde la pantalla de gestión sin arrastrar los demás.
    * Devuelve el conteo de lo que pasó para poder informarlo en pantalla.
    */
-  async sincronizar() {
-    const pendientes = await this.pendientes();
+  async sincronizar(soloEstos = null) {
+    let pendientes = await this.pendientes();
+
+    if (soloEstos && soloEstos.length > 0) {
+      const elegidos = new Set([].concat(soloEstos));
+      pendientes = pendientes.filter((registro) => elegidos.has(registro.idCliente));
+    }
+
     if (pendientes.length === 0) {
       return { sincronizados: 0, duplicados: 0, errores: 0, sinConexion: false };
     }
@@ -162,6 +207,10 @@ export const servicioOffline = {
         }))
       );
 
+      const porId = new Map(
+        (resultado.detalle || []).filter((fila) => fila.id_cliente).map((fila) => [fila.id_cliente, fila])
+      );
+
       // Marcamos solo lo que el servidor confirmó (subido o ya existente).
       // Lo que falló queda pendiente para el siguiente intento.
       const confirmados = (resultado.detalle || [])
@@ -169,18 +218,38 @@ export const servicioOffline = {
         .map((fila) => fila.id_cliente)
         .filter(Boolean);
 
+      const confirmadosSet = new Set(confirmados);
+      const fallidos = pendientes
+        .filter((registro) => !confirmadosSet.has(registro.idCliente))
+        .map((registro) => ({
+          idCliente: registro.idCliente,
+          mensaje:
+            (porId.get(registro.idCliente) || {}).mensaje ||
+            'El servidor no confirmó este registro.'
+        }));
+
       await this.marcarSincronizados(confirmados);
+      await this.anotarFallos(fallidos);
       await this.limpiarSincronizados();
 
       return { ...resultado, sinConexion: false };
     } catch (fallo) {
       // Sin red no es un fallo real: los registros siguen a salvo en el
       // dispositivo y se reintentará cuando vuelva la señal.
+      const sinConexion = fallo.esFallaDeRed === true;
+
+      await this.anotarFallos(
+        pendientes.map((registro) => ({
+          idCliente: registro.idCliente,
+          mensaje: sinConexion ? 'Sin conexión al intentar subirlo.' : fallo.message || 'Error al subir.'
+        }))
+      );
+
       return {
         sincronizados: 0,
         duplicados: 0,
         errores: pendientes.length,
-        sinConexion: fallo.esFallaDeRed === true
+        sinConexion
       };
     }
   }

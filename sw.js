@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v2.3.1';
+const VERSION_CACHE = 'v2.3.2';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -69,6 +69,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarImportacionCsv.js',
   '/assets/js/composables/usarNotificaciones.js',
   '/assets/js/composables/usarInstalacionPwa.js',
+  '/assets/js/composables/usarPendientes.js',
   '/assets/js/composables/usarPermisos.js',
 
   // Componentes y contenido
@@ -86,6 +87,7 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/modal-guia.html',
   '/assets/views/parciales/modal-importacion.html',
   '/assets/views/parciales/modal-instalar.html',
+  '/assets/views/parciales/modal-pendientes.html',
   '/assets/views/parciales/notificaciones.html',
   '/assets/views/vistas/asistencias.html',
   '/assets/views/vistas/configuracion.html',

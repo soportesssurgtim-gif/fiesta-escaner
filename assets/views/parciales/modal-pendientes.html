@@ -1,0 +1,204 @@
+<!--
+  Registros guardados en este dispositivo que todavía no llegaron al servidor.
+
+  Antes solo había un contador y un botón que reintentaba todo junto. Eso sirve
+  mientras la cola avanza, pero no cuando algo se atasca: un DUI que no está en
+  el padrón se rechaza siempre, y el contador se quedaba clavado sin que nadie
+  pudiera ver de quién se trataba ni sacarlo de la cola.
+-->
+<div v-if="pendientes.abierto" class="modal-fondo" @click.self="pendientes.cerrar()">
+  <div class="modal-panel flex max-h-[85vh] w-full max-w-3xl flex-col">
+
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+              :class="pendientes.hayPendientes
+                      ? 'bg-warning-50 text-warning-500 dark:bg-warning-500/15'
+                      : 'bg-success-50 text-success-500 dark:bg-success-500/15'">
+          <i class="fa-solid fa-cloud-arrow-up text-theme-xl"></i>
+        </span>
+        <div class="min-w-0">
+          <h2 class="modal-titulo">Registros sin subir</h2>
+          <p class="text-theme-xs text-gray-500 dark:text-gray-400">
+            Guardados en este dispositivo, todavía no están en la base de datos.
+          </p>
+        </div>
+      </div>
+      <button type="button" @click="pendientes.cerrar()" class="boton-icono" aria-label="Cerrar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Estado de la conexión: es lo primero que explica por qué no suben. -->
+    <div v-if="!escaner.estadoRed.enLinea"
+         class="mb-4 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+      <i class="fa-solid fa-plug-circle-xmark mt-0.5 shrink-0 text-error-500"></i>
+      <p class="text-theme-xs text-error-700 dark:text-error-400">
+        Este dispositivo está sin conexión. Los registros están a salvo y subirán
+        solos en cuanto vuelva la señal.
+      </p>
+    </div>
+
+    <!-- Cargando -->
+    <div v-if="pendientes.cargando" class="py-12 text-center">
+      <i class="fa-solid fa-circle-notch animar-girar text-2xl text-gray-300"></i>
+    </div>
+
+    <!-- Nada pendiente -->
+    <div v-else-if="!pendientes.hayPendientes" class="py-12 text-center">
+      <i class="fa-solid fa-circle-check mb-3 block text-4xl text-success-400"></i>
+      <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">
+        Todo está sincronizado
+      </p>
+      <p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+        No queda ningún escaneo guardado en este dispositivo.
+      </p>
+    </div>
+
+    <template v-else>
+      <!-- Resumen -->
+      <div class="mb-4 grid grid-cols-3 gap-2">
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">{{ pendientes.resumen.total }}</p>
+          <p class="text-[11px] leading-tight text-gray-500 dark:text-gray-400">Por subir</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold"
+             :class="pendientes.resumen.conProblemas > 0 ? 'text-warning-600 dark:text-warning-400' : 'text-gray-800 dark:text-white/90'">
+            {{ pendientes.resumen.conProblemas }}
+          </p>
+          <p class="text-[11px] leading-tight text-gray-500 dark:text-gray-400">Ya fallaron</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold"
+             :class="pendientes.resumen.sinIdentificar > 0 ? 'text-error-600 dark:text-error-400' : 'text-gray-800 dark:text-white/90'">
+            {{ pendientes.resumen.sinIdentificar }}
+          </p>
+          <p class="text-[11px] leading-tight text-gray-500 dark:text-gray-400">Sin identificar</p>
+        </div>
+      </div>
+
+      <!-- Lista -->
+      <div class="-mx-1 flex-1 space-y-2 overflow-y-auto px-1">
+        <div v-for="registro in pendientes.lista" :key="registro.idCliente"
+             class="rounded-xl border p-3 transition"
+             :class="pendientes.seleccion.includes(registro.idCliente)
+                     ? 'border-brand-300 bg-brand-50/50 dark:border-brand-500/40 dark:bg-brand-500/5'
+                     : 'border-gray-200 dark:border-gray-800'">
+
+          <div class="flex items-start gap-3">
+            <input type="checkbox"
+                   :checked="pendientes.seleccion.includes(registro.idCliente)"
+                   @change="pendientes.alternarSeleccion(registro.idCliente)"
+                   class="mt-1 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-500"
+                   :aria-label="'Seleccionar el registro de ' + (registro.nombre || registro.duiLegible)" />
+
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                  {{ registro.nombre || 'Sin identificar' }}
+                </p>
+                <span v-if="!registro.enPadron" class="insignia insignia-error">No está en el padrón</span>
+                <span v-else-if="registro.intentos > 0" class="insignia insignia-alerta">
+                  {{ registro.intentos }} {{ registro.intentos === 1 ? 'intento' : 'intentos' }}
+                </span>
+              </div>
+
+              <p class="mt-0.5 font-mono text-theme-xs text-gray-500 dark:text-gray-400">
+                {{ registro.duiLegible }}
+              </p>
+              <p class="text-theme-xs text-gray-400">
+                {{ registro.momentoLegible }} · {{ registro.dispositivo }}
+              </p>
+
+              <p v-if="registro.ultimoError"
+                 class="mt-1.5 rounded-lg bg-error-50 px-2 py-1 text-[11px] leading-snug text-error-700 dark:bg-error-500/10 dark:text-error-400">
+                {{ registro.ultimoError }}
+              </p>
+            </div>
+
+            <div class="flex shrink-0 gap-1">
+              <button type="button"
+                      @click="pendientes.reintentar(registro.idCliente)"
+                      class="boton-icono"
+                      :disabled="pendientes.trabajando !== '' || !escaner.estadoRed.enLinea"
+                      title="Intentar subir este registro">
+                <i class="fa-solid"
+                   :class="pendientes.trabajando === registro.idCliente ? 'fa-circle-notch animar-girar' : 'fa-cloud-arrow-up'"></i>
+              </button>
+              <button type="button"
+                      @click="pendientes.descartar(registro.idCliente)"
+                      class="boton-icono boton-icono-peligro"
+                      :disabled="pendientes.trabajando !== ''"
+                      title="Descartar este registro. No se puede deshacer.">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acciones -->
+      <div class="mt-4 border-t border-gray-200 pt-4 dark:border-gray-800">
+        <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="button" @click="pendientes.alternarTodos()"
+                  class="text-theme-xs font-medium text-brand-500 hover:text-brand-600">
+            {{ pendientes.todosSeleccionados ? 'Quitar la selección' : 'Seleccionar todos' }}
+          </button>
+          <span v-if="pendientes.seleccion.length > 0" class="text-theme-xs text-gray-500">
+            {{ pendientes.seleccion.length }} seleccionados
+          </span>
+          <button type="button" @click="pendientes.exportarCsv()"
+                  class="ml-auto text-theme-xs font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+            <i class="fa-solid fa-file-arrow-down"></i> Descargar respaldo CSV
+          </button>
+        </div>
+
+        <!-- Confirmación del descarte. Va en línea y no en otro modal encima:
+             apilar diálogos en un teléfono deja el segundo sin lugar. -->
+        <div v-if="pendientes.confirmandoDescarte"
+             class="mb-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+          <p class="text-theme-sm font-medium text-error-700 dark:text-error-400">
+            ¿Descartar
+            {{ pendientes.seleccion.length > 0 ? pendientes.seleccion.length : pendientes.lista.length }}
+            registros?
+          </p>
+          <p class="mt-1 text-theme-xs text-error-700 dark:text-error-400">
+            Esos escaneos se pierden sin haber llegado nunca a la base de datos.
+            Si todavía no descargaste el respaldo, hazlo antes.
+          </p>
+          <div class="mt-3 flex gap-2">
+            <button type="button" @click="pendientes.confirmandoDescarte = false"
+                    class="boton boton-secundario flex-1">
+              Cancelar
+            </button>
+            <button type="button"
+                    @click="pendientes.descartar(pendientes.seleccion.length > 0
+                                                 ? pendientes.seleccion
+                                                 : pendientes.lista.map(r => r.idCliente))"
+                    class="boton boton-peligro flex-1"
+                    :disabled="pendientes.trabajando !== ''">
+              Sí, descartar
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="flex flex-col gap-2 sm:flex-row">
+          <button type="button" @click="pendientes.reintentar()"
+                  class="boton boton-primario flex-1"
+                  :disabled="pendientes.trabajando !== '' || !escaner.estadoRed.enLinea">
+            <i class="fa-solid"
+               :class="pendientes.trabajando === 'todos' ? 'fa-circle-notch animar-girar' : 'fa-cloud-arrow-up'"></i>
+            {{ pendientes.trabajando === 'todos' ? 'Subiendo…' : 'Intentar subir todo' }}
+          </button>
+          <button type="button" @click="pendientes.confirmandoDescarte = true"
+                  class="boton boton-secundario text-error-600 dark:text-error-400"
+                  :disabled="pendientes.trabajando !== ''">
+            <i class="fa-solid fa-trash"></i>
+            {{ pendientes.seleccion.length > 0 ? 'Descartar seleccionados' : 'Descartar todo' }}
+          </button>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
