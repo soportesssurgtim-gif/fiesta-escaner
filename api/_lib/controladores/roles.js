@@ -74,6 +74,26 @@ async function guardarPermiso({ req, res, sesion }) {
  *
  * Acá usamos un upsert único sobre la llave (rol, modulo): una sola consulta,
  * y si algo falla el error sube en vez de perderse.
+ *
+ * ---
+ * Sobre el `id`, que estuvo rompiendo esto:
+ *
+ * La pantalla manda la matriz completa, con `id` en los módulos que ya tenían
+ * permiso guardado y `id: null` en los que no. La versión anterior conservaba
+ * ese id solo cuando venía, así que el lote quedaba con objetos de claves
+ * distintas: unos con `id`, otros sin.
+ *
+ * PostgREST exige que en un upsert por lotes TODOS los objetos tengan
+ * exactamente las mismas claves, y responde PGRST102 "All object keys must
+ * match". Ese error se relanzaba y llegaba al navegador como un 500 sin
+ * explicación: guardar permisos fallaba siempre que el rol tuviera al menos un
+ * módulo nuevo, que es el caso corriente.
+ *
+ * La solución es no mandar el id en absoluto. El conflicto se resuelve por
+ * (rol, modulo), que es único gracias al índice de la migración 003: si la
+ * fila existe se actualiza, y si no, se inserta con el id que genera la base.
+ * El id del cliente no aportaba nada y encima abría la puerta a un choque por
+ * llave primaria.
  */
 async function guardarMatrizDeRol({ req, res, sesion }) {
   if (!esAdministrador(sesion.rol)) {
@@ -93,20 +113,13 @@ async function guardarMatrizDeRol({ req, res, sesion }) {
     return responderSolicitudInvalida(res, 'Los permisos recibidos no traen rol o módulo.');
   }
 
-  // Conservamos el id cuando el permiso ya existía, para que el upsert actualice
-  // en lugar de duplicar.
-  const conIdentificador = permisos.map((permiso, indice) => {
-    const idOriginal = entradas[indice] && entradas[indice].id;
-    return idOriginal ? { ...permiso, id: idOriginal } : permiso;
-  });
-
   const { error } = await supabase
     .from(TABLAS.permisos)
-    .upsert(conIdentificador, { onConflict: 'rol,modulo' });
+    .upsert(permisos, { onConflict: 'rol,modulo' });
 
   if (error) throw error;
 
-  return responderOk(res, { ok: true, guardados: conIdentificador.length });
+  return responderOk(res, { ok: true, guardados: permisos.length });
 }
 
 export const controladorRoles = crearControladorCatalogo({
