@@ -27,11 +27,15 @@
         </span>
 
         <template v-else>
-          <img src="/assets/iconos/logo-horizontal-azul.png"
+          <img :src="apariencia.logoForma.valor === 'vertical'
+                     ? '/assets/iconos/logo-vertical-azul.png'
+                     : '/assets/iconos/logo-horizontal-azul.png'"
                alt="Alcaldía Municipal de San Salvador Sur"
                class="mb-6 h-auto max-w-full object-contain dark:hidden"
                :style="{ width: apariencia.anchoLogin.valor + 'px' }" />
-          <img src="/assets/iconos/logo-horizontal-blanco.png"
+          <img :src="apariencia.logoForma.valor === 'vertical'
+                     ? '/assets/iconos/logo-vertical-blanco.png'
+                     : '/assets/iconos/logo-horizontal-blanco.png'"
                alt="Alcaldía Municipal de San Salvador Sur"
                class="mb-6 hidden h-auto max-w-full object-contain dark:block"
                :style="{ width: apariencia.anchoLogin.valor + 'px' }" />

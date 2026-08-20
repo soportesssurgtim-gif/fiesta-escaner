@@ -259,12 +259,15 @@
                         :class="apariencia.logoForma.valor === opcion.valor
                                 ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
                                 : 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700'">
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                  <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gray-50 p-1 dark:bg-gray-800">
                     <img v-if="opcion.valor === 'escudo'"
                          src="/assets/iconos/logo-escudo-azul.png" alt=""
-                         class="h-7 w-7 object-contain" />
+                         class="h-full w-full object-contain" />
+                    <img v-else-if="opcion.valor === 'vertical'"
+                         src="/assets/iconos/logo-vertical-azul.png" alt=""
+                         class="h-full w-full object-contain" />
                     <img v-else src="/assets/iconos/logo-horizontal-azul.png" alt=""
-                         class="w-9 object-contain" />
+                         class="w-full object-contain" />
                   </span>
                   <span class="min-w-0 flex-1">
                     <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
@@ -279,36 +282,78 @@
                 </button>
               </div>
 
+              <!--
+                Los tamaños se guardan con botón y no al soltar el deslizador.
+                Ajustar un tamaño lleva varios intentos, y guardar cada paso
+                llena la pantalla de avisos y manda una petición por cada píxel.
+                Mientras tanto la vista previa de abajo ya muestra cómo queda.
+              -->
               <div class="space-y-4">
                 <div>
-                  <label for="ancho-sidebar" class="etiqueta mb-1 flex justify-between">
-                    <span>Tamaño en el menú lateral</span>
-                    <span class="font-mono text-gray-400">{{ apariencia.anchoSidebar.valor }} px</span>
+                  <label for="ancho-sidebar" class="etiqueta mb-1">
+                    Tamaño en el menú lateral
                   </label>
-                  <input id="ancho-sidebar" type="range"
-                         :min="apariencia.anchoSidebar.minimo"
-                         :max="apariencia.anchoSidebar.maximo"
-                         :value="apariencia.anchoSidebar.valor"
-                         @input="apariencia.anchoSidebar.valor = Number($event.target.value)"
-                         @change="cambiarAnchoSidebar($event.target.value)"
-                         :disabled="!permisos.esAdministrador"
-                         class="w-full accent-brand-500 disabled:cursor-not-allowed" />
+                  <div class="flex items-center gap-3">
+                    <input id="ancho-sidebar" type="range"
+                           :min="apariencia.anchoSidebar.minimo"
+                           :max="apariencia.anchoSidebar.maximo"
+                           v-model.number="apariencia.anchoSidebar.valor"
+                           :disabled="!permisos.esAdministrador"
+                           class="min-w-0 flex-1 accent-brand-500 disabled:cursor-not-allowed" />
+                    <input type="number"
+                           :min="apariencia.anchoSidebar.minimo"
+                           :max="apariencia.anchoSidebar.maximo"
+                           v-model.number="apariencia.anchoSidebar.valor"
+                           :disabled="!permisos.esAdministrador"
+                           aria-label="Tamaño en el menú lateral, en píxeles"
+                           class="campo w-20 shrink-0 text-center" />
+                    <span class="shrink-0 text-theme-xs text-gray-400">px</span>
+                  </div>
                 </div>
 
                 <div>
-                  <label for="ancho-login" class="etiqueta mb-1 flex justify-between">
-                    <span>Tamaño en el inicio de sesión</span>
-                    <span class="font-mono text-gray-400">{{ apariencia.anchoLogin.valor }} px</span>
+                  <label for="ancho-login" class="etiqueta mb-1">
+                    Tamaño en el inicio de sesión
                   </label>
-                  <input id="ancho-login" type="range"
-                         :min="apariencia.anchoLogin.minimo"
-                         :max="apariencia.anchoLogin.maximo"
-                         :value="apariencia.anchoLogin.valor"
-                         @input="apariencia.anchoLogin.valor = Number($event.target.value)"
-                         @change="cambiarAnchoLogin($event.target.value)"
-                         :disabled="!permisos.esAdministrador"
-                         class="w-full accent-brand-500 disabled:cursor-not-allowed" />
+                  <div class="flex items-center gap-3">
+                    <input id="ancho-login" type="range"
+                           :min="apariencia.anchoLogin.minimo"
+                           :max="apariencia.anchoLogin.maximo"
+                           v-model.number="apariencia.anchoLogin.valor"
+                           :disabled="!permisos.esAdministrador"
+                           class="min-w-0 flex-1 accent-brand-500 disabled:cursor-not-allowed" />
+                    <input type="number"
+                           :min="apariencia.anchoLogin.minimo"
+                           :max="apariencia.anchoLogin.maximo"
+                           v-model.number="apariencia.anchoLogin.valor"
+                           :disabled="!permisos.esAdministrador"
+                           aria-label="Tamaño en el inicio de sesión, en píxeles"
+                           class="campo w-20 shrink-0 text-center" />
+                    <span class="shrink-0 text-theme-xs text-gray-400">px</span>
+                  </div>
                 </div>
+
+                <div v-if="permisos.esAdministrador"
+                     class="flex items-center gap-2">
+                  <button type="button" @click="guardarTamanosLogo()"
+                          class="boton boton-primario"
+                          :disabled="!hayTamanosSinGuardar || apariencia.guardando !== ''">
+                    <i v-if="apariencia.guardando.startsWith('logo_ancho')"
+                       class="fa-solid fa-circle-notch animar-girar"></i>
+                    <i v-else class="fa-solid fa-floppy-disk"></i>
+                    Guardar tamaños
+                  </button>
+                  <button type="button" @click="descartarTamanosLogo()"
+                          class="boton boton-secundario"
+                          :disabled="!hayTamanosSinGuardar || apariencia.guardando !== ''">
+                    Descartar
+                  </button>
+                </div>
+
+                <p v-if="hayTamanosSinGuardar" class="text-theme-xs text-warning-600 dark:text-warning-400">
+                  <i class="fa-solid fa-circle-exclamation"></i>
+                  Hay cambios de tamaño sin guardar.
+                </p>
               </div>
             </div>
 
@@ -316,7 +361,7 @@
             <p class="mb-2 mt-4 text-theme-xs text-gray-500 dark:text-gray-400">
               Así queda el encabezado del menú
             </p>
-            <div class="flex min-h-[72px] items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 dark:border-gray-800 dark:bg-gray-900">
+            <div class="flex min-h-[72px] items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 py-2 dark:border-gray-800 dark:bg-gray-900">
               <template v-if="apariencia.logoForma.valor === 'escudo'">
                 <span class="flex shrink-0 items-center justify-center rounded-xl bg-brand-500 p-1.5"
                       :style="{ width: apariencia.anchoSidebar.valor + 'px',
@@ -336,14 +381,48 @@
               </template>
 
               <template v-else>
-                <img src="/assets/iconos/logo-horizontal-azul.png"
+                <img :src="apariencia.logoForma.valor === 'vertical'
+                           ? '/assets/iconos/logo-vertical-azul.png'
+                           : '/assets/iconos/logo-horizontal-azul.png'"
                      alt="Alcaldía Municipal de San Salvador Sur"
                      class="h-auto max-w-full object-contain dark:hidden"
                      :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
-                <img src="/assets/iconos/logo-horizontal-blanco.png"
+                <img :src="apariencia.logoForma.valor === 'vertical'
+                           ? '/assets/iconos/logo-vertical-blanco.png'
+                           : '/assets/iconos/logo-horizontal-blanco.png'"
                      alt="Alcaldía Municipal de San Salvador Sur"
                      class="hidden h-auto max-w-full object-contain dark:block"
                      :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
+              </template>
+            </div>
+
+            <!-- Y de la pantalla de entrada, que usa su propio tamaño -->
+            <p class="mb-2 mt-4 text-theme-xs text-gray-500 dark:text-gray-400">
+              Y así el inicio de sesión
+            </p>
+            <div class="flex min-h-[80px] items-center rounded-xl border border-gray-200 bg-white px-5 py-3 dark:border-gray-800 dark:bg-gray-900">
+              <span v-if="apariencia.logoForma.valor === 'escudo'"
+                    class="flex shrink-0 items-center justify-center rounded-2xl bg-brand-500 p-2.5"
+                    :style="{ width: apariencia.anchoLogin.valor + 'px',
+                              height: apariencia.anchoLogin.valor + 'px' }">
+                <img src="/assets/iconos/logo-escudo-blanco.png"
+                     alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
+                     class="h-full w-full object-contain" />
+              </span>
+
+              <template v-else>
+                <img :src="apariencia.logoForma.valor === 'vertical'
+                           ? '/assets/iconos/logo-vertical-azul.png'
+                           : '/assets/iconos/logo-horizontal-azul.png'"
+                     alt="Alcaldía Municipal de San Salvador Sur"
+                     class="h-auto max-w-full object-contain dark:hidden"
+                     :style="{ width: apariencia.anchoLogin.valor + 'px' }" />
+                <img :src="apariencia.logoForma.valor === 'vertical'
+                           ? '/assets/iconos/logo-vertical-blanco.png'
+                           : '/assets/iconos/logo-horizontal-blanco.png'"
+                     alt="Alcaldía Municipal de San Salvador Sur"
+                     class="hidden h-auto max-w-full object-contain dark:block"
+                     :style="{ width: apariencia.anchoLogin.valor + 'px' }" />
               </template>
             </div>
           </div>

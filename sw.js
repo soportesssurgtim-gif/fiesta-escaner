@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.3.0';
+const VERSION_CACHE = 'v3.3.1';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -57,6 +57,8 @@ const ARCHIVOS_BASE = [
   '/assets/iconos/logo-horizontal-blanco.png',
   '/assets/iconos/logo-escudo-azul.png',
   '/assets/iconos/logo-escudo-blanco.png',
+  '/assets/iconos/logo-vertical-azul.png',
+  '/assets/iconos/logo-vertical-blanco.png',
 
   // Punto de entrada y núcleo
   '/assets/js/app.js',

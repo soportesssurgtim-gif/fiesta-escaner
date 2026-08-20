@@ -1370,21 +1370,41 @@ async function iniciar() {
 
       const logoInicial = logoCacheado();
 
+      /*
+       * Cada parámetro lleva dos valores: `valor` es lo que se está viendo y
+       * `guardado` es lo que hay en la base.
+       *
+       * Hacen falta los dos porque los deslizadores de tamaño actualizan la
+       * vista previa mientras se arrastran. Con un solo campo, al soltar el
+       * deslizador el valor nuevo ya estaba escrito y el guardado no tenía con
+       * qué compararlo: creía que no había cambiado nada y no guardaba nunca.
+       */
+      const anchoSidebarInicial = logoInicial ? logoInicial.anchoSidebar : 40;
+      const anchoLoginInicial = logoInicial ? logoInicial.anchoLogin : 56;
+      const formaInicial = logoInicial ? logoInicial.forma : 'escudo';
+      const colorInicial = marca.actual();
+
       const apariencia = reactive({
         // Qué clave se está guardando ahora mismo, o '' si ninguna.
         guardando: '',
-        tema: { valor: 'sistema', opciones: [] },
-        color: { valor: marca.actual(), sugerencias: [] },
-        logoForma: { valor: logoInicial ? logoInicial.forma : 'escudo', opciones: [] },
+        tema: { valor: 'sistema', guardado: 'sistema', opciones: [] },
+        color: { valor: colorInicial, guardado: colorInicial, sugerencias: [] },
+        logoForma: { valor: formaInicial, guardado: formaInicial, opciones: [] },
         anchoSidebar: {
-          valor: logoInicial ? logoInicial.anchoSidebar : 40,
+          valor: anchoSidebarInicial, guardado: anchoSidebarInicial,
           minimo: 28, maximo: 240, recomendado: {}
         },
         anchoLogin: {
-          valor: logoInicial ? logoInicial.anchoLogin : 56,
+          valor: anchoLoginInicial, guardado: anchoLoginInicial,
           minimo: 32, maximo: 320, recomendado: {}
         }
       });
+
+      /** ¿Hay tamaños tocados que todavía no se guardaron? */
+      const hayTamanosSinGuardar = computed(() =>
+        apariencia.anchoSidebar.valor !== apariencia.anchoSidebar.guardado ||
+        apariencia.anchoLogin.valor !== apariencia.anchoLogin.guardado
+      );
 
       // Se recalcula en cada cambio y no una sola vez al arrancar: el usuario
       // puede tocar el botón de la barra superior con la pantalla abierta.
@@ -1415,6 +1435,7 @@ async function iniciar() {
           if (!parametro) return null;
 
           destino.valor = transformar(parametro.valor);
+          destino.guardado = destino.valor;
           if (parametro.opciones) destino.opciones = parametro.opciones;
           if (parametro.sugerencias) destino.sugerencias = parametro.sugerencias;
           if (parametro.minimo !== undefined) destino.minimo = parametro.minimo;
@@ -1478,15 +1499,18 @@ async function iniciar() {
        * nuevo y con el anterior si hay que deshacer.
        */
       async function guardarApariencia(clave, destino, valor, alAplicar) {
-        if (String(valor) === String(destino.valor)) return;
+        // Se compara contra lo que hay en la base, NO contra lo que se está
+        // viendo: al soltar un deslizador lo que se ve ya es el valor nuevo.
+        if (String(valor) === String(destino.guardado)) return true;
 
-        const anterior = destino.valor;
+        const anterior = destino.guardado;
         destino.valor = valor;
         apariencia.guardando = clave;
         if (alAplicar) alAplicar(valor);
 
         try {
           await api.configuracion.guardar(clave, String(valor));
+          destino.guardado = valor;
           guardarLogoEnCache();
         } catch (fallo) {
           destino.valor = anterior;
@@ -1529,6 +1553,9 @@ async function iniciar() {
         const ok = await guardarApariencia('logo_forma', apariencia.logoForma, valor);
         if (!ok) return;
 
+        // Cada forma se ve bien en un rango distinto: el escudo es cuadrado, el
+        // vertical lleva el nombre debajo y el horizontal al costado. Dejar el
+        // tamaño de la forma anterior deja el logo diminuto o desbordado.
         const sugeridoSidebar = apariencia.anchoSidebar.recomendado?.[valor];
         const sugeridoLogin = apariencia.anchoLogin.recomendado?.[valor];
 
@@ -1542,18 +1569,36 @@ async function iniciar() {
         notificarExito('Forma del logo actualizada.');
       }
 
-      function cambiarAnchoSidebar(valor) {
-        return guardarApariencia('logo_ancho_sidebar', apariencia.anchoSidebar, Number(valor));
+      /**
+       * Guarda los dos tamaños de una vez.
+       *
+       * Van con botón y no al soltar el deslizador: ajustar un tamaño lleva
+       * varios intentos, y guardar cada paso llena la pantalla de avisos y
+       * manda una petición por cada píxel que se mueve. Mientras tanto la vista
+       * previa ya muestra cómo va a quedar.
+       */
+      async function guardarTamanosLogo() {
+        const sidebarOk = await guardarApariencia(
+          'logo_ancho_sidebar', apariencia.anchoSidebar, apariencia.anchoSidebar.valor);
+        const loginOk = await guardarApariencia(
+          'logo_ancho_login', apariencia.anchoLogin, apariencia.anchoLogin.valor);
+
+        if (sidebarOk && loginOk) notificarExito('Tamaños del logo guardados.');
       }
 
-      function cambiarAnchoLogin(valor) {
-        return guardarApariencia('logo_ancho_login', apariencia.anchoLogin, Number(valor));
+      /** Vuelve a los tamaños que están guardados. */
+      function descartarTamanosLogo() {
+        apariencia.anchoSidebar.valor = apariencia.anchoSidebar.guardado;
+        apariencia.anchoLogin.valor = apariencia.anchoLogin.guardado;
       }
 
       /** Vuelve todo a como venía de fábrica. */
       async function restablecerApariencia() {
         await cambiarColorPrimario('#465fff');
+        // cambiarFormaLogo ya lleva los tamaños al recomendado de la forma.
         await cambiarFormaLogo('escudo');
+        await guardarApariencia('logo_ancho_sidebar', apariencia.anchoSidebar, 40);
+        await guardarApariencia('logo_ancho_login', apariencia.anchoLogin, 56);
         notificarExito('Apariencia restablecida.');
       }
 
@@ -1959,7 +2004,8 @@ async function iniciar() {
         apariencia, tienePreferenciaPropia, paletaPrevia, contrasteDelColor,
         cambiarTemaSistema, volverAlTemaDelSistema,
         cambiarColorPrimario, cambiarFormaLogo,
-        cambiarAnchoSidebar, cambiarAnchoLogin, restablecerApariencia,
+        hayTamanosSinGuardar, guardarTamanosLogo, descartarTamanosLogo,
+        restablecerApariencia,
 
         // Vaciado de registros
         purga, confirmacionValida, cargarPurgables,

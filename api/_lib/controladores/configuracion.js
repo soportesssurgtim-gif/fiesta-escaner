@@ -98,7 +98,8 @@ export const PARAMETROS = [
     porDefecto: 'escudo',
     opciones: [
       { valor: 'escudo', etiqueta: 'Solo el escudo', detalle: 'El escudo sobre una placa del color primario, con el nombre al lado.' },
-      { valor: 'horizontal', etiqueta: 'Logo completo', detalle: 'El logo con «San Salvador Sur» escrito, sin texto extra.' }
+      { valor: 'vertical', etiqueta: 'Vertical', detalle: 'El escudo con «San Salvador Sur» debajo, en cuadrado.' },
+      { valor: 'horizontal', etiqueta: 'Horizontal', detalle: 'El escudo con «San Salvador Sur» al costado, apaisado.' }
     ]
   },
   {
@@ -109,9 +110,11 @@ export const PARAMETROS = [
     porDefecto: '40',
     minimo: 28,
     maximo: 240,
-    // Cada forma se ve bien en un rango distinto: el escudo es cuadrado y el
-    // horizontal necesita más del doble para que se lea su texto.
-    recomendado: { escudo: 40, horizontal: 150 }
+    // Cada forma se ve bien en un rango distinto. El escudo es cuadrado y va
+    // sobre una placa. El vertical lleva el nombre debajo, así que necesita
+    // alto —y siendo cuadrado, ese alto es también su ancho—. El horizontal
+    // necesita más del doble de ancho para que se lea su texto.
+    recomendado: { escudo: 40, vertical: 56, horizontal: 150 }
   },
   {
     clave: 'logo_ancho_login',
@@ -121,7 +124,7 @@ export const PARAMETROS = [
     porDefecto: '56',
     minimo: 32,
     maximo: 320,
-    recomendado: { escudo: 56, horizontal: 190 }
+    recomendado: { escudo: 56, vertical: 110, horizontal: 190 }
   }
 ];
 
