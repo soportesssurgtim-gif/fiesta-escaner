@@ -12,9 +12,13 @@
     <div class="mx-auto w-full max-w-md">
 
       <div class="mb-8">
-        <div class="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500 text-2xl text-white shadow-theme-md">
-          <i class="fa-solid fa-qrcode"></i>
-        </div>
+        <!-- El logo institucional, en su versión clara u oscura según el tema. -->
+        <img src="/assets/iconos/logo-horizontal-azul.png"
+             alt="Alcaldía Municipal de San Salvador Sur"
+             class="mb-6 h-14 w-auto dark:hidden" />
+        <img src="/assets/iconos/logo-horizontal-blanco.png"
+             alt="Alcaldía Municipal de San Salvador Sur"
+             class="mb-6 hidden h-14 w-auto dark:block" />
         <h1 class="text-title-sm font-bold text-gray-800 dark:text-white/90">
           Control de Asistencia
         </h1>
@@ -106,10 +110,15 @@
     <div class="absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-brand-700/20 blur-3xl"></div>
 
     <div class="relative z-10 max-w-md px-12 text-center">
-      <img src="https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png"
+      <!--
+        Se sirve desde el propio dominio y no desde sansalvadorsur.gob.sv: la
+        app es una PWA que se usa en la puerta del evento, donde la red puede no
+        estar, y una imagen externa no la cachea el service worker.
+        El panel es bg-gray-900 siempre, así que acá va la versión blanca fija.
+      -->
+      <img src="/assets/iconos/logo-escudo-blanco.png"
            alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
-           class="mx-auto mb-8 h-24 w-24 object-contain"
-           loading="lazy" />
+           class="mx-auto mb-8 h-24 w-24 object-contain" />
       <h2 class="mb-4 text-title-sm font-bold text-white">
         Eventos institucionales
       </h2>

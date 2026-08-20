@@ -45,14 +45,59 @@ export function responderMetodoNoPermitido(res) {
 }
 
 /**
+ * Códigos con los que Postgres y PostgREST avisan que el esquema no tiene algo.
+ *
+ * Los cuatro significan lo mismo para nosotros: el código va más adelantado que
+ * la base. Casi siempre es una migración que quedó sin correr.
+ */
+const FALTA_EN_EL_ESQUEMA = {
+  '42P01': 'tabla',   // Postgres: la tabla no existe
+  '42703': 'columna', // Postgres: la columna no existe
+  PGRST205: 'tabla',  // PostgREST: la tabla no está en su caché de esquema
+  PGRST204: 'columna' // PostgREST: la columna no está en su caché de esquema
+};
+
+/**
+ * Saca el nombre de lo que falta del mensaje de Postgres.
+ *
+ * Los mensajes vienen en dos formatos: «column sorteos.descripcion does not
+ * exist» y «Could not find the table 'public.sorteo_premios' in the schema
+ * cache». De ahí se recorta el identificador y nada más: el mensaje crudo puede
+ * traer fragmentos de la consulta.
+ */
+function nombreDeLoQueFalta(mensaje) {
+  const texto = String(mensaje || '');
+  const entreComillas = texto.match(/'(?:public\.)?([A-Za-z0-9_.]+)'/);
+  if (entreComillas) return entreComillas[1];
+
+  const suelto = texto.match(/(?:column|table|relation)\s+"?([A-Za-z0-9_.]+)"?/i);
+  return suelto ? suelto[1] : '';
+}
+
+/**
  * Algo se rompió del lado del servidor.
  *
  * Registramos el detalle completo en los logs de Vercel pero al cliente solo le
  * devolvemos un mensaje corto: los errores crudos de Postgres pueden filtrar
  * nombres de tablas y columnas.
+ *
+ * La excepción es cuando falta algo del esquema. Ahí el mensaje genérico hace
+ * perder el tiempo a quien administra: manda a revisar el código cuando lo único
+ * que pasa es que hay una migración pendiente. Ese caso sí se dice claro.
  */
 export function responderErrorInterno(res, contexto, error) {
   console.error(`[${contexto}]`, error);
+
+  const tipo = error && FALTA_EN_EL_ESQUEMA[error.code];
+  if (tipo) {
+    const nombre = nombreDeLoQueFalta(error.message);
+    return responderJson(res, 500, {
+      error: `La base de datos no tiene ${nombre ? `la ${tipo} «${nombre}»` : `una ${tipo} que el sistema necesita`}. ` +
+             'Falta correr una migración pendiente en Supabase (carpeta supabase/migrations).',
+      faltaMigracion: true
+    });
+  }
+
   return responderJson(res, 500, { error: `Ocurrió un error al procesar ${contexto}.` });
 }
 

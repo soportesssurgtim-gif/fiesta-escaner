@@ -45,6 +45,27 @@ export const INTERRUPTORES = [
 ];
 
 /**
+ * Parámetros de opción múltiple.
+ *
+ * A diferencia de los interruptores, que son sí o no, estos guardan uno de
+ * varios valores. Las opciones se declaran acá y el guardado las valida: un
+ * valor fuera de la lista dejaría a la pantalla sin saber qué mostrar.
+ */
+export const PARAMETROS = [
+  {
+    clave: 'tema_sistema',
+    etiqueta: 'Tema de la interfaz',
+    descripcion: 'El aspecto con el que arranca la aplicación en todos los dispositivos.',
+    porDefecto: 'sistema',
+    opciones: [
+      { valor: 'sistema', etiqueta: 'Según el dispositivo', detalle: 'Sigue la preferencia del sistema operativo.' },
+      { valor: 'claro', etiqueta: 'Claro', detalle: 'Fondo blanco. Se lee mejor de día y en proyección.' },
+      { valor: 'oscuro', etiqueta: 'Oscuro', detalle: 'Fondo oscuro. Cansa menos la vista de noche.' }
+    ]
+  }
+];
+
+/**
  * Conjuntos de datos que se pueden vaciar desde la pantalla de configuración.
  *
  * Existe para no tener que entrar a Supabase a borrar a mano entre prueba y
@@ -245,7 +266,16 @@ async function listarConfiguracion({ res }) {
     )
   }));
 
-  return responderOk(res, { interruptores, parametros: data || [] });
+  // Los parámetros se devuelven resueltos igual que los interruptores: con su
+  // valor efectivo, aunque la fila todavía no exista en la base.
+  const parametros = PARAMETROS.map((parametro) => {
+    const guardado = guardados.get(parametro.clave);
+    const valido = parametro.opciones.some((o) => o.valor === guardado);
+
+    return { ...parametro, valor: valido ? guardado : parametro.porDefecto };
+  });
+
+  return responderOk(res, { interruptores, parametros, filas: data || [] });
 }
 
 async function guardarConfiguracion({ req, res, sesion }) {
@@ -260,10 +290,23 @@ async function guardarConfiguracion({ req, res, sesion }) {
     return responderSolicitudInvalida(res, 'Falta la clave del parámetro.');
   }
 
-  // Los interruptores conocidos se normalizan a TRUE/FALSE; cualquier otro
-  // parámetro se guarda tal cual vino.
+  // Los interruptores conocidos se normalizan a TRUE/FALSE; los parámetros de
+  // opción múltiple se validan contra su lista; cualquier otra clave se guarda
+  // tal cual vino.
   const esInterruptor = INTERRUPTORES.some((i) => i.clave === clave);
+  const parametro = PARAMETROS.find((p) => p.clave === clave);
+
   const valor = esInterruptor ? aBandera(cuerpo.valor) : aTexto(cuerpo.valor);
+
+  if (parametro) {
+    if (!parametro.opciones.some((o) => o.valor === valor)) {
+      return responderSolicitudInvalida(
+        res,
+        `"${valor}" no es un valor válido para ${parametro.etiqueta}. ` +
+        `Las opciones son: ${parametro.opciones.map((o) => o.valor).join(', ')}.`
+      );
+    }
+  }
 
   const { error } = await supabase
     .from(TABLAS.configuracion)

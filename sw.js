@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.1.0';
+const VERSION_CACHE = 'v3.2.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -49,6 +49,14 @@ const ARCHIVOS_BASE = [
   '/assets/iconos/icono-512.png',
   '/assets/iconos/icono-192-maskable.png',
   '/assets/iconos/icono-512-maskable.png',
+
+  // El logo institucional. Va en dos variantes de color porque el azul es
+  // ilegible sobre fondo oscuro, y en dos formas porque el horizontal no entra
+  // en la barra lateral plegada.
+  '/assets/iconos/logo-horizontal-azul.png',
+  '/assets/iconos/logo-horizontal-blanco.png',
+  '/assets/iconos/logo-escudo-azul.png',
+  '/assets/iconos/logo-escudo-blanco.png',
 
   // Punto de entrada y núcleo
   '/assets/js/app.js',

@@ -20,16 +20,40 @@
          sidebarMovil ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
        ]">
 
-  <!-- Encabezado con el logo -->
+  <!--
+    Encabezado con el logo institucional.
+
+    Son dos archivos y no un filtro CSS: el azul institucional sobre el fondo
+    oscuro queda ilegible, y teñirlo con `invert` le cambia el color a la marca.
+    La versión blanca es la oficial para fondos oscuros.
+
+    Con la barra plegada quedan 90 px y el logo horizontal no entra, así que ahí
+    va solo el escudo. El ícono de la PWA no sirve para eso: lleva el texto
+    "San Salvador Sur" debajo y a 40 px es una mancha.
+  -->
   <div class="flex h-[72px] shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800"
        :class="{ 'justify-center px-0': !sidebarExpandido }">
-    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
-      <i class="fa-solid fa-qrcode"></i>
-    </div>
+
     <div v-if="sidebarExpandido" class="min-w-0">
-      <p class="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">Asistencia SSSur</p>
-      <p class="truncate text-theme-xs text-gray-500 dark:text-gray-400">Gerencia de Tecnología</p>
+      <img src="/assets/iconos/logo-horizontal-azul.png"
+           alt="Alcaldía Municipal de San Salvador Sur"
+           class="h-9 w-auto dark:hidden" />
+      <img src="/assets/iconos/logo-horizontal-blanco.png"
+           alt="Alcaldía Municipal de San Salvador Sur"
+           class="hidden h-9 w-auto dark:block" />
+      <p class="mt-1 truncate text-theme-xs text-gray-500 dark:text-gray-400">
+        Control de Asistencia
+      </p>
     </div>
+
+    <template v-else>
+      <img src="/assets/iconos/logo-escudo-azul.png"
+           alt="Alcaldía Municipal de San Salvador Sur"
+           class="h-10 w-10 shrink-0 object-contain dark:hidden" />
+      <img src="/assets/iconos/logo-escudo-blanco.png"
+           alt="Alcaldía Municipal de San Salvador Sur"
+           class="hidden h-10 w-10 shrink-0 object-contain dark:block" />
+    </template>
   </div>
 
   <!-- Evento activo. Es la información más importante de la pantalla: si no

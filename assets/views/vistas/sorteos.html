@@ -136,7 +136,23 @@
             </span>
           </div>
 
-          <div v-if="editorSorteo.premios.length === 0"
+          <!--
+            Sin premios en el catálogo no hay nada que elegir, así que agregar
+            líneas no sirve de nada. Se manda a crearlos primero.
+          -->
+          <div v-if="premios.lista.length === 0"
+               class="rounded-xl border border-dashed border-warning-300 bg-warning-50 p-4 text-center dark:border-warning-500/30 dark:bg-warning-500/10">
+            <i class="fa-solid fa-gift mb-2 text-xl text-warning-500"></i>
+            <p class="text-theme-sm text-gray-700 dark:text-gray-300">
+              Todavía no hay premios en el catálogo.
+            </p>
+            <button type="button" @click="cerrarSorteo(); cambiarVista('premios')"
+                    class="boton boton-secundario mt-3">
+              <i class="fa-solid fa-arrow-right"></i> Crear premios primero
+            </button>
+          </div>
+
+          <div v-else-if="editorSorteo.premios.length === 0"
                class="rounded-xl border border-dashed border-gray-300 py-6 text-center dark:border-gray-700">
             <p class="text-theme-sm text-gray-400">Todavía no agregaste ningún premio.</p>
           </div>
@@ -166,7 +182,8 @@
             </div>
           </div>
 
-          <button type="button" @click="agregarPremioAlSorteo()"
+          <button v-if="premios.lista.length > 0"
+                  type="button" @click="agregarPremioAlSorteo()"
                   class="boton boton-secundario mt-2 w-full">
             <i class="fa-solid fa-plus"></i> Agregar premio
           </button>

@@ -276,9 +276,44 @@ async function listarNovedades({ req, res }) {
 }
 
 /**
+ * Lo que el código de hoy espera encontrar en la base.
+ *
+ * Cada entrada es una columna que introdujo alguna migración. Alcanza con una
+ * columna por migración: si esa está, la migración corrió entera.
+ */
+const ESQUEMA_ESPERADO = [
+  { tabla: 'sorteo_premios', columna: 'id', migracion: '005_sorteos_multiples_premios' },
+  { tabla: 'sorteos', columna: 'permite_repetir_ganador', migracion: '005_sorteos_multiples_premios' },
+  { tabla: 'ganadores', columna: 'sorteo_premio', migracion: '005_sorteos_multiples_premios' },
+  { tabla: 'roles', columna: 'descripcion', migracion: '004_descripcion_roles' }
+];
+
+/**
+ * ¿La base está al día con el código?
+ *
+ * Un desfase acá no se nota hasta que alguien intenta usar la pantalla nueva y
+ * le explota en la cara, casi siempre en plena fiesta. Preguntarlo antes de
+ * abrir las puertas cuesta unas pocas consultas de conteo.
+ */
+async function migracionesPendientes() {
+  const revisiones = await Promise.all(
+    ESQUEMA_ESPERADO.map(async ({ tabla, columna, migracion }) => {
+      // Ojo con `head: true`: sobre una tabla que no existe devuelve 204 sin
+      // error, así que el chequeo pasaría siempre. Un select normal con
+      // limit(1) sí devuelve el 404 y su código. Cuesta una fila.
+      const { error } = await supabase.from(tabla).select(columna).limit(1);
+      return error ? migracion : null;
+    })
+  );
+
+  return [...new Set(revisiones.filter(Boolean))];
+}
+
+/**
  * Chequeo de salud para antes de abrir las puertas.
  * Responde las tres preguntas que siempre se hacen el día del evento:
  * ¿hay evento activo?, ¿hay empleados cargados?, ¿cuántos entraron ya?
+ * Y una cuarta que no se pregunta pero debería: ¿la base está al día?
  */
 async function diagnosticar({ res }) {
   const inicio = Date.now();
@@ -290,6 +325,15 @@ async function diagnosticar({ res }) {
   const empleadosActivos = await repositorioEmpleados.contar({ activo: SI });
   if (empleadosActivos === 0) alertas.push('No hay empleados activos en el catálogo.');
 
+  const pendientes = await migracionesPendientes();
+  if (pendientes.length > 0) {
+    alertas.push(
+      `Falta correr ${pendientes.length === 1 ? 'la migración' : 'las migraciones'} ` +
+      `${pendientes.join(', ')} en el SQL Editor de Supabase. ` +
+      'Hasta que se corra, las pantallas que dependen de esos campos van a fallar.'
+    );
+  }
+
   let registrados = 0;
   if (evento) {
     registrados = await repositorioAsistencias.contar({ evento: evento.id });
@@ -300,6 +344,7 @@ async function diagnosticar({ res }) {
     eventoActivo: evento ? evento.nombre : null,
     empleadosActivos,
     asistentesRegistrados: registrados,
+    migracionesPendientes: pendientes,
     alertas,
     latenciaMs: Date.now() - inicio
   });

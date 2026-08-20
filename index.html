@@ -35,11 +35,19 @@
   <script>
     (function aplicarTemaGuardado() {
       try {
-        var guardado = localStorage.getItem('sssur_tema');
-        var prefiereOscuro = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (guardado === 'oscuro' || (!guardado && prefiereOscuro)) {
-          document.documentElement.classList.add('dark');
-        }
+        // Mismo orden de prioridad que assets/js/nucleo/tema.js: la elección
+        // personal manda sobre el tema institucional, y ese sobre el sistema
+        // operativo. Acá va duplicado a propósito: tiene que correr antes de
+        // cargar cualquier módulo o se ve el parpadeo que este script evita.
+        var personal = localStorage.getItem('sssur_tema');
+        var institucional = localStorage.getItem('sssur_tema_sistema');
+        var elegido = personal || institucional;
+
+        var oscuro = elegido
+          ? elegido === 'oscuro'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (oscuro) document.documentElement.classList.add('dark');
       } catch (e) {
         // Si el navegador tiene el almacenamiento bloqueado, seguimos en claro.
       }

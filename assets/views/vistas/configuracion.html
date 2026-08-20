@@ -46,6 +46,90 @@
       </div>
     </div>
 
+    <!--
+      Apariencia.
+
+      El tema elegido acá es el arranque por defecto para todos los
+      dispositivos, no una imposición: quien haya tocado el botón de la barra
+      superior conserva su elección. Por eso el aviso de abajo, con la salida
+      para volver a seguir al sistema.
+    -->
+    <div class="tarjeta">
+      <div class="tarjeta-encabezado">
+        <div>
+          <h2 class="tarjeta-titulo">Apariencia</h2>
+          <p class="tarjeta-subtitulo">Con qué tema arranca la aplicación para todos</p>
+        </div>
+      </div>
+
+      <div class="tarjeta-cuerpo">
+        <div v-if="temaSistema.opciones.length === 0"
+             class="py-8 text-center text-theme-sm text-gray-400">
+          <i class="fa-solid fa-circle-notch animar-girar"></i> Cargando…
+        </div>
+
+        <div v-else class="space-y-3">
+          <button v-for="opcion in temaSistema.opciones" :key="opcion.valor"
+                  type="button"
+                  @click="cambiarTemaSistema(opcion.valor)"
+                  :disabled="!permisos.esAdministrador || temaSistema.guardando !== ''"
+                  class="flex w-full items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                  :class="temaSistema.valor === opcion.valor
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                          : 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700'">
+
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  :class="temaSistema.valor === opcion.valor
+                          ? 'bg-brand-500 text-white'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'">
+              <i class="fa-solid"
+                 :class="{
+                   'fa-circle-half-stroke': opcion.valor === 'sistema',
+                   'fa-sun': opcion.valor === 'claro',
+                   'fa-moon': opcion.valor === 'oscuro'
+                 }"></i>
+            </span>
+
+            <span class="min-w-0 flex-1">
+              <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                {{ opcion.etiqueta }}
+              </span>
+              <span class="mt-0.5 block text-theme-sm text-gray-500 dark:text-gray-400">
+                {{ opcion.detalle }}
+              </span>
+            </span>
+
+            <i v-if="temaSistema.guardando === opcion.valor"
+               class="fa-solid fa-circle-notch animar-girar shrink-0 text-brand-500"></i>
+            <i v-else-if="temaSistema.valor === opcion.valor"
+               class="fa-solid fa-circle-check shrink-0 text-brand-500"></i>
+          </button>
+
+          <p v-if="!permisos.esAdministrador"
+             class="text-theme-xs text-gray-400">
+            Solo un administrador puede cambiar el tema del sistema.
+          </p>
+
+          <!--
+            Si este dispositivo tiene una elección propia, lo de arriba no lo
+            afecta. Decirlo evita el reporte de "cambié el tema y no pasó nada".
+          -->
+          <div v-if="tienePreferenciaPropia"
+               class="flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10 sm:flex-row sm:items-center">
+            <i class="fa-solid fa-circle-info mt-0.5 shrink-0 text-warning-500"></i>
+            <p class="min-w-0 flex-1 text-theme-sm text-gray-700 dark:text-gray-300">
+              En este dispositivo elegiste el tema a mano, así que sigue esa elección
+              y no la del sistema.
+            </p>
+            <button type="button" @click="volverAlTemaDelSistema()"
+                    class="boton boton-secundario shrink-0">
+              <i class="fa-solid fa-rotate-left"></i> Seguir al sistema
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Diagnóstico -->
     <div class="tarjeta">
       <div class="tarjeta-encabezado">

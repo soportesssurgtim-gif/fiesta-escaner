@@ -1,17 +1,43 @@
 /**
  * Modo claro / oscuro.
  *
- * La preferencia se guarda en localStorage y se aplica agregando o quitando la
- * clase `dark` en <html>, que es lo que leen tanto Tailwind como nuestro CSS
- * de componentes.
+ * Hay tres cosas que pueden decidir el tema, y este es el orden en que mandan:
+ *
+ *   1. La elección personal del usuario en este dispositivo (el botón de la
+ *      barra superior). Si eligió, se respeta y nada la pisa.
+ *   2. El tema institucional, definido en Configuración y guardado en la tabla
+ *      `configuracion`. Es el arranque por defecto para todos.
+ *   3. La preferencia del sistema operativo.
+ *
+ * El tema institucional se cachea en localStorage porque se necesita antes de
+ * que la API responda: sin cache, cada carga arrancaría con el tema equivocado
+ * y saltaría al correcto un segundo después.
  *
  * Ojo: la primera aplicación NO ocurre acá sino en un script inline dentro del
  * <head> de index.html. Tiene que pasar antes del primer pintado o se ve un
- * destello blanco al cargar. Este módulo se encarga del resto: alternarlo y
- * seguir los cambios del sistema operativo.
+ * destello blanco al cargar. Este módulo se encarga del resto.
  */
 
 const CLAVE = 'sssur_tema';
+const CLAVE_SISTEMA = 'sssur_tema_sistema';
+
+/** localStorage puede estar bloqueado; nunca debe tumbar la aplicación. */
+function leer(clave) {
+  try {
+    return localStorage.getItem(clave);
+  } catch {
+    return null;
+  }
+}
+
+function escribir(clave, valor) {
+  try {
+    if (valor === null) localStorage.removeItem(clave);
+    else localStorage.setItem(clave, valor);
+  } catch {
+    // Sin almacenamiento el tema dura lo que dure la pestaña. Aceptable.
+  }
+}
 
 function preferenciaDelSistema() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
@@ -25,6 +51,17 @@ function aplicar(modo) {
   if (meta) meta.setAttribute('content', modo === 'oscuro' ? '#101828' : '#465fff');
 }
 
+/** El modo que corresponde según las tres fuentes, en orden de prioridad. */
+function resolver() {
+  const personal = leer(CLAVE);
+  if (personal === 'claro' || personal === 'oscuro') return personal;
+
+  const institucional = leer(CLAVE_SISTEMA);
+  if (institucional === 'claro' || institucional === 'oscuro') return institucional;
+
+  return preferenciaDelSistema();
+}
+
 export const tema = {
   /** El modo activo ahora mismo. */
   actual() {
@@ -36,14 +73,16 @@ export const tema = {
     return this.actual() === 'oscuro';
   },
 
+  /** ¿El usuario eligió a mano en este dispositivo? */
+  tienePreferenciaPropia() {
+    const personal = leer(CLAVE);
+    return personal === 'claro' || personal === 'oscuro';
+  },
+
   establecer(modo) {
     const elegido = modo === 'oscuro' ? 'oscuro' : 'claro';
     aplicar(elegido);
-    try {
-      localStorage.setItem(CLAVE, elegido);
-    } catch {
-      // Sin almacenamiento el tema dura lo que dure la pestaña. Aceptable.
-    }
+    escribir(CLAVE, elegido);
     return elegido;
   },
 
@@ -52,21 +91,43 @@ export const tema = {
   },
 
   /**
-   * Sigue los cambios de tema del sistema operativo, pero solo mientras el
-   * usuario no haya elegido uno a mano. Si eligió, se respeta su decisión.
+   * Olvida la elección personal y vuelve a lo que diga la institución (o el
+   * sistema operativo). Es la salida para quien tocó el botón una vez y quedó
+   * clavado en un tema que ya no quiere.
+   */
+  olvidarPreferenciaPropia() {
+    escribir(CLAVE, null);
+    const modo = resolver();
+    aplicar(modo);
+    return modo;
+  },
+
+  /**
+   * Guarda el tema que define la institución y lo aplica si el usuario no
+   * eligió uno propio. `valor` es 'claro', 'oscuro' o 'sistema'.
+   */
+  aplicarDelSistema(valor) {
+    const institucional = valor === 'claro' || valor === 'oscuro' ? valor : 'sistema';
+
+    // 'sistema' se guarda como ausencia: así resolver() cae al sistema
+    // operativo sin necesitar un caso especial.
+    escribir(CLAVE_SISTEMA, institucional === 'sistema' ? null : institucional);
+
+    const modo = resolver();
+    aplicar(modo);
+    return modo;
+  },
+
+  /**
+   * Sigue los cambios de tema del sistema operativo, pero solo mientras nadie
+   * haya decidido antes: ni el usuario en este dispositivo ni la institución.
    */
   seguirAlSistema(alCambiar) {
     const consulta = window.matchMedia('(prefers-color-scheme: dark)');
 
     consulta.addEventListener('change', () => {
-      let eligioManualmente = false;
-      try {
-        eligioManualmente = Boolean(localStorage.getItem(CLAVE));
-      } catch {
-        eligioManualmente = false;
-      }
-
-      if (eligioManualmente) return;
+      if (this.tienePreferenciaPropia()) return;
+      if (leer(CLAVE_SISTEMA)) return;
 
       const modo = preferenciaDelSistema();
       aplicar(modo);

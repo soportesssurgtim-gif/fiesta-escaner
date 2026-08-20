@@ -127,9 +127,15 @@ async function iniciar() {
       } = usarNotificaciones();
 
       // ---- Tema ----
+      // `tienePreferenciaPropia` se declara más abajo, junto al resto de la
+      // configuración. Acá solo se lee, y eso ocurre recién cuando alguien hace
+      // clic, con setup() ya terminado.
       const modoOscuro = ref(tema.esOscuro());
       function alternarTema() {
         modoOscuro.value = tema.alternar() === 'oscuro';
+        // Tocar el botón es elegir: desde ahora este dispositivo deja de seguir
+        // al tema institucional hasta que se le diga lo contrario.
+        tienePreferenciaPropia.value = true;
       }
 
       // ---- Instalación en el dispositivo ----
@@ -411,6 +417,7 @@ async function iniciar() {
           formularioLogin.password = '';
           vista.value = 'scanner';
           sincronizacion.arrancar();
+          aplicarTemaInstitucional();
           notificarExito(`Bienvenido, ${respuesta.nombreMostrar || respuesta.usuario}.`);
 
           // Si la clave sigue siendo la temporal, abrimos el cambio de una vez.
@@ -895,8 +902,13 @@ async function iniciar() {
         error: ''
       });
 
+      // Solo cuentan las líneas que ya tienen premio elegido: una línea recién
+      // agregada trae cantidad 1 y todavía no reparte nada.
       const totalUnidadesSorteo = computed(() =>
-        editorSorteo.premios.reduce((suma, linea) => suma + (Number(linea.cantidad) || 0), 0)
+        editorSorteo.premios.reduce(
+          (suma, linea) => suma + (linea.premioId ? Number(linea.cantidad) || 0 : 0),
+          0
+        )
       );
 
       function abrirSorteo(sorteo = null) {
@@ -935,7 +947,18 @@ async function iniciar() {
           return;
         }
 
-        const lineas = editorSorteo.premios.filter((linea) => linea.premioId);
+        // Una línea sin premio elegido se descartaba en silencio, y el sorteo
+        // se guardaba con menos premios de los que se veían en pantalla. Mejor
+        // frenar y decirlo.
+        const sinElegir = editorSorteo.premios.filter((linea) => !linea.premioId).length;
+        if (sinElegir > 0) {
+          editorSorteo.error = sinElegir === 1
+            ? 'Hay una línea sin premio elegido. Elígele uno o quítala.'
+            : `Hay ${sinElegir} líneas sin premio elegido. Elígeles uno o quítalas.`;
+          return;
+        }
+
+        const lineas = editorSorteo.premios;
 
         // Un mismo premio dos veces no tiene sentido: para repetirlo se sube la
         // cantidad, y además el servidor lo rechazaría por el índice único.
@@ -1296,13 +1319,94 @@ async function iniciar() {
       const diagnostico = ref(null);
       const revisandoSistema = ref(false);
 
+      /*
+       * El tema institucional.
+       *
+       * Vive en la tabla `configuracion` y define con qué aspecto arranca la
+       * aplicación en todos los dispositivos. No pisa a quien ya eligió uno a
+       * mano con el botón de la barra superior: para eso está el botón de
+       * "usar el tema del sistema", que olvida esa elección.
+       */
+      const parametros = ref([]);
+      const temaSistema = reactive({ valor: 'sistema', guardando: '', opciones: [] });
+
+      // Se recalcula en cada cambio y no una sola vez al arrancar: el usuario
+      // puede tocar el botón de la barra superior con la pantalla abierta.
+      const tienePreferenciaPropia = ref(tema.tienePreferenciaPropia());
+
+      function refrescarTemaSistema(datos) {
+        parametros.value = datos.parametros || [];
+
+        const elegido = parametros.value.find((p) => p.clave === 'tema_sistema');
+        if (!elegido) return;
+
+        temaSistema.valor = elegido.valor;
+        temaSistema.opciones = elegido.opciones || [];
+
+        tema.aplicarDelSistema(elegido.valor);
+        modoOscuro.value = tema.esOscuro();
+        tienePreferenciaPropia.value = tema.tienePreferenciaPropia();
+      }
+
       async function cargarConfiguracion() {
         try {
           const datos = await api.configuracion.leer();
           interruptores.value = datos.interruptores || [];
+          refrescarTemaSistema(datos);
         } catch (fallo) {
           console.error('[configuracion]', fallo);
         }
+      }
+
+      /**
+       * Aplica el tema institucional al entrar.
+       *
+       * Se llama al iniciar sesión y al arrancar con una sesión guardada, no
+       * solo al abrir Configuración: si esperara a eso, el tema definido por la
+       * institución no se vería nunca en el uso normal.
+       *
+       * Falla en silencio a propósito. Que no se pueda leer el tema no es razón
+       * para molestar a nadie: se sigue con el que ya está aplicado.
+       */
+      async function aplicarTemaInstitucional() {
+        try {
+          refrescarTemaSistema(await api.configuracion.leer());
+        } catch (fallo) {
+          console.warn('[tema] No se pudo leer el tema institucional:', fallo.message);
+        }
+      }
+
+      /** Cambia el tema para toda la institución. Solo administradores. */
+      async function cambiarTemaSistema(valor) {
+        if (valor === temaSistema.valor) return;
+
+        const anterior = temaSistema.valor;
+        // Se aplica de inmediato para que se vea el efecto de lo que se elige,
+        // y se revierte si el guardado falla.
+        temaSistema.valor = valor;
+        temaSistema.guardando = valor;
+        tema.aplicarDelSistema(valor);
+        modoOscuro.value = tema.esOscuro();
+
+        try {
+          await api.configuracion.guardar('tema_sistema', valor);
+          notificarExito('Tema del sistema actualizado.');
+        } catch (fallo) {
+          temaSistema.valor = anterior;
+          tema.aplicarDelSistema(anterior);
+          modoOscuro.value = tema.esOscuro();
+          notificarError(fallo.message || 'No se pudo guardar el tema.');
+        } finally {
+          temaSistema.guardando = '';
+        }
+      }
+
+      /** Olvida la elección personal de este dispositivo. */
+      function volverAlTemaDelSistema() {
+        tema.olvidarPreferenciaPropia();
+        modoOscuro.value = tema.esOscuro();
+        tienePreferenciaPropia.value = false;
+        notificarExito('Este dispositivo vuelve a seguir el tema del sistema.');
       }
 
       async function alternarInterruptor(interruptor) {
@@ -1594,6 +1698,7 @@ async function iniciar() {
           sesion.impersonadoPor = guardada.impersonadoPor || null;
           await recargarCatalogos();
           sincronizacion.arrancar();
+          aplicarTemaInstitucional();
         }
 
         escaner.vigilarConexion();
@@ -1695,6 +1800,8 @@ async function iniciar() {
         // Configuración
         interruptores, diagnostico, revisandoSistema,
         alternarInterruptor, revisarSistema, cargarConfiguracion,
+        temaSistema, tienePreferenciaPropia,
+        cambiarTemaSistema, volverAlTemaDelSistema,
 
         // Vaciado de registros
         purga, confirmacionValida, cargarPurgables,
