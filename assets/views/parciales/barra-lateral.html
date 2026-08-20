@@ -34,16 +34,22 @@
   <div class="flex h-[72px] shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800"
        :class="{ 'justify-center px-0': !sidebarExpandido }">
 
+    <!--
+      Se dimensiona por ancho y no por alto. El logo lleva "San Salvador Sur"
+      escrito adentro: a la altura que entraba antes ese texto quedaba de 4 px
+      y no se leía. A 150 px de ancho el logo mide 64 px de alto, entra en el
+      encabezado y el nombre se lee.
+
+      Por eso tampoco hay subtítulo debajo: no queda lugar, y el nombre de la
+      institución ya lo dice el propio logo.
+    -->
     <div v-if="sidebarExpandido" class="min-w-0">
       <img src="/assets/iconos/logo-horizontal-azul.png"
            alt="Alcaldía Municipal de San Salvador Sur"
-           class="h-9 w-auto dark:hidden" />
+           class="h-auto w-[150px] max-w-full dark:hidden" />
       <img src="/assets/iconos/logo-horizontal-blanco.png"
            alt="Alcaldía Municipal de San Salvador Sur"
-           class="hidden h-9 w-auto dark:block" />
-      <p class="mt-1 truncate text-theme-xs text-gray-500 dark:text-gray-400">
-        Control de Asistencia
-      </p>
+           class="hidden h-auto w-[150px] max-w-full dark:block" />
     </div>
 
     <template v-else>
