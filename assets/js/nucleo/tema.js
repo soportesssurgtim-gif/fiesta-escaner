@@ -47,8 +47,24 @@ function aplicar(modo) {
   document.documentElement.classList.toggle('dark', modo === 'oscuro');
 
   // Mantenemos la barra del navegador móvil en sintonía con el fondo.
+  //
+  // En claro toma el color primario configurado, no uno fijo: si la institución
+  // cambió su color, la barra del navegador tiene que acompañar. Se lee de la
+  // variable CSS porque es la única fuente de verdad; marca.js la reescribe
+  // cuando cambia el color.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', modo === 'oscuro' ? '#101828' : '#465fff');
+  if (!meta) return;
+
+  if (modo === 'oscuro') {
+    meta.setAttribute('content', '#101828');
+    return;
+  }
+
+  const primario = getComputedStyle(document.documentElement)
+    .getPropertyValue('--marca-500')
+    .trim();
+
+  meta.setAttribute('content', primario || '#465fff');
 }
 
 /** El modo que corresponde según las tres fuentes, en orden de prioridad. */
@@ -71,6 +87,16 @@ export const tema = {
   /** ¿Está en oscuro? Atajo cómodo para los v-if de las plantillas. */
   esOscuro() {
     return this.actual() === 'oscuro';
+  },
+
+  /**
+   * Vuelve a aplicar el modo actual sin tocar ninguna preferencia.
+   *
+   * Hace falta cuando cambia el color primario: la barra del navegador lo lee
+   * de la variable CSS, y sin volver a pasar por acá se queda con el anterior.
+   */
+  reaplicar() {
+    aplicar(this.actual());
   },
 
   /** ¿El usuario eligió a mano en este dispositivo? */

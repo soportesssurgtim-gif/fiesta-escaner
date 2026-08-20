@@ -8,7 +8,7 @@
 
 import { supabase } from '../supabase.js';
 import { TABLAS, BUCKET_PLANTILLAS } from '../configuracion.js';
-import { aTexto, aBandera, esVerdadero } from '../valores.js';
+import { aTexto, aEntero, aBandera, esVerdadero } from '../valores.js';
 import { leerCuerpo } from '../peticion.js';
 import { esAdministrador } from '../seguridad.js';
 import {
@@ -45,15 +45,24 @@ export const INTERRUPTORES = [
 ];
 
 /**
- * Parámetros de opción múltiple.
+ * Parámetros de apariencia.
  *
- * A diferencia de los interruptores, que son sí o no, estos guardan uno de
- * varios valores. Las opciones se declaran acá y el guardado las valida: un
- * valor fuera de la lista dejaría a la pantalla sin saber qué mostrar.
+ * A diferencia de los interruptores, que son sí o no, estos guardan un valor de
+ * un tipo declarado. El tipo decide cómo se valida al guardar y qué control
+ * dibuja la pantalla:
+ *
+ *   opcion  uno de una lista cerrada
+ *   color   un hexadecimal de seis dígitos
+ *   numero  un entero dentro de un rango
+ *
+ * Validar contra la declaración y no contra lo que mande la pantalla es lo que
+ * evita que un valor raro deje la interfaz sin saber qué mostrar. Es la
+ * diferencia entre un color mal escrito y una aplicación sin color.
  */
 export const PARAMETROS = [
   {
     clave: 'tema_sistema',
+    tipo: 'opcion',
     etiqueta: 'Tema de la interfaz',
     descripcion: 'El aspecto con el que arranca la aplicación en todos los dispositivos.',
     porDefecto: 'sistema',
@@ -62,8 +71,98 @@ export const PARAMETROS = [
       { valor: 'claro', etiqueta: 'Claro', detalle: 'Fondo blanco. Se lee mejor de día y en proyección.' },
       { valor: 'oscuro', etiqueta: 'Oscuro', detalle: 'Fondo oscuro. Cansa menos la vista de noche.' }
     ]
+  },
+  {
+    clave: 'color_primario',
+    tipo: 'color',
+    etiqueta: 'Color primario',
+    descripcion: 'El color de los botones, los enlaces activos y todo lo que la interfaz destaca.',
+    porDefecto: '#465fff',
+    // Sugerencias, no un límite: la pantalla también acepta cualquier otro.
+    sugerencias: [
+      { valor: '#465fff', etiqueta: 'Azul original' },
+      { valor: '#0a1f8f', etiqueta: 'Azul institucional' },
+      { valor: '#0369a1', etiqueta: 'Celeste' },
+      { valor: '#047857', etiqueta: 'Verde' },
+      { valor: '#b91c1c', etiqueta: 'Rojo' },
+      { valor: '#6d28d9', etiqueta: 'Violeta' },
+      { valor: '#c2410c', etiqueta: 'Naranja' },
+      { valor: '#1f2937', etiqueta: 'Gris oscuro' }
+    ]
+  },
+  {
+    clave: 'logo_forma',
+    tipo: 'opcion',
+    etiqueta: 'Forma del logo',
+    descripcion: 'Cuál de las dos versiones del logo municipal se usa en la interfaz.',
+    porDefecto: 'escudo',
+    opciones: [
+      { valor: 'escudo', etiqueta: 'Solo el escudo', detalle: 'El escudo sobre una placa del color primario, con el nombre al lado.' },
+      { valor: 'horizontal', etiqueta: 'Logo completo', detalle: 'El logo con «San Salvador Sur» escrito, sin texto extra.' }
+    ]
+  },
+  {
+    clave: 'logo_ancho_sidebar',
+    tipo: 'numero',
+    etiqueta: 'Tamaño en la barra lateral',
+    descripcion: 'Ancho del logo en el menú, en píxeles.',
+    porDefecto: '40',
+    minimo: 28,
+    maximo: 240,
+    // Cada forma se ve bien en un rango distinto: el escudo es cuadrado y el
+    // horizontal necesita más del doble para que se lea su texto.
+    recomendado: { escudo: 40, horizontal: 150 }
+  },
+  {
+    clave: 'logo_ancho_login',
+    tipo: 'numero',
+    etiqueta: 'Tamaño en el inicio de sesión',
+    descripcion: 'Ancho del logo en la pantalla de entrada, en píxeles.',
+    porDefecto: '56',
+    minimo: 32,
+    maximo: 320,
+    recomendado: { escudo: 56, horizontal: 190 }
   }
 ];
+
+/** ¿Es un hexadecimal de seis dígitos? */
+const ES_HEX = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Valida y normaliza el valor de un parámetro.
+ * Devuelve `{ valor }` si está bien, o `{ error }` con qué tiene de malo.
+ */
+function validarParametro(parametro, crudo) {
+  if (parametro.tipo === 'color') {
+    const color = '#' + String(crudo || '').trim().replace(/^#/, '').toLowerCase();
+    if (!ES_HEX.test(color)) {
+      return { error: `"${crudo}" no es un color válido. Se espera un hexadecimal como #465fff.` };
+    }
+    return { valor: color };
+  }
+
+  if (parametro.tipo === 'numero') {
+    const numero = aEntero(crudo, NaN);
+    if (!Number.isFinite(numero)) {
+      return { error: `"${crudo}" no es un número.` };
+    }
+    if (numero < parametro.minimo || numero > parametro.maximo) {
+      return {
+        error: `${parametro.etiqueta} tiene que estar entre ${parametro.minimo} y ${parametro.maximo}.`
+      };
+    }
+    return { valor: String(numero) };
+  }
+
+  const valor = aTexto(crudo);
+  if (!parametro.opciones.some((o) => o.valor === valor)) {
+    return {
+      error: `"${valor}" no es un valor válido para ${parametro.etiqueta}. ` +
+             `Las opciones son: ${parametro.opciones.map((o) => o.valor).join(', ')}.`
+    };
+  }
+  return { valor };
+}
 
 /**
  * Conjuntos de datos que se pueden vaciar desde la pantalla de configuración.
@@ -267,12 +366,18 @@ async function listarConfiguracion({ res }) {
   }));
 
   // Los parámetros se devuelven resueltos igual que los interruptores: con su
-  // valor efectivo, aunque la fila todavía no exista en la base.
+  // valor efectivo, aunque la fila todavía no exista en la base. Si lo guardado
+  // ya no pasa la validación —porque cambió el rango o la lista de opciones—
+  // se cae al valor por defecto en vez de devolver algo que la pantalla no
+  // sabría dibujar.
   const parametros = PARAMETROS.map((parametro) => {
     const guardado = guardados.get(parametro.clave);
-    const valido = parametro.opciones.some((o) => o.valor === guardado);
+    const revisado = guardado === undefined ? null : validarParametro(parametro, guardado);
 
-    return { ...parametro, valor: valido ? guardado : parametro.porDefecto };
+    return {
+      ...parametro,
+      valor: revisado && !revisado.error ? revisado.valor : parametro.porDefecto
+    };
   });
 
   return responderOk(res, { interruptores, parametros, filas: data || [] });
@@ -290,22 +395,19 @@ async function guardarConfiguracion({ req, res, sesion }) {
     return responderSolicitudInvalida(res, 'Falta la clave del parámetro.');
   }
 
-  // Los interruptores conocidos se normalizan a TRUE/FALSE; los parámetros de
-  // opción múltiple se validan contra su lista; cualquier otra clave se guarda
-  // tal cual vino.
+  // Los interruptores conocidos se normalizan a TRUE/FALSE; los parámetros
+  // declarados se validan según su tipo; cualquier otra clave se guarda tal
+  // cual vino.
   const esInterruptor = INTERRUPTORES.some((i) => i.clave === clave);
   const parametro = PARAMETROS.find((p) => p.clave === clave);
 
-  const valor = esInterruptor ? aBandera(cuerpo.valor) : aTexto(cuerpo.valor);
-
+  let valor;
   if (parametro) {
-    if (!parametro.opciones.some((o) => o.valor === valor)) {
-      return responderSolicitudInvalida(
-        res,
-        `"${valor}" no es un valor válido para ${parametro.etiqueta}. ` +
-        `Las opciones son: ${parametro.opciones.map((o) => o.valor).join(', ')}.`
-      );
-    }
+    const revisado = validarParametro(parametro, cuerpo.valor);
+    if (revisado.error) return responderSolicitudInvalida(res, revisado.error);
+    valor = revisado.valor;
+  } else {
+    valor = esInterruptor ? aBandera(cuerpo.valor) : aTexto(cuerpo.valor);
   }
 
   const { error } = await supabase

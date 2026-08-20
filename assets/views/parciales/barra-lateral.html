@@ -23,42 +23,51 @@
   <!--
     Encabezado con el logo institucional.
 
-    Son dos archivos y no un filtro CSS: el azul institucional sobre el fondo
-    oscuro queda ilegible, y teñirlo con `invert` le cambia el color a la marca.
-    La versión blanca es la oficial para fondos oscuros.
+    La forma y el tamaño salen de Configuración. Con «escudo» va el escudo sobre
+    una placa del color primario y el nombre al lado; con «logo completo» va el
+    logo horizontal solo, que ya trae el nombre escrito adentro.
 
-    Con la barra plegada quedan 90 px y el logo horizontal no entra, así que ahí
-    va solo el escudo. El ícono de la PWA no sirve para eso: lleva el texto
+    El escudo va en dos archivos y no con un filtro CSS: sobre la placa de color
+    tiene que ser blanco, y teñir el azul institucional con `invert` le cambia el
+    color a la marca. La versión blanca es la oficial para fondos oscuros.
+
+    Con la barra plegada quedan 90 px, así que ahí siempre va la placa: el logo
+    horizontal no entra, y el ícono de la PWA tampoco sirve porque lleva el texto
     "San Salvador Sur" debajo y a 40 px es una mancha.
   -->
   <div class="flex h-[72px] shrink-0 items-center gap-3 border-b border-gray-200 px-5 dark:border-gray-800"
        :class="{ 'justify-center px-0': !sidebarExpandido }">
 
-    <!--
-      Se dimensiona por ancho y no por alto. El logo lleva "San Salvador Sur"
-      escrito adentro: a la altura que entraba antes ese texto quedaba de 4 px
-      y no se leía. A 150 px de ancho el logo mide 64 px de alto, entra en el
-      encabezado y el nombre se lee.
+    <!-- Placa con el escudo -->
+    <span v-if="!sidebarExpandido || apariencia.logoForma.valor === 'escudo'"
+          class="flex shrink-0 items-center justify-center rounded-xl bg-brand-500 p-1.5 shadow-theme-xs"
+          :style="sidebarExpandido
+                  ? { width: apariencia.anchoSidebar.valor + 'px', height: apariencia.anchoSidebar.valor + 'px' }
+                  : { width: '40px', height: '40px' }">
+      <img src="/assets/iconos/logo-escudo-blanco.png"
+           alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
+           class="h-full w-full object-contain" />
+    </span>
 
-      Por eso tampoco hay subtítulo debajo: no queda lugar, y el nombre de la
-      institución ya lo dice el propio logo.
-    -->
-    <div v-if="sidebarExpandido" class="min-w-0">
-      <img src="/assets/iconos/logo-horizontal-azul.png"
-           alt="Alcaldía Municipal de San Salvador Sur"
-           class="h-auto w-[150px] max-w-full dark:hidden" />
-      <img src="/assets/iconos/logo-horizontal-blanco.png"
-           alt="Alcaldía Municipal de San Salvador Sur"
-           class="hidden h-auto w-[150px] max-w-full dark:block" />
+    <div v-if="sidebarExpandido && apariencia.logoForma.valor === 'escudo'" class="min-w-0">
+      <p class="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+        Asistencia SSSur
+      </p>
+      <p class="truncate text-theme-xs text-gray-500 dark:text-gray-400">
+        Gerencia de Tecnología
+      </p>
     </div>
 
-    <template v-else>
-      <img src="/assets/iconos/logo-escudo-azul.png"
+    <!-- O el logo horizontal, que ya trae el nombre -->
+    <template v-if="sidebarExpandido && apariencia.logoForma.valor === 'horizontal'">
+      <img src="/assets/iconos/logo-horizontal-azul.png"
            alt="Alcaldía Municipal de San Salvador Sur"
-           class="h-10 w-10 shrink-0 object-contain dark:hidden" />
-      <img src="/assets/iconos/logo-escudo-blanco.png"
+           class="h-auto max-w-full object-contain dark:hidden"
+           :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
+      <img src="/assets/iconos/logo-horizontal-blanco.png"
            alt="Alcaldía Municipal de San Salvador Sur"
-           class="hidden h-10 w-10 shrink-0 object-contain dark:block" />
+           class="hidden h-auto max-w-full object-contain dark:block"
+           :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
     </template>
   </div>
 

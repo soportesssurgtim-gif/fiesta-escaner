@@ -49,82 +49,303 @@
     <!--
       Apariencia.
 
-      El tema elegido acá es el arranque por defecto para todos los
-      dispositivos, no una imposición: quien haya tocado el botón de la barra
-      superior conserva su elección. Por eso el aviso de abajo, con la salida
-      para volver a seguir al sistema.
+      Tres cosas que definen cómo se ve el sistema para todos: el tema claro u
+      oscuro, el color primario del que sale toda la paleta, y la forma y el
+      tamaño del logo.
+
+      El tema es el único que NO se impone: quien haya tocado el botón de la
+      barra superior conserva su elección, y por eso está el aviso de abajo con
+      la salida para volver a seguir al sistema. El color y el logo son de la
+      institución y sí valen para todos.
     -->
-    <div class="tarjeta">
+    <div class="tarjeta lg:col-span-2">
       <div class="tarjeta-encabezado">
         <div>
           <h2 class="tarjeta-titulo">Apariencia</h2>
-          <p class="tarjeta-subtitulo">Con qué tema arranca la aplicación para todos</p>
+          <p class="tarjeta-subtitulo">Cómo se ve el sistema en todos los dispositivos</p>
         </div>
+        <button v-if="permisos.esAdministrador"
+                type="button" @click="restablecerApariencia()"
+                class="boton boton-secundario"
+                :disabled="apariencia.guardando !== ''">
+          <i class="fa-solid fa-rotate-left"></i> Restablecer
+        </button>
       </div>
 
       <div class="tarjeta-cuerpo">
-        <div v-if="temaSistema.opciones.length === 0"
-             class="py-8 text-center text-theme-sm text-gray-400">
-          <i class="fa-solid fa-circle-notch animar-girar"></i> Cargando…
-        </div>
+        <p v-if="!permisos.esAdministrador"
+           class="mb-5 rounded-xl border border-gray-200 p-3 text-theme-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+          <i class="fa-solid fa-lock"></i>
+          Solo un administrador puede cambiar la apariencia del sistema.
+        </p>
 
-        <div v-else class="space-y-3">
-          <button v-for="opcion in temaSistema.opciones" :key="opcion.valor"
-                  type="button"
-                  @click="cambiarTemaSistema(opcion.valor)"
-                  :disabled="!permisos.esAdministrador || temaSistema.guardando !== ''"
-                  class="flex w-full items-center gap-4 rounded-xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
-                  :class="temaSistema.valor === opcion.valor
-                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
-                          : 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700'">
+        <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
 
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                  :class="temaSistema.valor === opcion.valor
-                          ? 'bg-brand-500 text-white'
-                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'">
-              <i class="fa-solid"
-                 :class="{
-                   'fa-circle-half-stroke': opcion.valor === 'sistema',
-                   'fa-sun': opcion.valor === 'claro',
-                   'fa-moon': opcion.valor === 'oscuro'
-                 }"></i>
-            </span>
-
-            <span class="min-w-0 flex-1">
-              <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
-                {{ opcion.etiqueta }}
-              </span>
-              <span class="mt-0.5 block text-theme-sm text-gray-500 dark:text-gray-400">
-                {{ opcion.detalle }}
-              </span>
-            </span>
-
-            <i v-if="temaSistema.guardando === opcion.valor"
-               class="fa-solid fa-circle-notch animar-girar shrink-0 text-brand-500"></i>
-            <i v-else-if="temaSistema.valor === opcion.valor"
-               class="fa-solid fa-circle-check shrink-0 text-brand-500"></i>
-          </button>
-
-          <p v-if="!permisos.esAdministrador"
-             class="text-theme-xs text-gray-400">
-            Solo un administrador puede cambiar el tema del sistema.
-          </p>
-
-          <!--
-            Si este dispositivo tiene una elección propia, lo de arriba no lo
-            afecta. Decirlo evita el reporte de "cambié el tema y no pasó nada".
-          -->
-          <div v-if="tienePreferenciaPropia"
-               class="flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10 sm:flex-row sm:items-center">
-            <i class="fa-solid fa-circle-info mt-0.5 shrink-0 text-warning-500"></i>
-            <p class="min-w-0 flex-1 text-theme-sm text-gray-700 dark:text-gray-300">
-              En este dispositivo elegiste el tema a mano, así que sigue esa elección
-              y no la del sistema.
+          <!-- ============ TEMA ============ -->
+          <div>
+            <h3 class="mb-1 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              Tema
+            </h3>
+            <p class="mb-3 text-theme-xs text-gray-500 dark:text-gray-400">
+              Con qué aspecto arranca la aplicación.
             </p>
-            <button type="button" @click="volverAlTemaDelSistema()"
-                    class="boton boton-secundario shrink-0">
-              <i class="fa-solid fa-rotate-left"></i> Seguir al sistema
-            </button>
+
+            <div v-if="apariencia.tema.opciones.length === 0"
+                 class="py-6 text-center text-theme-sm text-gray-400">
+              <i class="fa-solid fa-circle-notch animar-girar"></i> Cargando…
+            </div>
+
+            <div v-else class="space-y-2">
+              <button v-for="opcion in apariencia.tema.opciones" :key="opcion.valor"
+                      type="button"
+                      @click="cambiarTemaSistema(opcion.valor)"
+                      :disabled="!permisos.esAdministrador || apariencia.guardando !== ''"
+                      class="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                      :class="apariencia.tema.valor === opcion.valor
+                              ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                              : 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700'">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                      :class="apariencia.tema.valor === opcion.valor
+                              ? 'bg-brand-500 text-white'
+                              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'">
+                  <i class="fa-solid"
+                     :class="{
+                       'fa-circle-half-stroke': opcion.valor === 'sistema',
+                       'fa-sun': opcion.valor === 'claro',
+                       'fa-moon': opcion.valor === 'oscuro'
+                     }"></i>
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                    {{ opcion.etiqueta }}
+                  </span>
+                  <span class="block text-theme-xs text-gray-500 dark:text-gray-400">
+                    {{ opcion.detalle }}
+                  </span>
+                </span>
+                <i v-if="apariencia.tema.valor === opcion.valor"
+                   class="fa-solid fa-circle-check shrink-0 text-brand-500"></i>
+              </button>
+            </div>
+
+            <!--
+              Si este dispositivo tiene una elección propia, lo de arriba no lo
+              afecta. Decirlo evita el reporte de "cambié el tema y no pasó nada".
+            -->
+            <div v-if="tienePreferenciaPropia"
+                 class="mt-3 flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-3 dark:border-warning-500/30 dark:bg-warning-500/10 sm:flex-row sm:items-center">
+              <i class="fa-solid fa-circle-info mt-0.5 shrink-0 text-warning-500"></i>
+              <p class="min-w-0 flex-1 text-theme-xs text-gray-700 dark:text-gray-300">
+                En este dispositivo elegiste el tema a mano, así que sigue esa
+                elección y no la del sistema.
+              </p>
+              <button type="button" @click="volverAlTemaDelSistema()"
+                      class="boton boton-secundario shrink-0">
+                <i class="fa-solid fa-rotate-left"></i> Seguir al sistema
+              </button>
+            </div>
+          </div>
+
+          <!-- ============ COLOR PRIMARIO ============ -->
+          <div>
+            <h3 class="mb-1 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              Color primario
+            </h3>
+            <p class="mb-3 text-theme-xs text-gray-500 dark:text-gray-400">
+              De este color salen los botones, los enlaces activos y todo lo que
+              la interfaz destaca.
+            </p>
+
+            <div class="flex flex-wrap gap-2">
+              <button v-for="sugerencia in apariencia.color.sugerencias" :key="sugerencia.valor"
+                      type="button"
+                      @click="cambiarColorPrimario(sugerencia.valor)"
+                      :disabled="!permisos.esAdministrador || apariencia.guardando !== ''"
+                      :title="sugerencia.etiqueta"
+                      :aria-label="sugerencia.etiqueta"
+                      class="h-10 w-10 rounded-xl border-2 transition disabled:cursor-not-allowed disabled:opacity-60"
+                      :class="apariencia.color.valor === sugerencia.valor
+                              ? 'border-gray-800 dark:border-white'
+                              : 'border-transparent hover:scale-105'"
+                      :style="{ backgroundColor: sugerencia.valor }">
+                <i v-if="apariencia.color.valor === sugerencia.valor"
+                   class="fa-solid fa-check text-white"></i>
+              </button>
+            </div>
+
+            <!-- Cualquier otro color, para cuando el de la marca no está en la lista -->
+            <div class="mt-3 flex items-center gap-3">
+              <label for="campo-color" class="text-theme-xs text-gray-500 dark:text-gray-400">
+                Otro color
+              </label>
+              <input id="campo-color" type="color"
+                     :value="apariencia.color.valor"
+                     @change="cambiarColorPrimario($event.target.value)"
+                     :disabled="!permisos.esAdministrador || apariencia.guardando !== ''"
+                     class="h-10 w-16 cursor-pointer rounded-lg border border-gray-200 bg-transparent disabled:cursor-not-allowed dark:border-gray-800" />
+              <span class="font-mono text-theme-xs uppercase text-gray-500 dark:text-gray-400">
+                {{ apariencia.color.valor }}
+              </span>
+              <i v-if="apariencia.guardando === 'color_primario'"
+                 class="fa-solid fa-circle-notch animar-girar text-brand-500"></i>
+            </div>
+
+            <!-- Los doce tonos que se derivan -->
+            <p class="mb-2 mt-4 text-theme-xs text-gray-500 dark:text-gray-400">
+              Los tonos que se generan
+            </p>
+            <div class="flex overflow-hidden rounded-lg">
+              <span v-for="tono in paletaPrevia" :key="tono.paso"
+                    class="h-8 flex-1"
+                    :style="{ backgroundColor: tono.color }"
+                    :title="tono.paso + ': ' + tono.color"></span>
+            </div>
+
+            <!--
+              El botón primario es fondo del color con texto blanco. Con un
+              amarillo o un celeste claro eso queda ilegible, y no hay forma de
+              notarlo hasta que alguien no puede leer un botón.
+            -->
+            <div v-if="contrasteDelColor.nivel !== 'bien'"
+                 class="mt-4 flex gap-3 rounded-xl border p-3"
+                 :class="contrasteDelColor.nivel === 'malo'
+                         ? 'border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10'
+                         : 'border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10'">
+              <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0"
+                 :class="contrasteDelColor.nivel === 'malo' ? 'text-error-500' : 'text-warning-500'"></i>
+              <p class="text-theme-xs text-gray-700 dark:text-gray-300">
+                <template v-if="contrasteDelColor.nivel === 'malo'">
+                  El texto blanco de los botones no se lee sobre este color
+                  ({{ contrasteDelColor.razon.toFixed(1) }}:1, hace falta 4.5:1).
+                  Elige uno más oscuro.
+                </template>
+                <template v-else>
+                  El texto blanco de los botones se lee justo sobre este color
+                  ({{ contrasteDelColor.razon.toFixed(1) }}:1). Uno un poco más
+                  oscuro se leería mejor.
+                </template>
+              </p>
+            </div>
+
+            <!-- Cómo queda, sin tener que salir de la pantalla a mirar -->
+            <p class="mb-2 mt-4 text-theme-xs text-gray-500 dark:text-gray-400">
+              Cómo se va a ver
+            </p>
+            <div class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
+              <span class="boton boton-primario pointer-events-none">Guardar</span>
+              <span class="boton boton-secundario pointer-events-none">Cancelar</span>
+              <span class="insignia insignia-marca">Activo</span>
+              <span class="insignia insignia-exito">Éxito</span>
+              <span class="insignia insignia-neutra">Neutro</span>
+            </div>
+          </div>
+
+          <!-- ============ LOGO ============ -->
+          <div class="lg:col-span-2">
+            <h3 class="mb-1 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              Logo
+            </h3>
+            <p class="mb-3 text-theme-xs text-gray-500 dark:text-gray-400">
+              Qué versión del logo municipal se usa y de qué tamaño.
+            </p>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div class="space-y-2">
+                <button v-for="opcion in apariencia.logoForma.opciones" :key="opcion.valor"
+                        type="button"
+                        @click="cambiarFormaLogo(opcion.valor)"
+                        :disabled="!permisos.esAdministrador || apariencia.guardando !== ''"
+                        class="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
+                        :class="apariencia.logoForma.valor === opcion.valor
+                                ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10'
+                                : 'border-gray-200 hover:border-gray-300 dark:border-gray-800 dark:hover:border-gray-700'">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                    <img v-if="opcion.valor === 'escudo'"
+                         src="/assets/iconos/logo-escudo-azul.png" alt=""
+                         class="h-7 w-7 object-contain" />
+                    <img v-else src="/assets/iconos/logo-horizontal-azul.png" alt=""
+                         class="w-9 object-contain" />
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                      {{ opcion.etiqueta }}
+                    </span>
+                    <span class="block text-theme-xs text-gray-500 dark:text-gray-400">
+                      {{ opcion.detalle }}
+                    </span>
+                  </span>
+                  <i v-if="apariencia.logoForma.valor === opcion.valor"
+                     class="fa-solid fa-circle-check shrink-0 text-brand-500"></i>
+                </button>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label for="ancho-sidebar" class="etiqueta mb-1 flex justify-between">
+                    <span>Tamaño en el menú lateral</span>
+                    <span class="font-mono text-gray-400">{{ apariencia.anchoSidebar.valor }} px</span>
+                  </label>
+                  <input id="ancho-sidebar" type="range"
+                         :min="apariencia.anchoSidebar.minimo"
+                         :max="apariencia.anchoSidebar.maximo"
+                         :value="apariencia.anchoSidebar.valor"
+                         @input="apariencia.anchoSidebar.valor = Number($event.target.value)"
+                         @change="cambiarAnchoSidebar($event.target.value)"
+                         :disabled="!permisos.esAdministrador"
+                         class="w-full accent-brand-500 disabled:cursor-not-allowed" />
+                </div>
+
+                <div>
+                  <label for="ancho-login" class="etiqueta mb-1 flex justify-between">
+                    <span>Tamaño en el inicio de sesión</span>
+                    <span class="font-mono text-gray-400">{{ apariencia.anchoLogin.valor }} px</span>
+                  </label>
+                  <input id="ancho-login" type="range"
+                         :min="apariencia.anchoLogin.minimo"
+                         :max="apariencia.anchoLogin.maximo"
+                         :value="apariencia.anchoLogin.valor"
+                         @input="apariencia.anchoLogin.valor = Number($event.target.value)"
+                         @change="cambiarAnchoLogin($event.target.value)"
+                         :disabled="!permisos.esAdministrador"
+                         class="w-full accent-brand-500 disabled:cursor-not-allowed" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Vista previa a escala real del encabezado del menú -->
+            <p class="mb-2 mt-4 text-theme-xs text-gray-500 dark:text-gray-400">
+              Así queda el encabezado del menú
+            </p>
+            <div class="flex min-h-[72px] items-center gap-3 rounded-xl border border-gray-200 bg-white px-5 dark:border-gray-800 dark:bg-gray-900">
+              <template v-if="apariencia.logoForma.valor === 'escudo'">
+                <span class="flex shrink-0 items-center justify-center rounded-xl bg-brand-500 p-1.5"
+                      :style="{ width: apariencia.anchoSidebar.valor + 'px',
+                                height: apariencia.anchoSidebar.valor + 'px' }">
+                  <img src="/assets/iconos/logo-escudo-blanco.png"
+                       alt="Escudo de la Alcaldía Municipal de San Salvador Sur"
+                       class="h-full w-full object-contain" />
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+                    Asistencia SSSur
+                  </span>
+                  <span class="block truncate text-theme-xs text-gray-500 dark:text-gray-400">
+                    Gerencia de Tecnología
+                  </span>
+                </span>
+              </template>
+
+              <template v-else>
+                <img src="/assets/iconos/logo-horizontal-azul.png"
+                     alt="Alcaldía Municipal de San Salvador Sur"
+                     class="h-auto max-w-full object-contain dark:hidden"
+                     :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
+                <img src="/assets/iconos/logo-horizontal-blanco.png"
+                     alt="Alcaldía Municipal de San Salvador Sur"
+                     class="hidden h-auto max-w-full object-contain dark:block"
+                     :style="{ width: apariencia.anchoSidebar.valor + 'px' }" />
+              </template>
+            </div>
           </div>
         </div>
       </div>

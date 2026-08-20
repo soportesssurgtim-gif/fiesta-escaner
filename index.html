@@ -33,6 +33,38 @@
     se opera el evento.
   -->
   <script>
+    /*
+      La paleta de la marca, antes del primer pintado.
+
+      Se lee ya derivada del cache: el algoritmo que la calcula vive en
+      assets/js/nucleo/marca.js y no puede correr acá sin duplicarlo entero.
+      Si no hay nada cacheado no se hace nada y quedan los valores por defecto
+      de sistema-diseno.css, que son el color original.
+    */
+    (function aplicarPaletaGuardada() {
+      try {
+        var paleta = JSON.parse(localStorage.getItem('sssur_paleta') || 'null');
+        if (!paleta) return;
+
+        var raiz = document.documentElement;
+        var pasos = [25, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+
+        for (var i = 0; i < pasos.length; i++) {
+          var hex = paleta[pasos[i]];
+          if (!/^#[0-9a-f]{6}$/i.test(hex || '')) return;  // cache corrupto: se ignora entero
+
+          var n = parseInt(hex.slice(1), 16);
+          raiz.style.setProperty('--marca-' + pasos[i], hex);
+          raiz.style.setProperty(
+            '--marca-' + pasos[i] + '-rgb',
+            ((n >> 16) & 255) + ' ' + ((n >> 8) & 255) + ' ' + (n & 255)
+          );
+        }
+      } catch (e) {
+        // Almacenamiento bloqueado o JSON roto: se sigue con el color por defecto.
+      }
+    })();
+
     (function aplicarTemaGuardado() {
       try {
         // Mismo orden de prioridad que assets/js/nucleo/tema.js: la elección
@@ -73,10 +105,28 @@
             sans: ['Outfit', 'ui-sans-serif', 'system-ui', 'sans-serif']
           },
           colors: {
+            /*
+              La marca NO lleva colores fijos: apunta a las variables CSS que
+              define assets/css/sistema-diseno.css, y que reescribe
+              assets/js/nucleo/marca.js cuando la institución configura otro
+              color primario.
+
+              Van como terna «R G B» dentro de rgb() y no como hex porque así
+              sigue funcionando la opacidad de Tailwind: bg-brand-500/20.
+            */
             brand: {
-              25: '#f2f7ff', 50: '#ecf3ff', 100: '#dde9ff', 200: '#c2d6ff',
-              300: '#9cb9ff', 400: '#7592ff', 500: '#465fff', 600: '#3641f5',
-              700: '#2a31d8', 800: '#252dae', 900: '#262e89', 950: '#161950'
+              25: 'rgb(var(--marca-25-rgb) / <alpha-value>)',
+              50: 'rgb(var(--marca-50-rgb) / <alpha-value>)',
+              100: 'rgb(var(--marca-100-rgb) / <alpha-value>)',
+              200: 'rgb(var(--marca-200-rgb) / <alpha-value>)',
+              300: 'rgb(var(--marca-300-rgb) / <alpha-value>)',
+              400: 'rgb(var(--marca-400-rgb) / <alpha-value>)',
+              500: 'rgb(var(--marca-500-rgb) / <alpha-value>)',
+              600: 'rgb(var(--marca-600-rgb) / <alpha-value>)',
+              700: 'rgb(var(--marca-700-rgb) / <alpha-value>)',
+              800: 'rgb(var(--marca-800-rgb) / <alpha-value>)',
+              900: 'rgb(var(--marca-900-rgb) / <alpha-value>)',
+              950: 'rgb(var(--marca-950-rgb) / <alpha-value>)'
             },
             gray: {
               25: '#fcfcfd', 50: '#f9fafb', 100: '#f2f4f7', 200: '#e4e7ec',

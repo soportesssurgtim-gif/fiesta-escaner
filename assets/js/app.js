@@ -14,6 +14,7 @@ import { cargarPlantillas } from './nucleo/cargadorVistas.js';
 import { almacenSesion } from './nucleo/almacenSesion.js';
 import { http } from './nucleo/clienteHttp.js';
 import { tema } from './nucleo/tema.js';
+import { marca, contrasteConBlanco, PASOS as PASOS_MARCA } from './nucleo/marca.js';
 import * as formato from './nucleo/formato.js';
 
 import { api } from './servicios/servicioApi.js';
@@ -417,7 +418,7 @@ async function iniciar() {
           formularioLogin.password = '';
           vista.value = 'scanner';
           sincronizacion.arrancar();
-          aplicarTemaInstitucional();
+          aplicarAparienciaInstitucional();
           notificarExito(`Bienvenido, ${respuesta.nombreMostrar || respuesta.usuario}.`);
 
           // Si la clave sigue siendo la temporal, abrimos el cambio de una vez.
@@ -1320,88 +1321,243 @@ async function iniciar() {
       const revisandoSistema = ref(false);
 
       /*
-       * El tema institucional.
+       * La apariencia institucional.
        *
-       * Vive en la tabla `configuracion` y define con qué aspecto arranca la
-       * aplicación en todos los dispositivos. No pisa a quien ya eligió uno a
-       * mano con el botón de la barra superior: para eso está el botón de
-       * "usar el tema del sistema", que olvida esa elección.
+       * Vive en la tabla `configuracion` y define cómo arranca la aplicación en
+       * todos los dispositivos: el tema claro u oscuro, el color primario del
+       * que sale toda la paleta, y qué forma y tamaño tiene el logo.
+       *
+       * Lo del tema no pisa a quien ya eligió uno a mano con el botón de la
+       * barra superior: para eso está el botón de "seguir al sistema", que
+       * olvida esa elección. El color y el logo sí son de la institución y no
+       * se eligen por dispositivo.
        */
-      const parametros = ref([]);
-      const temaSistema = reactive({ valor: 'sistema', guardando: '', opciones: [] });
+      /*
+       * El logo se cachea aparte de la paleta.
+       *
+       * La pantalla de entrada se dibuja sin sesión, y sin sesión no se puede
+       * leer la configuración. Sin este cache, cada visita arrancaría con el
+       * logo de fábrica y saltaría al configurado recién después de entrar.
+       */
+      const CLAVE_LOGO = 'sssur_logo';
+
+      function logoCacheado() {
+        try {
+          const guardado = JSON.parse(localStorage.getItem(CLAVE_LOGO) || 'null');
+          if (!guardado) return null;
+
+          return {
+            forma: guardado.forma === 'horizontal' ? 'horizontal' : 'escudo',
+            anchoSidebar: Number(guardado.anchoSidebar) || 40,
+            anchoLogin: Number(guardado.anchoLogin) || 56
+          };
+        } catch {
+          return null;
+        }
+      }
+
+      function guardarLogoEnCache() {
+        try {
+          localStorage.setItem(CLAVE_LOGO, JSON.stringify({
+            forma: apariencia.logoForma.valor,
+            anchoSidebar: apariencia.anchoSidebar.valor,
+            anchoLogin: apariencia.anchoLogin.valor
+          }));
+        } catch {
+          // Sin almacenamiento el login muestra el logo de fábrica. Aceptable.
+        }
+      }
+
+      const logoInicial = logoCacheado();
+
+      const apariencia = reactive({
+        // Qué clave se está guardando ahora mismo, o '' si ninguna.
+        guardando: '',
+        tema: { valor: 'sistema', opciones: [] },
+        color: { valor: marca.actual(), sugerencias: [] },
+        logoForma: { valor: logoInicial ? logoInicial.forma : 'escudo', opciones: [] },
+        anchoSidebar: {
+          valor: logoInicial ? logoInicial.anchoSidebar : 40,
+          minimo: 28, maximo: 240, recomendado: {}
+        },
+        anchoLogin: {
+          valor: logoInicial ? logoInicial.anchoLogin : 56,
+          minimo: 32, maximo: 320, recomendado: {}
+        }
+      });
 
       // Se recalcula en cada cambio y no una sola vez al arrancar: el usuario
       // puede tocar el botón de la barra superior con la pantalla abierta.
       const tienePreferenciaPropia = ref(tema.tienePreferenciaPropia());
 
-      function refrescarTemaSistema(datos) {
-        parametros.value = datos.parametros || [];
+      /** Los doce tonos del color elegido, para la tira de vista previa. */
+      const paletaPrevia = computed(() => {
+        const paleta = marca.previsualizar(apariencia.color.valor);
+        return PASOS_MARCA.map((paso) => ({ paso, color: paleta[paso] }));
+      });
 
-        const elegido = parametros.value.find((p) => p.clave === 'tema_sistema');
-        if (!elegido) return;
+      /*
+       * ¿Se lee el texto blanco de los botones sobre el color elegido?
+       *
+       * El botón primario es fondo del color con texto blanco. Con un amarillo
+       * o un celeste claro eso queda ilegible, y no hay forma de que la persona
+       * que elige el color se dé cuenta hasta que alguien no puede leer un
+       * botón. Por eso se avisa acá mismo.
+       */
+      const contrasteDelColor = computed(() => contrasteConBlanco(apariencia.color.valor));
 
-        temaSistema.valor = elegido.valor;
-        temaSistema.opciones = elegido.opciones || [];
+      /** Deja el estado local igual a lo que devolvió la API. */
+      function refrescarApariencia(datos) {
+        const porClave = new Map((datos.parametros || []).map((p) => [p.clave, p]));
 
-        tema.aplicarDelSistema(elegido.valor);
-        modoOscuro.value = tema.esOscuro();
-        tienePreferenciaPropia.value = tema.tienePreferenciaPropia();
+        const tomar = (clave, destino, transformar = (v) => v) => {
+          const parametro = porClave.get(clave);
+          if (!parametro) return null;
+
+          destino.valor = transformar(parametro.valor);
+          if (parametro.opciones) destino.opciones = parametro.opciones;
+          if (parametro.sugerencias) destino.sugerencias = parametro.sugerencias;
+          if (parametro.minimo !== undefined) destino.minimo = parametro.minimo;
+          if (parametro.maximo !== undefined) destino.maximo = parametro.maximo;
+          if (parametro.recomendado) destino.recomendado = parametro.recomendado;
+          return parametro;
+        };
+
+        const elTema = tomar('tema_sistema', apariencia.tema);
+        tomar('color_primario', apariencia.color);
+        tomar('logo_forma', apariencia.logoForma);
+        tomar('logo_ancho_sidebar', apariencia.anchoSidebar, Number);
+        tomar('logo_ancho_login', apariencia.anchoLogin, Number);
+
+        marca.establecer(apariencia.color.valor);
+        tema.reaplicar();
+        guardarLogoEnCache();
+
+        if (elTema) {
+          tema.aplicarDelSistema(elTema.valor);
+          modoOscuro.value = tema.esOscuro();
+          tienePreferenciaPropia.value = tema.tienePreferenciaPropia();
+        }
       }
 
       async function cargarConfiguracion() {
         try {
           const datos = await api.configuracion.leer();
           interruptores.value = datos.interruptores || [];
-          refrescarTemaSistema(datos);
+          refrescarApariencia(datos);
         } catch (fallo) {
           console.error('[configuracion]', fallo);
         }
       }
 
       /**
-       * Aplica el tema institucional al entrar.
+       * Aplica la apariencia institucional al entrar.
        *
        * Se llama al iniciar sesión y al arrancar con una sesión guardada, no
-       * solo al abrir Configuración: si esperara a eso, el tema definido por la
-       * institución no se vería nunca en el uso normal.
+       * solo al abrir Configuración: si esperara a eso, el color y el tema que
+       * definió la institución no se verían nunca en el uso normal.
        *
-       * Falla en silencio a propósito. Que no se pueda leer el tema no es razón
-       * para molestar a nadie: se sigue con el que ya está aplicado.
+       * Falla en silencio a propósito. Que no se pueda leer la apariencia no es
+       * razón para molestar a nadie: se sigue con la que ya está aplicada, que
+       * salió del cache y casi siempre es la correcta.
        */
-      async function aplicarTemaInstitucional() {
+      async function aplicarAparienciaInstitucional() {
         try {
-          refrescarTemaSistema(await api.configuracion.leer());
+          refrescarApariencia(await api.configuracion.leer());
         } catch (fallo) {
-          console.warn('[tema] No se pudo leer el tema institucional:', fallo.message);
+          console.warn('[apariencia] No se pudo leer la configuración:', fallo.message);
         }
       }
 
-      /** Cambia el tema para toda la institución. Solo administradores. */
-      async function cambiarTemaSistema(valor) {
-        if (valor === temaSistema.valor) return;
+      /**
+       * Guarda un parámetro de apariencia.
+       *
+       * Se aplica en pantalla antes de que responda el servidor, para que se
+       * vea el efecto de lo que se elige, y se revierte si el guardado falla.
+       * `alAplicar` es lo que hace visible el cambio; se lo llama con el valor
+       * nuevo y con el anterior si hay que deshacer.
+       */
+      async function guardarApariencia(clave, destino, valor, alAplicar) {
+        if (String(valor) === String(destino.valor)) return;
 
-        const anterior = temaSistema.valor;
-        // Se aplica de inmediato para que se vea el efecto de lo que se elige,
-        // y se revierte si el guardado falla.
-        temaSistema.valor = valor;
-        temaSistema.guardando = valor;
-        tema.aplicarDelSistema(valor);
-        modoOscuro.value = tema.esOscuro();
+        const anterior = destino.valor;
+        destino.valor = valor;
+        apariencia.guardando = clave;
+        if (alAplicar) alAplicar(valor);
 
         try {
-          await api.configuracion.guardar('tema_sistema', valor);
-          notificarExito('Tema del sistema actualizado.');
+          await api.configuracion.guardar(clave, String(valor));
+          guardarLogoEnCache();
         } catch (fallo) {
-          temaSistema.valor = anterior;
-          tema.aplicarDelSistema(anterior);
-          modoOscuro.value = tema.esOscuro();
-          notificarError(fallo.message || 'No se pudo guardar el tema.');
+          destino.valor = anterior;
+          if (alAplicar) alAplicar(anterior);
+          notificarError(fallo.message || 'No se pudo guardar el cambio.');
+          return false;
         } finally {
-          temaSistema.guardando = '';
+          apariencia.guardando = '';
         }
+        return true;
       }
 
-      /** Olvida la elección personal de este dispositivo. */
+      async function cambiarTemaSistema(valor) {
+        const ok = await guardarApariencia('tema_sistema', apariencia.tema, valor, (v) => {
+          tema.aplicarDelSistema(v);
+          modoOscuro.value = tema.esOscuro();
+        });
+        if (ok) notificarExito('Tema del sistema actualizado.');
+      }
+
+      async function cambiarColorPrimario(valor) {
+        const ok = await guardarApariencia('color_primario', apariencia.color, valor, (v) => {
+          marca.establecer(v);
+          // La barra del navegador móvil lee el color de la variable CSS, así
+          // que hay que volver a aplicarla despues de reescribirla.
+          tema.reaplicar();
+        });
+        if (ok) notificarExito('Color del sistema actualizado.');
+      }
+
+      /**
+       * Cambia la forma del logo y le ajusta el tamaño.
+       *
+       * El escudo es cuadrado y el logo horizontal necesita más del doble de
+       * ancho para que se lea su texto. Dejar el tamaño de la forma anterior
+       * deja el logo diminuto o desbordado, así que se lleva al recomendado de
+       * la forma nueva. Después se puede ajustar a mano.
+       */
+      async function cambiarFormaLogo(valor) {
+        const ok = await guardarApariencia('logo_forma', apariencia.logoForma, valor);
+        if (!ok) return;
+
+        const sugeridoSidebar = apariencia.anchoSidebar.recomendado?.[valor];
+        const sugeridoLogin = apariencia.anchoLogin.recomendado?.[valor];
+
+        if (sugeridoSidebar) {
+          await guardarApariencia('logo_ancho_sidebar', apariencia.anchoSidebar, sugeridoSidebar);
+        }
+        if (sugeridoLogin) {
+          await guardarApariencia('logo_ancho_login', apariencia.anchoLogin, sugeridoLogin);
+        }
+
+        notificarExito('Forma del logo actualizada.');
+      }
+
+      function cambiarAnchoSidebar(valor) {
+        return guardarApariencia('logo_ancho_sidebar', apariencia.anchoSidebar, Number(valor));
+      }
+
+      function cambiarAnchoLogin(valor) {
+        return guardarApariencia('logo_ancho_login', apariencia.anchoLogin, Number(valor));
+      }
+
+      /** Vuelve todo a como venía de fábrica. */
+      async function restablecerApariencia() {
+        await cambiarColorPrimario('#465fff');
+        await cambiarFormaLogo('escudo');
+        notificarExito('Apariencia restablecida.');
+      }
+
+      /** Olvida la elección personal de tema de este dispositivo. */
       function volverAlTemaDelSistema() {
         tema.olvidarPreferenciaPropia();
         modoOscuro.value = tema.esOscuro();
@@ -1698,7 +1854,7 @@ async function iniciar() {
           sesion.impersonadoPor = guardada.impersonadoPor || null;
           await recargarCatalogos();
           sincronizacion.arrancar();
-          aplicarTemaInstitucional();
+          aplicarAparienciaInstitucional();
         }
 
         escaner.vigilarConexion();
@@ -1800,8 +1956,10 @@ async function iniciar() {
         // Configuración
         interruptores, diagnostico, revisandoSistema,
         alternarInterruptor, revisarSistema, cargarConfiguracion,
-        temaSistema, tienePreferenciaPropia,
+        apariencia, tienePreferenciaPropia, paletaPrevia, contrasteDelColor,
         cambiarTemaSistema, volverAlTemaDelSistema,
+        cambiarColorPrimario, cambiarFormaLogo,
+        cambiarAnchoSidebar, cambiarAnchoLogin, restablecerApariencia,
 
         // Vaciado de registros
         purga, confirmacionValida, cargarPurgables,

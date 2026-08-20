@@ -41,6 +41,29 @@
   --marca-900: #262e89;
   --marca-950: #161950;
 
+  /*
+   * Los mismos tonos como terna «R G B».
+   *
+   * Las clases de Tailwind (bg-brand-500 y compañía) los consumen con
+   * rgb(var(--marca-500-rgb) / <alpha>), que es lo que permite escribir
+   * bg-brand-500/20. Con el hex de arriba no se puede aplicar opacidad.
+   *
+   * Estos valores son el color por defecto. Si la institución configuró otro,
+   * assets/js/nucleo/marca.js reescribe los veinticuatro sobre :root.
+   */
+  --marca-25-rgb: 242 247 255;
+  --marca-50-rgb: 236 243 255;
+  --marca-100-rgb: 221 233 255;
+  --marca-200-rgb: 194 214 255;
+  --marca-300-rgb: 156 185 255;
+  --marca-400-rgb: 117 146 255;
+  --marca-500-rgb: 70 95 255;
+  --marca-600-rgb: 54 65 245;
+  --marca-700-rgb: 42 49 216;
+  --marca-800-rgb: 37 45 174;
+  --marca-900-rgb: 38 46 137;
+  --marca-950-rgb: 22 25 80;
+
   /* --- Grises --- */
   --gris-25:  #fcfcfd;
   --gris-50:  #f9fafb;
