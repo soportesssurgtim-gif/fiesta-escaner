@@ -117,6 +117,7 @@ export const api = {
   },
 
   sorteos: {
+    /** Los sorteos con su lista de premios y cuanto llevan repartido. */
     listar() {
       return http.obtener('premios', { accion: 'sorteos' });
     },
@@ -124,12 +125,29 @@ export const api = {
      * Guardar un sorteo usa su propia acción.
      * Antes esto pegaba a /api/premios sin acción, con lo cual el backend lo
      * tomaba como un premio y creaba un premio en vez de un sorteo.
+     *
+     * `datos.premios` es la lista completa de premios del sorteo: el servidor
+     * la sincroniza de una, dando de alta, actualizando y borrando lo que haga
+     * falta.
      */
     guardar(datos) {
       return http.enviar('premios', datos, { accion: 'sorteo' });
     },
-    sortear(sorteoId) {
-      return http.enviar('premios', { sorteoId }, { accion: 'sortear' });
+    /** Los ganadores de un sorteo, en el orden en que se llamaron. */
+    ganadores(sorteoId) {
+      return http.obtener('premios', { accion: 'ganadores', sorteoId });
+    },
+    /** Saca uno o varios ganadores de una linea de premio. */
+    sortear(sorteoId, lineaId, cantidad = 1) {
+      return http.enviar('premios', { sorteoId, lineaId, cantidad }, { accion: 'sortear' });
+    },
+    /** Marca que el premio se entrego en mano. */
+    marcarEntregado(id, entregado) {
+      return http.enviar('premios', { id, entregado: entregado ? 'TRUE' : 'FALSE' }, { accion: 'entregado' });
+    },
+    /** Abre o cierra el sorteo. */
+    cambiarEstado(id, abierto) {
+      return http.enviar('premios', { id, abierto: abierto ? 'TRUE' : 'FALSE' }, { accion: 'estado-sorteo' });
     }
   },
 

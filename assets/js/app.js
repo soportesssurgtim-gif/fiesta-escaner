@@ -33,6 +33,7 @@ import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
 import { usarBuscadorPersonas } from './composables/usarBuscadorPersonas.js';
+import { usarSorteos } from './composables/usarSorteos.js';
 
 import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -315,9 +316,18 @@ async function iniciar() {
         camposBusqueda: ['nombre', 'ubicacion']
       });
 
-      const sorteos = usarCatalogo({
+      /*
+       * Los sorteos ya no son un catálogo como los demás.
+       *
+       * usarCatalogo da lista + búsqueda + paginación + un modal de un solo
+       * formulario, y eso alcanzaba cuando un sorteo era un premio. Ahora cada
+       * sorteo lleva una lista de premios con cantidades, se extrae en vivo y
+       * tiene estado propio, así que la parte de operación vive en usarSorteos
+       * y acá queda solo lo que la tabla de administración necesita.
+       */
+      const sorteosCatalogo = usarCatalogo({
         alGuardar: (datos) => api.sorteos.guardar(datos),
-        formularioVacio: { id: null, nombre: '', premio: '' },
+        formularioVacio: { id: null, nombre: '' },
         camposBusqueda: ['nombre']
       });
 
@@ -342,7 +352,9 @@ async function iniciar() {
         roles.lista = bundle.roles || [];
         usuarios.lista = bundle.usuarios || [];
         eventos.lista = bundle.eventos || [];
-        sorteos.lista = bundle.sorteos || [];
+        // Los sorteos NO salen del bundle: necesitan su lista de premios y el
+        // conteo de lo repartido, que el bundle no trae. Los pide usarSorteos.
+        sorteosCatalogo.lista = bundle.sorteos || [];
 
         permisosCargados.value = bundle.permisos || [];
         asistencias.value = bundle.asistencias || [];
@@ -857,30 +869,107 @@ async function iniciar() {
         }
       }
 
-      const sorteando = ref(false);
-      const ganador = ref(null);
-      const errorSorteo = ref('');
-      const sorteoElegido = ref('');
+      // =====================================================================
+      // Sorteos
+      //
+      // La operación en vivo vive en usarSorteos; acá queda el formulario de
+      // administración, que edita el sorteo junto con su lista de premios.
+      // =====================================================================
 
-      async function sortear(sorteoId) {
-        const elegido = sorteoId || sorteoElegido.value || sorteos.formulario.id;
-        if (!elegido) {
-          errorSorteo.value = 'Primero elige un sorteo.';
+      const sorteos = usarSorteos({
+        notificar,
+        notificarError,
+        // Al extraer cambia el stock de los premios, así que el catálogo que
+        // está en pantalla queda desactualizado.
+        alCambiar: recargarCatalogos
+      });
+
+      const editorSorteo = reactive({
+        abierto: false,
+        id: null,
+        nombre: '',
+        descripcion: '',
+        permiteRepetirGanador: false,
+        premios: [],
+        guardando: false,
+        error: ''
+      });
+
+      const totalUnidadesSorteo = computed(() =>
+        editorSorteo.premios.reduce((suma, linea) => suma + (Number(linea.cantidad) || 0), 0)
+      );
+
+      function abrirSorteo(sorteo = null) {
+        Object.assign(editorSorteo, {
+          abierto: true,
+          id: sorteo ? sorteo.id : null,
+          nombre: sorteo ? sorteo.nombre || '' : '',
+          descripcion: sorteo ? sorteo.descripcion || '' : '',
+          permiteRepetirGanador: sorteo ? formato.esVerdadero(sorteo.permite_repetir_ganador) : false,
+          // Se copian las líneas para que cancelar no deje a medias lo que se
+          // estaba editando.
+          premios: sorteo
+            ? (sorteo.premios || []).map((p) => ({ premioId: p.premioId, cantidad: p.cantidad }))
+            : [],
+          guardando: false,
+          error: ''
+        });
+      }
+
+      function cerrarSorteo() {
+        editorSorteo.abierto = false;
+        editorSorteo.error = '';
+      }
+
+      function agregarPremioAlSorteo() {
+        editorSorteo.premios.push({ premioId: '', cantidad: 1 });
+      }
+
+      function quitarPremioDelSorteo(indice) {
+        editorSorteo.premios.splice(indice, 1);
+      }
+
+      async function guardarSorteo() {
+        if (!editorSorteo.nombre.trim()) {
+          editorSorteo.error = 'El nombre del sorteo es obligatorio.';
           return;
         }
 
-        errorSorteo.value = '';
-        ganador.value = null;
-        sorteando.value = true;
+        const lineas = editorSorteo.premios.filter((linea) => linea.premioId);
+
+        // Un mismo premio dos veces no tiene sentido: para repetirlo se sube la
+        // cantidad, y además el servidor lo rechazaría por el índice único.
+        const vistos = new Set();
+        for (const linea of lineas) {
+          if (vistos.has(linea.premioId)) {
+            editorSorteo.error = 'Hay un premio repetido en la lista. Súbele la cantidad en vez de agregarlo dos veces.';
+            return;
+          }
+          vistos.add(linea.premioId);
+        }
+
+        editorSorteo.guardando = true;
+        editorSorteo.error = '';
 
         try {
-          ganador.value = await api.sorteos.sortear(elegido);
-          notificarExito('¡Tenemos ganador!');
-          await recargarCatalogos();
+          await api.sorteos.guardar({
+            id: editorSorteo.id,
+            nombre: editorSorteo.nombre.trim(),
+            descripcion: editorSorteo.descripcion.trim(),
+            permiteRepetirGanador: editorSorteo.permiteRepetirGanador ? 'TRUE' : 'FALSE',
+            premios: lineas.map((linea) => ({
+              premioId: linea.premioId,
+              cantidad: Math.max(1, Number(linea.cantidad) || 1)
+            }))
+          });
+
+          notificarExito(editorSorteo.id ? 'Sorteo actualizado.' : 'Sorteo creado.');
+          cerrarSorteo();
+          await Promise.all([sorteos.cargar(), recargarCatalogos()]);
         } catch (fallo) {
-          errorSorteo.value = fallo.message || 'No se pudo realizar el sorteo.';
+          editorSorteo.error = fallo.message || 'No se pudo guardar el sorteo.';
         } finally {
-          sorteando.value = false;
+          editorSorteo.guardando = false;
         }
       }
 
@@ -1448,6 +1537,20 @@ async function iniciar() {
         }
       });
 
+      // Los sorteos traen su lista de premios y el conteo de lo repartido, que
+      // no vienen en el bundle inicial. Se piden al entrar a cualquiera de las
+      // dos pantallas que los usan.
+      watch(vista, (nueva) => {
+        if (nueva === 'rifa' || nueva === 'sorteos') sorteos.cargar();
+      });
+
+      // La tabla de administración usa la búsqueda y la paginación de
+      // usarCatalogo, pero las filas tienen que ser las enriquecidas: las del
+      // bundle no traen los premios ni el conteo de lo repartido.
+      watch(() => sorteos.lista, (nueva) => {
+        sorteosCatalogo.lista = nueva || [];
+      }, { immediate: true });
+
       // =====================================================================
       // Ciclo de vida
       // =====================================================================
@@ -1543,7 +1646,7 @@ async function iniciar() {
         cambioClave, abrirCambioClave, guardarClaveNueva,
 
         // Catálogos
-        departamentos, empleados, premios, usuarios, roles, eventos, sorteos,
+        departamentos, empleados, premios, usuarios, roles, eventos,
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
         recargarCatalogos, DISTRITOS,
@@ -1566,8 +1669,13 @@ async function iniciar() {
         // Importar / exportar
         importacion, importarEmpleados, importarDepartamentos, exportar, descargarPlantilla,
 
-        // Eventos y sorteos
-        activarEvento, sortear, sorteando, ganador, errorSorteo, sorteoElegido,
+        // Eventos
+        activarEvento,
+
+        // Sorteos
+        sorteos, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
+        abrirSorteo, cerrarSorteo, guardarSorteo,
+        agregarPremioAlSorteo, quitarPremioDelSorteo,
 
         // Tarjetas
         plantillas, plantillaElegida, nombrePlantilla, campoQr, hayPlantillaCargada,
