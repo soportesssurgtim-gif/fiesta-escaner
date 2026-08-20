@@ -5,11 +5,15 @@
   un vistazo. Quien opera esto tiene gente esperando y no puede detenerse a leer
   texto chico.
 
-  En el teléfono manda otra regla: la cámara y el resultado tienen que caber sin
-  desplazarse. Por eso las métricas se aplastan en una fila (.metricas-compactas)
-  y el orden cambia. En móvil es una columna con `order`:
+  La cámara se abre a pantalla completa, no en un recuadro dentro de la vista:
+  en el teléfono ese recuadro quedaba diminuto y apuntar a un QR impreso exigía
+  una puntería que no se tiene con gente esperando. Ahí mismo, encima de la
+  imagen, aparece la confirmación de cada lectura, grande y a color.
 
-      cámara → último registro → registrar a mano
+  En el teléfono las métricas no se muestran (ver .metricas-compactas en el
+  sistema de diseño). El orden de lo que queda es una columna con `order`:
+
+      lector → último registro → registrar a mano
 
   porque después de cada escaneo lo primero que se necesita ver es a quién se
   registró, no el campo de ingreso manual, que es el plan B.
@@ -19,8 +23,9 @@
 -->
 <section v-show="vista === 'scanner'" class="animar-aparecer">
 
-  <!-- Métricas. En móvil quedan en una sola fila y bien chicas: siguen a la
-       vista pero dejan la cámara arriba del doblez. -->
+  <!-- Métricas. No se muestran debajo de 640 px: en la puerta del evento lo
+       único que importa es escanear. Los mismos números están en Asistencias,
+       en Configuración y, el de pendientes, en la barra lateral. -->
   <div class="metricas-compactas mb-4 sm:mb-6">
     <div class="tarjeta p-5">
       <div class="metrica-icono bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
@@ -87,37 +92,28 @@
           </div>
         </div>
 
-        <!-- Contenedor del lector. La librería inyecta el <video> acá dentro. -->
-        <div class="relative mb-4 overflow-hidden rounded-xl bg-gray-900"
-             :class="escaner.escaneando ? 'aspect-square' : 'aspect-video'">
-          <div id="lector-qr" class="h-full w-full"></div>
-
-          <div v-if="!escaner.escaneando"
-               class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
-            <i class="fa-solid fa-camera text-4xl text-gray-600"></i>
-            <p class="text-theme-sm text-gray-400">La cámara está apagada</p>
-          </div>
-
-          <div v-if="escaner.iniciandoCamara"
-               class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900/80">
-            <i class="fa-solid fa-circle-notch animar-girar text-3xl text-brand-400"></i>
-            <p class="text-theme-sm text-gray-300">Abriendo la cámara…</p>
-          </div>
+        <!--
+          La cámara ya no vive acá: se abre a pantalla completa (más abajo, al
+          final de este archivo). En el recuadro fijo quedaba diminuta en el
+          teléfono y apuntar a un QR impreso exigía una puntería que no se
+          tiene con gente esperando.
+        -->
+        <div class="mb-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-300 py-8 text-center dark:border-gray-700">
+          <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-2xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+            <i class="fa-solid fa-qrcode"></i>
+          </span>
+          <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+            La cámara se abre a pantalla completa
+          </p>
         </div>
 
         <div class="flex flex-col gap-3 sm:flex-row">
-          <button v-if="!escaner.escaneando"
-                  type="button"
+          <button type="button"
                   @click="escaner.iniciar()"
                   class="boton boton-primario flex-1"
                   :disabled="escaner.iniciandoCamara">
-            <i class="fa-solid fa-camera"></i> Abrir cámara
-          </button>
-          <button v-else
-                  type="button"
-                  @click="escaner.detener()"
-                  class="boton boton-peligro flex-1">
-            <i class="fa-solid fa-stop"></i> Detener
+            <i class="fa-solid" :class="escaner.iniciandoCamara ? 'fa-circle-notch animar-girar' : 'fa-camera'"></i>
+            {{ escaner.iniciandoCamara ? 'Abriendo…' : 'Abrir cámara' }}
           </button>
 
           <label class="boton boton-secundario flex-1 cursor-pointer">
@@ -234,6 +230,138 @@
             <i class="fa-solid fa-circle-notch animar-girar"></i> Enviando…
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    ============================ CÁMARA A PANTALLA COMPLETA ==================
+
+    Se monta solo mientras está abierta: la librería inyecta su <video> dentro
+    de #lector-qr, y ese contenedor tiene que existir en el DOM antes de que
+    `iniciar()` la arranque. Por eso el composable enciende `camaraAbierta` y
+    espera un nextTick antes de buscarlo.
+  -->
+  <div v-if="escaner.camaraAbierta"
+       class="fixed inset-0 z-[9999] flex flex-col bg-gray-900">
+
+    <!-- Encabezado. El padding de arriba deja lugar a la muesca del teléfono. -->
+    <div class="flex shrink-0 items-center gap-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-theme-sm font-semibold text-white">
+          {{ eventoActivo ? eventoActivo.nombre : 'Sin evento activo' }}
+        </p>
+        <p class="text-theme-xs text-gray-400">
+          {{ resumen.total }} registradas
+          <span v-if="escaner.estadoRed.pendientes > 0" class="text-warning-400">
+            · {{ escaner.estadoRed.pendientes }} por subir
+          </span>
+          <span v-if="!escaner.estadoRed.enLinea" class="text-error-400">· sin conexión</span>
+        </p>
+      </div>
+
+      <span class="insignia shrink-0"
+            :class="escaner.escaneando ? 'insignia-exito' : 'insignia-neutra'">
+        <span class="h-1.5 w-1.5 rounded-full"
+              :class="escaner.escaneando ? 'bg-success-500' : 'bg-gray-400'"></span>
+        {{ escaner.escaneando ? 'Escaneando' : 'Detenido' }}
+      </span>
+
+      <button type="button" @click="escaner.detener()"
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-300 transition hover:bg-white/10 hover:text-white"
+              aria-label="Cerrar la cámara">
+        <i class="fa-solid fa-xmark text-theme-xl"></i>
+      </button>
+    </div>
+
+    <!-- Imagen de la cámara -->
+    <div class="relative min-h-0 flex-1">
+      <div id="lector-qr" class="h-full w-full"></div>
+
+      <div v-if="escaner.iniciandoCamara"
+           class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900">
+        <i class="fa-solid fa-circle-notch animar-girar text-3xl text-brand-400"></i>
+        <p class="text-theme-sm text-gray-300">Abriendo la cámara…</p>
+      </div>
+
+      <!-- Marco de puntería. Sin eventos de puntero para no tapar el toque de
+           enfoque que ofrecen algunos navegadores. -->
+      <div v-if="escaner.escaneando && !escaner.iniciandoCamara"
+           class="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div class="relative h-[62vw] w-[62vw] max-h-[300px] max-w-[300px]">
+          <span class="absolute left-0 top-0 h-8 w-8 rounded-tl-xl border-l-4 border-t-4 border-white/80"></span>
+          <span class="absolute right-0 top-0 h-8 w-8 rounded-tr-xl border-r-4 border-t-4 border-white/80"></span>
+          <span class="absolute bottom-0 left-0 h-8 w-8 rounded-bl-xl border-b-4 border-l-4 border-white/80"></span>
+          <span class="absolute bottom-0 right-0 h-8 w-8 rounded-br-xl border-b-4 border-r-4 border-white/80"></span>
+        </div>
+      </div>
+
+      <!--
+        Confirmación de la lectura.
+
+        Va encima de la cámara y ocupa la pantalla: quien opera esto mira de
+        reojo mientras la fila avanza, y tiene que poder leerla de lejos. Se
+        cierra sola al terminar la ventana de espera, que es el mismo momento
+        en que el lector vuelve a aceptar el mismo código.
+      -->
+      <div v-if="escaner.confirmacionAbierta && escaner.ultimoResultado"
+           @click="escaner.cerrarConfirmacion()"
+           class="animar-aparecer absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center"
+           :class="escaner.ultimoResultado.error ? 'bg-error-600/95'
+                   : escaner.ultimoResultado.duplicado ? 'bg-warning-500/95'
+                   : escaner.ultimoResultado.offline ? 'bg-blue-light-600/95'
+                   : 'bg-success-600/95'">
+
+        <i class="fa-solid text-6xl text-white"
+           :class="escaner.ultimoResultado.error ? 'fa-circle-xmark'
+                   : escaner.ultimoResultado.duplicado ? 'fa-clock-rotate-left'
+                   : escaner.ultimoResultado.offline ? 'fa-cloud-arrow-down'
+                   : 'fa-circle-check'"></i>
+
+        <div>
+          <p v-if="escaner.ultimoResultado.empleado"
+             class="text-title-sm font-bold leading-tight text-white">
+            {{ nombreCompleto(escaner.ultimoResultado.empleado) }}
+          </p>
+          <p v-if="escaner.ultimoResultado.empleado && escaner.ultimoResultado.empleado.dui"
+             class="mt-1 font-mono text-theme-sm text-white/80">
+            {{ formatearDui(escaner.ultimoResultado.empleado.dui) }}
+          </p>
+          <p v-if="!escaner.ultimoResultado.empleado || escaner.ultimoResultado.error"
+             class="mt-1 text-theme-xl font-semibold text-white">
+            {{ escaner.ultimoResultado.mensaje }}
+          </p>
+        </div>
+
+        <span class="rounded-full bg-white/20 px-4 py-1.5 text-theme-sm font-semibold text-white">
+          {{ escaner.ultimoResultado.error ? 'No se registró'
+             : escaner.ultimoResultado.duplicado ? 'Ya había ingresado'
+             : escaner.ultimoResultado.offline ? 'Se subirá al recuperar la señal'
+             : 'Asistencia registrada' }}
+        </span>
+
+        <p class="text-theme-xs text-white/70">
+          Toca para cerrar · el lector se reactiva en {{ escaner.segundosEspera }} s
+        </p>
+      </div>
+    </div>
+
+    <!-- Pie: ingreso manual sin salir de la cámara, que es el plan B cuando el
+         QR está rayado y la fila no se detiene. -->
+    <div class="shrink-0 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+      <div class="flex gap-2">
+        <input v-model="escaner.identificadorManual"
+               @keyup.enter="escaner.registrarManual()"
+               type="text"
+               inputmode="numeric"
+               class="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-theme-sm text-white placeholder:text-gray-400 focus:border-brand-400 focus:outline-none"
+               placeholder="DUI o código, si el QR no lee" />
+        <button type="button"
+                @click="escaner.registrarManual()"
+                class="boton boton-primario shrink-0"
+                :disabled="escaner.procesando">
+          <i class="fa-solid" :class="escaner.procesando ? 'fa-circle-notch animar-girar' : 'fa-arrow-right'"></i>
+        </button>
       </div>
     </div>
   </div>

@@ -21,9 +21,19 @@ const { ref, reactive, nextTick } = Vue;
 const ID_CONTENEDOR = 'lector-qr';
 const REINTENTOS = 2;
 
-// Cuánto ignoramos el mismo código después de leerlo. Un segundo y medio es
-// suficiente para que la persona se corra y entre la siguiente.
-const ESPERA_MISMO_CODIGO = 1500;
+/*
+ * Cuánto se ignora el mismo código después de leerlo.
+ *
+ * La cámara lee el mismo QR diez veces por segundo mientras la persona lo
+ * sostiene delante, así que sin esta ventana un solo escaneo se convierte en
+ * una decena de intentos por la misma persona. Tres segundos es el tiempo que
+ * tarda alguien en apartarse y que entre el siguiente.
+ *
+ * Es idempotencia del lado del cliente. La del servidor ya existe (la
+ * restricción UNIQUE de evento + empleado), pero llegar hasta allá para que
+ * rechace nueve duplicados es gastar red y batería en la puerta del evento.
+ */
+const ESPERA_MISMO_CODIGO = 3000;
 
 /**
  * @param {Object} config
@@ -40,6 +50,19 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
   const procesando = ref(false);
   const ultimoResultado = ref(null);
   const identificadorManual = ref('');
+
+  // La cámara ocupa la pantalla entera mientras se escanea. En un recuadro fijo
+  // dentro de la vista quedaba diminuta en el teléfono, y apuntar a un QR
+  // impreso en una tarjeta exigía una puntería que no se tiene con gente
+  // esperando.
+  const camaraAbierta = ref(false);
+
+  // Confirmación grande del último escaneo, encima de la cámara. Se va sola
+  // después de la ventana de espera: para cuando desaparece, el lector ya
+  // volvió a aceptar códigos, así que el operador nunca ve la cámara "libre"
+  // con una confirmación vieja encima.
+  const confirmacionAbierta = ref(false);
+  let relojConfirmacion = null;
 
   const estadoRed = reactive({
     enLinea: navigator.onLine,
@@ -88,6 +111,25 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
     return false;
   }
 
+  /**
+   * Muestra la confirmación del último escaneo y programa su cierre.
+   * Solo tiene sentido con la cámara a pantalla completa: en el escritorio el
+   * resultado ya está en su tarjeta, siempre visible.
+   */
+  function mostrarConfirmacion() {
+    if (!camaraAbierta.value) return;
+    confirmacionAbierta.value = true;
+    clearTimeout(relojConfirmacion);
+    relojConfirmacion = setTimeout(() => {
+      confirmacionAbierta.value = false;
+    }, ESPERA_MISMO_CODIGO);
+  }
+
+  function cerrarConfirmacion() {
+    clearTimeout(relojConfirmacion);
+    confirmacionAbierta.value = false;
+  }
+
   function buscarEmpleadoLocal(identificador) {
     const buscado = duiPlano(identificador);
     const lista = obtenerEmpleados() || [];
@@ -122,12 +164,14 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
           : `Guardado sin conexión. Pendientes: ${estadoRed.pendientes}`
       };
       emitirSonido('exito');
+      mostrarConfirmacion();
     } catch (fallo) {
       ultimoResultado.value = {
         error: true,
         mensaje: 'No se pudo guardar ni siquiera localmente: ' + (fallo.message || fallo)
       };
       emitirSonido('error');
+      mostrarConfirmacion();
     }
   }
 
@@ -144,6 +188,7 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
       const respuesta = await api.asistencias.registrar(identificador, 'escaner-web');
       ultimoResultado.value = respuesta;
       emitirSonido(respuesta.duplicado ? 'error' : 'exito');
+      mostrarConfirmacion();
 
       if (!respuesta.duplicado && alRegistrar) alRegistrar(respuesta, identificador);
     } catch (fallo) {
@@ -160,6 +205,7 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
       if (vaARepetirse) {
         ultimoResultado.value = { error: true, mensaje: fallo.message };
         emitirSonido('error');
+        mostrarConfirmacion();
       } else {
         await guardarLocalmente(identificador);
       }
@@ -203,9 +249,13 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
       return;
     }
 
+    // El contenedor del lector vive dentro de la pantalla completa, así que
+    // hay que abrirla ANTES de que la librería lo busque en el DOM.
+    camaraAbierta.value = true;
     escaneando.value = true;
     iniciandoCamara.value = true;
     ultimoResultado.value = null;
+    cerrarConfirmacion();
 
     // Damos un ciclo para que Vue pinte el contenedor antes de que la librería
     // lo busque en el DOM.
@@ -215,6 +265,7 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
     if (!contenedor) {
       iniciandoCamara.value = false;
       escaneando.value = false;
+      camaraAbierta.value = false;
       return;
     }
     contenedor.innerHTML = '';
@@ -229,6 +280,9 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
       );
     } catch (fallo) {
       escaneando.value = false;
+      // Se cierra la pantalla completa: dejarla abierta en negro, sin imagen y
+      // sin explicación, es peor que volver a la vista con el error a la vista.
+      camaraAbierta.value = false;
       ultimoResultado.value = {
         error: true,
         mensaje: 'No se pudo abrir la cámara. Revisa los permisos del navegador.'
@@ -242,6 +296,8 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
 
   async function detener() {
     escaneando.value = false;
+    camaraAbierta.value = false;
+    cerrarConfirmacion();
 
     if (lector) {
       try {
@@ -322,6 +378,25 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
     }
   }
 
+  /*
+   * Escape cierra la cámara.
+   *
+   * A pantalla completa el único modo de salir era el botón de la esquina, y en
+   * escritorio la reacción de cualquiera ante algo que ocupa toda la pantalla es
+   * apretar Escape. El listener se registra una sola vez y no se retira: el
+   * escáner vive mientras vive la aplicación.
+   */
+  document.addEventListener('keydown', (evento) => {
+    if (evento.key !== 'Escape' || !camaraAbierta.value) return;
+    if (confirmacionAbierta.value) {
+      // Primero se saca la confirmación de encima, sin apagar la cámara: la
+      // fila sigue avanzando y volver a abrirla cuesta un par de segundos.
+      cerrarConfirmacion();
+      return;
+    }
+    detener();
+  });
+
   /** Escucha los cambios de conectividad y sincroniza solo al volver la señal. */
   function vigilarConexion() {
     window.addEventListener('online', async () => {
@@ -349,6 +424,12 @@ export function usarEscanerQr({ notificar, obtenerEmpleados, alRegistrar }) {
     procesando,
     ultimoResultado,
     identificadorManual,
+    camaraAbierta,
+    confirmacionAbierta,
+    cerrarConfirmacion,
+    // La plantilla lo muestra en el aviso de espera. En segundos, que es como
+    // se le explica a una persona.
+    segundosEspera: ESPERA_MISMO_CODIGO / 1000,
     estadoRed,
     iniciar,
     detener,

@@ -536,51 +536,31 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
 .metrica-etiqueta { font-size: 0.875rem; color: var(--texto-tenue); }
 
 /*
- * Métricas compactas.
+ * Métricas del escáner.
  *
- * En el escáner las tres tarjetas a tamaño completo se apilaban en el teléfono
- * y ocupaban media pantalla, así que había que desplazarse hacia abajo para
- * llegar a la cámara. En la puerta del evento eso es inaceptable: lo único
- * que importa ahí es escanear.
+ * En el teléfono no se muestran. Se probó achicarlas a una fila y aun así
+ * empujaban la cámara hacia abajo, y en la puerta del evento lo único que
+ * importa es escanear. Los mismos números siguen disponibles en Asistencias y
+ * en Configuración, y el de pendientes está en la barra lateral.
  *
- * Debajo de 640 px las tres se aplastan en una sola fila. Los números siguen a
- * la vista, que es lo que se mira de reojo, pero dejan de estorbar.
+ * Desde 640 px vuelven completas: ahí sobra alto y son útiles de un vistazo.
  *
- * Los tamaños van acá y no en clases de Tailwind porque compiten con
- * .metrica-valor y .metrica-etiqueta, que tienen la misma especificidad: cuál
- * gana dependería del orden en que el navegador resuelva la hoja externa y el
- * <style> que inyecta el CDN, y eso no es algo que convenga dejar al azar.
+ * El display va acá y no en clases de Tailwind porque `hidden` y esta regla
+ * tienen la misma especificidad: cuál gana dependería del orden en que el
+ * navegador resuelva la hoja externa y el <style> que inyecta el CDN, y eso no
+ * es algo que convenga dejar al azar.
  */
-.metricas-compactas {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
+.metricas-compactas { display: none; }
 
 @media (min-width: 640px) {
-  .metricas-compactas { gap: 1rem; }
-}
-
-@media (max-width: 639px) {
-  .metricas-compactas > .tarjeta { padding: 0.625rem 0.5rem; }
-
-  .metricas-compactas .metrica-icono {
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 0.375rem;
-    font-size: 0.6875rem;
-  }
-
-  .metricas-compactas .metrica-valor {
-    margin-top: 0.25rem;
-    font-size: 1.375rem;
-  }
-
-  .metricas-compactas .metrica-etiqueta {
-    font-size: 0.625rem;
-    line-height: 1.2;
+  .metricas-compactas {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
   }
 }
+
+
 
 /*
  * Encabezado de tarjeta que no se parte en dos filas en el teléfono.
@@ -677,14 +657,38 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
   }
 }
 
-/* El lector de QR inyecta su propio HTML; lo alineamos con el resto. */
+/*
+ * Lector de QR.
+ *
+ * html5-qrcode inyecta su propio HTML y le pone medidas en línea calculadas a
+ * partir del contenedor. Ahora que la cámara va a pantalla completa hay que
+ * forzarlo a llenarla: si no, el vídeo sale con el tamaño nativo de la cámara,
+ * que casi nunca coincide con la pantalla, y quedan franjas negras a los lados.
+ *
+ * object-fit: cover recorta en vez de encoger. Se pierde algo de los bordes,
+ * pero el QR se sostiene en el centro, que es donde está el marco de puntería.
+ *
+ * Ya no lleva border-radius: las esquinas redondeadas eran para el recuadro
+ * dentro de la tarjeta, y a pantalla completa se ven como un error.
+ */
+#lector-qr { position: relative; overflow: hidden; }
+
 #lector-qr video,
 #lector-qr #reader {
-  border-radius: var(--radio) !important;
-  border: none !important;
   width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  object-fit: cover;
+  display: block;
 }
+
 #lector-qr #reader__scan_region { background: transparent !important; }
+
+/* La librería dibuja su propio recuadro y su icono de ayuda. Estorban: el
+   marco de puntería ya está en la plantilla, y los suyos quedan descolocados
+   al recortar la imagen. */
+#lector-qr #reader__scan_region > img,
+#lector-qr img[alt="Info icon"] { display: none !important; }
 #lector-qr #reader__dashboard_section_csr button {
   background: var(--marca-500) !important;
   color: #fff !important;
