@@ -1,5 +1,5 @@
 /**
- * Importación de CSV con barra de progreso.
+ * Importación de Excel o CSV con barra de progreso.
  *
  * Empleados y departamentos comparten esta pantalla: se elige el archivo, se
  * manda al servidor, y el detalle que devuelve se va mostrando fila por fila.
@@ -8,6 +8,8 @@
  * responde— pero sirve: da tiempo a leer qué se insertó y qué falló, en vez de
  * que aparezca un número final sin contexto.
  */
+
+import { esExcel, xlsxComoCsv } from '../servicios/servicioExcel.js';
 
 const { ref, reactive, computed } = Vue;
 
@@ -61,7 +63,15 @@ export function usarImportacionCsv({ notificar, alTerminar }) {
     reiniciar();
 
     try {
-      const texto = await archivo.text();
+      // El .xlsx se traduce a CSV acá mismo y el servidor sigue recibiendo lo
+      // de siempre. Su importador ya está probado y no hace falta enseñarle a
+      // descomprimir un ZIP dentro de una función serverless.
+      const texto = esExcel(archivo) ? await xlsxComoCsv(archivo) : await archivo.text();
+
+      if (!texto.trim()) {
+        throw new Error('El archivo está vacío.');
+      }
+
       const resultado = await enviarAlServidor(texto);
 
       procesando.value = false;

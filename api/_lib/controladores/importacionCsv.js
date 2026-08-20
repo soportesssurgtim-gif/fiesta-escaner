@@ -24,7 +24,24 @@ import { responderOk, responderSolicitudInvalida, responderSinPermiso } from '..
  * @param {Function} config.describir    (datos) => texto que se muestra en el detalle.
  * @param {string[]} [config.camposNoActualizables] Campos que se escriben al crear
  *                   pero no se pisan al actualizar (ej: el DUI, que es la clave).
+ * @param {Function} [config.prepararContexto] Se ejecuta UNA vez antes de
+ *                   recorrer las filas y lo que devuelve llega como segundo
+ *                   argumento de mapearFila. Sirve para traer catálogos que
+ *                   hacen falta para traducir columnas: empleados lo usa para
+ *                   resolver el nombre del departamento a su id. Va acá y no
+ *                   dentro de mapearFila porque consultarlo por cada fila serían
+ *                   cientos de viajes a la base y la función se pasaría del
+ *                   tiempo límite de Vercel.
  */
+/** Quita los campos de trabajo (los que empiezan con guion bajo). */
+function sinCamposAuxiliares(datos) {
+  const limpio = {};
+  for (const [campo, valor] of Object.entries(datos)) {
+    if (!campo.startsWith('_')) limpio[campo] = valor;
+  }
+  return limpio;
+}
+
 export function crearImportadorCsv(config) {
   const {
     repositorio,
@@ -32,7 +49,8 @@ export function crearImportadorCsv(config) {
     validarFila,
     claveNatural,
     describir,
-    camposNoActualizables = []
+    camposNoActualizables = [],
+    prepararContexto = null
   } = config;
 
   return async function importar(contexto) {
@@ -53,12 +71,14 @@ export function crearImportadorCsv(config) {
       return responderSolicitudInvalida(res, 'El archivo no tiene filas de datos.');
     }
 
+    const contextoExtra = prepararContexto ? await prepararContexto() : null;
+
     const resultado = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
 
     for (const fila of filas) {
       const numeroLinea = fila._linea;
       try {
-        const datos = mapearFila(fila);
+        const datos = mapearFila(fila, contextoExtra);
 
         const problema = validarFila(datos, fila);
         if (problema) {
@@ -70,10 +90,16 @@ export function crearImportadorCsv(config) {
 
         const existente = await repositorio.buscarUno(claveNatural(datos), 'id');
 
+        // Los campos que empiezan con guion bajo son de trabajo, no columnas:
+        // mapearFila los usa para pasarle información a validarFila (empleados
+        // manda ahí el problema al resolver el departamento). Si se colaran al
+        // insert, Postgres rechazaría la fila entera por una columna inexistente.
+        const paraGuardar = sinCamposAuxiliares(datos);
+
         if (existente && existente.id) {
           // Al actualizar no pisamos la clave natural: si alguien edita el DUI
           // en el CSV lo que quiere es crear a otra persona, no renombrar a esta.
-          const paraActualizar = { ...datos };
+          const paraActualizar = { ...paraGuardar };
           for (const campo of camposNoActualizables) delete paraActualizar[campo];
 
           await repositorio.actualizar(existente.id, paraActualizar);
@@ -84,7 +110,7 @@ export function crearImportadorCsv(config) {
             mensaje: describir(datos)
           });
         } else {
-          await repositorio.insertar(datos);
+          await repositorio.insertar(paraGuardar);
           resultado.insertados++;
           resultado.detalle.push({
             linea: numeroLinea,

@@ -6,13 +6,23 @@
                     marcador="Nombre, DUI, código o cargo">
       <template #acciones>
         <button type="button" @click="exportar('empleados')" class="boton boton-secundario">
-          <i class="fa-solid fa-file-arrow-down"></i> Exportar
+          <i class="fa-solid fa-file-excel"></i> Exportar
+        </button>
+
+        <!-- La plantilla vacía con los encabezados y una fila de ejemplo. Sin
+             ella nadie sabe cómo se escribe la fecha ni que el departamento va
+             por su nombre. -->
+        <button v-if="permisos.tienePermiso('empleados', 'Agregar')"
+                type="button" @click="descargarPlantilla('empleados')"
+                class="boton boton-secundario"
+                title="Excel vacío con las columnas que espera la importación">
+          <i class="fa-solid fa-file-arrow-down"></i> Plantilla
         </button>
 
         <label v-if="permisos.tienePermiso('empleados', 'Agregar')"
                class="boton boton-secundario cursor-pointer">
           <i class="fa-solid fa-file-arrow-up"></i> Importar
-          <input type="file" accept=".csv,text/csv" class="hidden" @change="importarEmpleados($event)" />
+          <input type="file" accept=".xlsx,.xlsm,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" @change="importarEmpleados($event)" />
         </label>
 
         <button v-if="permisos.tienePermiso('empleados', 'Agregar')"

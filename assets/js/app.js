@@ -18,6 +18,7 @@ import * as formato from './nucleo/formato.js';
 
 import { api } from './servicios/servicioApi.js';
 import { servicioInvitacion } from './servicios/servicioInvitacion.js';
+import { descargarXlsx } from './servicios/servicioExcel.js';
 import {
   disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
   urlQr, descargarQr, enlaceInvitacion
@@ -549,12 +550,164 @@ async function iniciar() {
       const importarDepartamentos = (evento) =>
         importacion.importar(evento, 'departamentos', (csv) => api.departamentos.importar(csv));
 
+      // =====================================================================
+      // Exportación a Excel
+      //
+      // Antes esto bajaba un CSV que armaba el servidor. Dos problemas: Excel
+      // abre los CSV con el separador de la configuración regional (en la
+      // mayoría de las máquinas de la alcaldía es el punto y coma, así que
+      // todo caía en una sola columna), y la columna de departamento traía el
+      // UUID, ilegible e imposible de corregir a mano.
+      //
+      // Ahora se genera un .xlsx en el navegador, con los datos que ya están
+      // cargados. Sin viaje al servidor y con el departamento por su nombre.
+      // =====================================================================
+
+      /**
+       * Qué columnas lleva cada catálogo.
+       *
+       * Los encabezados son los nombres internos y no títulos bonitos a
+       * propósito: el importador busca las columnas por su nombre, así que
+       * "fecha_nacimiento" se reconoce al reimportar y "Fecha de nacimiento"
+       * no. El archivo se edita en Excel y vuelve, y eso pesa más que la
+       * estética.
+       *
+       * El `id` de la fila no va: el importador nunca lo usa (empareja por DUI
+       * y por nombre de departamento) y una columna de UUID solo estorba a
+       * quien tiene que corregir el archivo.
+       */
+      const COLUMNAS_EXPORTACION = {
+        empleados: {
+          nombreArchivo: 'empleados',
+          hoja: 'Empleados',
+          encabezados: [
+            'nombres', 'apellidos', 'dui', 'codigo', 'departamento',
+            'cargo', 'distrito', 'fecha_nacimiento', 'telefono', 'correo', 'activo'
+          ],
+          ejemplo: [
+            'Ana María', 'López Portillo', '01234567-8', 'EMP-001', 'Obras Públicas',
+            'Analista', 'Panchimalco', '1990-03-24', '70001234', 'ana.lopez@ejemplo.sv', 'TRUE'
+          ],
+          /**
+           * Columnas que se eligen de un desplegable en vez de escribirse.
+           *
+           * Es la diferencia entre un archivo que importa limpio y uno que
+           * falla fila por fila: "Panchimalco" escrito a mano aparece también
+           * como "PANCHIMALCO", "panchimalco " con espacio al final y
+           * "Panchimalko". El departamento además tiene que existir en el
+           * catálogo, o el importador rechaza la fila.
+           *
+           * Solo los departamentos activos: ofrecer uno dado de baja sería
+           * invitar a asignar gente a un departamento que ya no opera.
+           */
+          listas: () => [
+            { columna: 'distrito', titulo: 'Distrito', valores: [...DISTRITOS] },
+            {
+              columna: 'departamento',
+              titulo: 'Departamento',
+              valores: departamentos.lista
+                .filter((fila) => formato.esVerdadero(fila.activo))
+                .map((fila) => fila.nombre_dpto)
+                .filter(Boolean)
+                .sort((a, b) => a.localeCompare(b, 'es'))
+            }
+          ],
+
+          filas: () => empleados.lista.map((persona) => [
+            persona.nombres || '',
+            persona.apellidos || '',
+            formato.formatearDui(persona.dui),
+            persona.codigo || '',
+            nombreDeDepartamento(persona.dpto),
+            persona.cargo || '',
+            persona.distrito || '',
+            formato.aFechaIso(persona.fecha_nacimiento),
+            persona.telefono || '',
+            persona.correo || '',
+            formato.esVerdadero(persona.activo) ? 'TRUE' : 'FALSE'
+          ])
+        },
+
+        departamentos: {
+          nombreArchivo: 'departamentos',
+          hoja: 'Departamentos',
+          encabezados: ['cod_dpto', 'nombre_dpto', 'activo'],
+          ejemplo: ['OP-01', 'Obras Públicas', 'TRUE'],
+          filas: () => departamentos.lista.map((fila) => [
+            fila.cod_dpto || '',
+            fila.nombre_dpto || '',
+            formato.esVerdadero(fila.activo) ? 'TRUE' : 'FALSE'
+          ])
+        }
+      };
+
+      /** El nombre del departamento a partir de su id, para la exportación. */
+      function nombreDeDepartamento(id) {
+        if (!id) return '';
+        const encontrado = departamentos.lista.find((fila) => fila.id === id);
+        return encontrado ? encontrado.nombre_dpto || '' : '';
+      }
+
+      /** Fecha de hoy para el nombre del archivo: 2026-08-20. */
+      function hoy() {
+        return new Date().toISOString().slice(0, 10);
+      }
+
       async function exportar(recurso) {
+        const definicion = COLUMNAS_EXPORTACION[recurso];
+        if (!definicion) return;
+
         try {
-          await api[recurso].exportar();
-          notificarExito('La descarga comenzó.');
+          const filas = definicion.filas();
+          if (filas.length === 0) {
+            notificarAlerta('No hay nada que exportar todavía.');
+            return;
+          }
+
+          await descargarXlsx({
+            encabezados: definicion.encabezados,
+            filas,
+            nombreHoja: definicion.hoja,
+            nombreArchivo: `${definicion.nombreArchivo}-${hoy()}.xlsx`
+          });
+
+          notificarExito(`${filas.length} registros exportados.`);
         } catch (fallo) {
+          console.error('[exportar]', fallo);
           notificarError(fallo.message || 'No se pudo exportar.');
+        }
+      }
+
+      /**
+       * Baja un Excel vacío con los encabezados y una fila de ejemplo.
+       *
+       * La fila de ejemplo importa más de lo que parece: sin ella nadie sabe si
+       * la fecha va como 24/03/1990 o 1990-03-24, ni que el departamento se
+       * escribe por su nombre y tiene que existir antes en el catálogo.
+       */
+      async function descargarPlantilla(recurso) {
+        const definicion = COLUMNAS_EXPORTACION[recurso];
+        if (!definicion) return;
+
+        try {
+          const listas = definicion.listas ? definicion.listas() : [];
+
+          await descargarXlsx({
+            encabezados: definicion.encabezados,
+            filas: [definicion.ejemplo],
+            nombreHoja: definicion.hoja,
+            nombreArchivo: `plantilla-${definicion.nombreArchivo}.xlsx`,
+            listas
+          });
+
+          notificarInfo(
+            listas.length > 0
+              ? 'Reemplaza la fila de ejemplo con tus datos. Distrito y departamento se eligen de una lista.'
+              : 'Reemplaza la fila de ejemplo con tus datos y vuelve a subirla.'
+          );
+        } catch (fallo) {
+          console.error('[plantilla]', fallo);
+          notificarError(fallo.message || 'No se pudo generar la plantilla.');
         }
       }
 
@@ -1228,7 +1381,7 @@ async function iniciar() {
         sincronizacion,
 
         // Importar / exportar
-        importacion, importarEmpleados, importarDepartamentos, exportar,
+        importacion, importarEmpleados, importarDepartamentos, exportar, descargarPlantilla,
 
         // Eventos y sorteos
         activarEvento, sortear, sorteando, ganador, errorSorteo, sorteoElegido,

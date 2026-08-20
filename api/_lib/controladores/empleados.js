@@ -12,6 +12,7 @@ import { generarCsv } from '../csv.js';
 import { responderOk, responderDescargaCsv } from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 import { crearImportadorCsv } from './importacionCsv.js';
+import { repositorioDepartamentos } from './departamentos.js';
 
 const COLUMNAS_CSV = [
   'id', 'distrito', 'dpto', 'cargo', 'nombres', 'apellidos',
@@ -66,6 +67,51 @@ async function listarParaTarjetas({ res }) {
   return responderOk(res, filas);
 }
 
+/**
+ * Traduce el departamento que viene en el archivo a su id.
+ *
+ * La exportación muestra el NOMBRE del departamento, no su UUID: un archivo
+ * lleno de "9f3c8a12-…" es ilegible y nadie puede corregirlo en Excel. Pero la
+ * columna `dpto` de la base guarda el id, así que al reimportar hay que
+ * traducir de vuelta.
+ *
+ * Se aceptan las dos formas. Si el valor es un UUID se usa tal cual, para que
+ * los archivos exportados antes de este cambio sigan sirviendo. Si no, se busca
+ * por nombre ignorando mayúsculas y tildes, que es como la gente lo escribe.
+ *
+ * Devuelve `{ id }` si se resolvió, o `{ error }` con una explicación. No se
+ * inventa un departamento ni se deja en blanco en silencio: un empleado en el
+ * departamento equivocado es peor que una fila que falla y se puede corregir.
+ */
+function resolverDepartamento(valor, departamentos) {
+  const crudo = aTexto(valor);
+  if (!crudo) return { id: null };
+
+  if (ES_UUID.test(crudo)) return { id: crudo };
+
+  const buscado = normalizarNombre(crudo);
+  const encontrado = (departamentos || []).find(
+    (fila) => normalizarNombre(fila.nombre_dpto) === buscado ||
+              normalizarNombre(fila.cod_dpto) === buscado
+  );
+
+  if (encontrado) return { id: encontrado.id };
+
+  return { error: `el departamento "${crudo}" no existe en el catálogo` };
+}
+
+/** Para comparar nombres escritos a mano: sin tildes, sin dobles espacios. */
+function normalizarNombre(valor) {
+  return aTexto(valor)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function exportarCsv({ res }) {
   const filas = await repositorioEmpleados.listar({}, COLUMNAS_CSV.join(', '));
   return responderDescargaCsv(res, 'empleados.csv', generarCsv(filas, COLUMNAS_CSV));
@@ -73,23 +119,43 @@ async function exportarCsv({ res }) {
 
 const importarCsv = crearImportadorCsv({
   repositorio: repositorioEmpleados,
-  mapearFila: (fila) => ({
-    distrito: aTexto(fila.distrito),
-    dpto: aTexto(fila.dpto) || null,
-    cargo: aTexto(fila.cargo),
-    nombres: aTexto(fila.nombres),
-    apellidos: aTexto(fila.apellidos),
-    fecha_nacimiento: aTexto(fila.fecha_nacimiento),
-    telefono: aTexto(fila.telefono),
-    correo: aTexto(fila.correo),
-    dui: normalizarDui(fila.dui),
-    codigo: aTexto(fila.codigo),
-    activo: aBandera(fila.activo ?? 'TRUE')
+
+  // El catálogo de departamentos se trae una sola vez, antes de recorrer las
+  // filas: buscarlo por cada empleado serían cientos de consultas y la función
+  // se pasaría del tiempo límite de Vercel.
+  prepararContexto: async () => ({
+    departamentos: await repositorioDepartamentos.listar({}, 'id, cod_dpto, nombre_dpto')
   }),
+
+  mapearFila: (fila, contexto) => {
+    // Se acepta el nombre en cualquiera de las formas en que puede venir el
+    // encabezado, porque la exportación lo llama "departamento" y los archivos
+    // viejos lo llamaban "dpto".
+    const departamento = resolverDepartamento(
+      fila.departamento ?? fila.nombre_dpto ?? fila.dpto,
+      contexto && contexto.departamentos
+    );
+
+    return {
+      distrito: aTexto(fila.distrito),
+      dpto: departamento.id ?? null,
+      _errorDepartamento: departamento.error || null,
+      cargo: aTexto(fila.cargo),
+      nombres: aTexto(fila.nombres),
+      apellidos: aTexto(fila.apellidos),
+      fecha_nacimiento: aTexto(fila.fecha_nacimiento),
+      telefono: aTexto(fila.telefono),
+      correo: aTexto(fila.correo),
+      dui: normalizarDui(fila.dui),
+      codigo: aTexto(fila.codigo),
+      activo: aBandera(fila.activo ?? 'TRUE')
+    };
+  },
   validarFila: (datos) => {
     if (!datos.nombres || !datos.apellidos) return 'nombres y apellidos son obligatorios';
     if (!datos.dui) return 'el DUI es obligatorio';
     if (datos.dui.length !== 9) return `el DUI "${datos.dui}" no tiene 9 dígitos`;
+    if (datos._errorDepartamento) return datos._errorDepartamento;
     return null;
   },
   claveNatural: (datos) => ({ dui: datos.dui }),
