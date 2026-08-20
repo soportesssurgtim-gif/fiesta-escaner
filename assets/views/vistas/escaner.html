@@ -267,6 +267,45 @@
         {{ escaner.escaneando ? 'Escaneando' : 'Detenido' }}
       </span>
 
+      <!--
+        Cambiar de cámara.
+
+        Solo aparece si el teléfono tiene más de una. Es la salida cuando el
+        navegador abrió la gran angular, que no enfoca de cerca y deja el QR
+        borroso: el escáner se ve funcionando y sin embargo no lee nada.
+        La elección se recuerda, así que se ajusta una vez por teléfono.
+      -->
+      <div v-if="escaner.camaras.length > 1" class="relative shrink-0">
+        <button type="button"
+                @click="escaner.selectorCamarasAbierto = !escaner.selectorCamarasAbierto"
+                class="flex h-10 w-10 items-center justify-center rounded-lg text-gray-300 transition hover:bg-white/10 hover:text-white"
+                aria-label="Cambiar de cámara">
+          <i class="fa-solid fa-camera-rotate text-theme-xl"></i>
+        </button>
+
+        <div v-if="escaner.selectorCamarasAbierto"
+             class="animar-aparecer absolute right-0 top-full z-10 mt-2 w-64 rounded-xl border border-white/10 bg-gray-900 p-2 shadow-theme-lg">
+          <p class="px-2 pb-2 pt-1 text-theme-xs text-gray-400">
+            Si el código no se lee, prueba otra cámara.
+          </p>
+
+          <button v-for="camara in escaner.camaras" :key="camara.id"
+                  type="button"
+                  @click="escaner.cambiarCamara(camara.id)"
+                  class="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-theme-sm transition"
+                  :class="camara.id === escaner.camaraElegida
+                          ? 'bg-brand-500/20 text-brand-300'
+                          : 'text-gray-300 hover:bg-white/5'">
+            <i class="fa-solid w-4 shrink-0 text-theme-xs"
+               :class="camara.id === escaner.camaraElegida ? 'fa-circle-check' : 'fa-camera'"></i>
+            <span class="min-w-0 flex-1 truncate">{{ camara.etiqueta }}</span>
+            <i v-if="camara.esGranAngular"
+               class="fa-solid fa-triangle-exclamation shrink-0 text-theme-xs text-warning-400"
+               title="Las gran angular no enfocan de cerca"></i>
+          </button>
+        </div>
+      </div>
+
       <button type="button" @click="escaner.detener()"
               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-300 transition hover:bg-white/10 hover:text-white"
               aria-label="Cerrar la cámara">
@@ -282,6 +321,18 @@
            class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900">
         <i class="fa-solid fa-circle-notch animar-girar text-3xl text-brand-400"></i>
         <p class="text-theme-sm text-gray-300">Abriendo la cámara…</p>
+      </div>
+
+      <!-- El síntoma de la gran angular engaña: la imagen se ve nítida y aun
+           así el QR de cerca nunca entra. Sin decirlo, el operador concluye
+           que el escáner está roto. -->
+      <div v-if="escaner.usandoGranAngular && escaner.escaneando"
+           class="absolute inset-x-3 top-3 z-10 flex gap-2.5 rounded-xl bg-warning-500/95 p-3">
+        <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0 text-white"></i>
+        <p class="text-theme-xs leading-snug text-white">
+          Esta es la cámara gran angular y no enfoca de cerca. Toca el ícono de
+          cámaras, arriba, y elige otra.
+        </p>
       </div>
 
       <!-- Marco de puntería. Sin eventos de puntero para no tapar el toque de
