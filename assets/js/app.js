@@ -925,7 +925,11 @@ async function iniciar() {
         abierto: false,
         persona: null,
         campoQr: 'dui',
-        generando: false
+        generando: false,
+        // '' | 'baja' | 'definitivo'. Qué confirmación está a la vista.
+        confirmando: '',
+        trabajando: false,
+        error: ''
       });
 
       // El QR no se pide al backend: es una URL de QuickChart que se arma acá,
@@ -968,6 +972,8 @@ async function iniciar() {
         detalle.persona = persona;
         detalle.campoQr = 'dui';
         detalle.abierto = true;
+        detalle.confirmando = '';
+        detalle.error = '';
         // Saber si hay plantillas define si se puede ofrecer la tarjeta
         // completa o solamente el QR suelto.
         if (plantillas.value.length === 0) cargarPlantillas();
@@ -976,6 +982,41 @@ async function iniciar() {
       function cerrarDetalle() {
         detalle.abierto = false;
         detalle.persona = null;
+        detalle.confirmando = '';
+        detalle.error = '';
+      }
+
+      /**
+       * Baja y borrado de un empleado.
+       *
+       * Son dos cosas distintas y la interfaz las separa a propósito:
+       *
+       *   · Dar de baja apaga la bandera `activo`. La persona sale del escáner
+       *     y de las tarjetas, pero su historial de asistencias sigue ahí. Es
+       *     lo que se hace el 99% de las veces, y lo puede hacer cualquiera con
+       *     permiso de eliminar sobre el módulo.
+       *
+       *   · Borrar definitivamente se lleva la fila. Solo administradores, y
+       *     el servidor lo niega si la persona tiene asistencias, premios o una
+       *     cuenta: eso se llevaría por delante el registro de un evento que ya
+       *     pasó y no se puede reconstruir.
+       */
+      async function ejecutarBaja(definitivo) {
+        if (!detalle.persona) return;
+
+        detalle.trabajando = true;
+        detalle.error = '';
+
+        try {
+          const resultado = await api.empleados.eliminar(detalle.persona.id, definitivo);
+          notificarExito(resultado.mensaje || 'Listo.');
+          cerrarDetalle();
+          await recargarCatalogos();
+        } catch (fallo) {
+          detalle.error = fallo.message || 'No se pudo completar la operación.';
+        } finally {
+          detalle.trabajando = false;
+        }
       }
 
       /** Pasa al formulario de edición sin dejar los dos modales encimados. */
@@ -1398,7 +1439,7 @@ async function iniciar() {
 
         // Detalle de un empleado
         detalle, qrDetalle, enlaceDetalle, departamentoDetalle, asistenciaDetalle,
-        abrirDetalle, cerrarDetalle, editarDesdeDetalle,
+        abrirDetalle, cerrarDetalle, editarDesdeDetalle, ejecutarBaja,
         descargarQrDetalle, copiarEnlaceDetalle, generarTarjetaDetalle,
 
         // Configuración

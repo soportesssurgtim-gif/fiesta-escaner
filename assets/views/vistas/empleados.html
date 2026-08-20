@@ -217,10 +217,84 @@
         </div>
       </div>
 
-      <div class="mt-6 flex gap-3">
+      <!--
+        Baja y borrado.
+
+        Son dos operaciones distintas y por eso son dos botones y no uno con un
+        menú: dar de baja es reversible y se usa siempre; borrar no tiene vuelta
+        atrás y solo lo ve un administrador.
+
+        La confirmación va en línea y no en otro modal encima: apilar diálogos
+        en un teléfono deja el segundo sin lugar.
+      -->
+      <div v-if="detalle.confirmando"
+           class="mt-6 rounded-xl border p-3"
+           :class="detalle.confirmando === 'definitivo'
+                   ? 'border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10'
+                   : 'border-warning-200 bg-warning-50 dark:border-warning-500/30 dark:bg-warning-500/10'">
+
+        <p class="text-theme-sm font-medium"
+           :class="detalle.confirmando === 'definitivo'
+                   ? 'text-error-700 dark:text-error-400'
+                   : 'text-warning-700 dark:text-warning-400'">
+          {{ detalle.confirmando === 'definitivo'
+             ? '¿Borrar definitivamente a ' + nombreCompleto(detalle.persona) + '?'
+             : '¿Dar de baja a ' + nombreCompleto(detalle.persona) + '?' }}
+        </p>
+
+        <p class="mt-1 text-theme-xs"
+           :class="detalle.confirmando === 'definitivo'
+                   ? 'text-error-700 dark:text-error-400'
+                   : 'text-warning-700 dark:text-warning-400'">
+          {{ detalle.confirmando === 'definitivo'
+             ? 'Se borra la ficha y no se puede deshacer. Si tiene asistencias o una cuenta, el sistema no lo va a permitir.'
+             : 'Deja de aparecer en el escáner y en las tarjetas, pero su historial se conserva. Se puede reactivar editándolo.' }}
+        </p>
+
+        <div class="mt-3 flex gap-2">
+          <button type="button" @click="detalle.confirmando = ''"
+                  class="boton boton-secundario flex-1"
+                  :disabled="detalle.trabajando">
+            Cancelar
+          </button>
+          <button type="button"
+                  @click="ejecutarBaja(detalle.confirmando === 'definitivo')"
+                  class="boton flex-1"
+                  :class="detalle.confirmando === 'definitivo' ? 'boton-peligro' : 'boton-primario'"
+                  :disabled="detalle.trabajando">
+            <i v-if="detalle.trabajando" class="fa-solid fa-circle-notch animar-girar"></i>
+            {{ detalle.confirmando === 'definitivo' ? 'Sí, borrar' : 'Sí, dar de baja' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="detalle.error"
+           class="mt-4 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 dark:border-error-500/30 dark:bg-error-500/10">
+        <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0 text-error-500"></i>
+        <p class="text-theme-sm text-error-700 dark:text-error-400">{{ detalle.error }}</p>
+      </div>
+
+      <div class="mt-6 flex flex-wrap gap-3">
         <button type="button" @click="cerrarDetalle()" class="boton boton-secundario flex-1">
           Cerrar
         </button>
+
+        <button v-if="permisos.tienePermiso('empleados', 'Eliminar') && esVerdadero(detalle.persona.activo)"
+                type="button" @click="detalle.confirmando = 'baja'"
+                class="boton boton-secundario flex-1 text-warning-600 dark:text-warning-400"
+                :disabled="detalle.trabajando">
+          <i class="fa-solid fa-user-slash"></i> Dar de baja
+        </button>
+
+        <!-- Solo el administrador. El servidor lo vuelve a comprobar. -->
+        <button v-if="permisos.esAdministrador"
+                type="button" @click="detalle.confirmando = 'definitivo'"
+                class="boton boton-secundario flex-1 text-error-600 dark:text-error-400"
+                :disabled="detalle.trabajando"
+                title="Borra la ficha por completo. No se puede deshacer.">
+          <i class="fa-solid fa-trash"></i> Eliminar
+        </button>
+
         <button v-if="permisos.tienePermiso('empleados', 'Editar')"
                 type="button" @click="editarDesdeDetalle()" class="boton boton-primario flex-1">
           <i class="fa-solid fa-pen"></i> Editar

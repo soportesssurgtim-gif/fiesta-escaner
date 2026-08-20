@@ -5,11 +5,20 @@
  * sorteos. El DUI es la clave natural y tiene índice único en la base.
  */
 
+import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
-import { TABLAS } from '../configuracion.js';
-import { aTexto, aBandera, normalizarDui } from '../valores.js';
+import { TABLAS, NO } from '../configuracion.js';
+import { aTexto, aBandera, esVerdadero, normalizarDui } from '../valores.js';
 import { generarCsv } from '../csv.js';
-import { responderOk, responderDescargaCsv } from '../respuestas.js';
+import { leerCuerpo } from '../peticion.js';
+import { esAdministrador, puedeEnModulo } from '../seguridad.js';
+import {
+  responderOk,
+  responderDescargaCsv,
+  responderSolicitudInvalida,
+  responderNoEncontrado,
+  responderSinPermiso
+} from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 import { crearImportadorCsv } from './importacionCsv.js';
 import { repositorioDepartamentos } from './departamentos.js';
@@ -163,6 +172,110 @@ const importarCsv = crearImportadorCsv({
   camposNoActualizables: ['dui']
 });
 
+/**
+ * Da de baja a un empleado, o lo borra del todo.
+ *
+ * Son dos operaciones muy distintas y por eso conviven en la misma acción con
+ * una bandera, en vez de esconderse detrás del mismo botón:
+ *
+ *   · Baja (lo normal)  → `activo = FALSE`. La persona deja de aparecer en el
+ *     escáner y en las tarjetas, pero su historial de asistencias sigue en pie.
+ *     Alcanza con tener el permiso de eliminar sobre el módulo.
+ *
+ *   · Borrado definitivo → se va la fila. Solo administradores, porque no tiene
+ *     vuelta atrás.
+ *
+ * El borrado definitivo se niega si la persona tiene algo colgando. Tres tablas
+ * apuntan a empleados (asistencias, ganadores y usuarios), así que borrarla
+ * rompería la integridad o, peor, se llevaría por delante el registro de que
+ * asistió a un evento pasado. Un evento no se repite para reconstruir eso, así
+ * que se explica y no se borra.
+ */
+async function eliminarEmpleado({ req, res, sesion }) {
+  const cuerpo = await leerCuerpo(req);
+  const id = aTexto(cuerpo.id);
+
+  if (!id) {
+    return responderSolicitudInvalida(res, 'Falta indicar a quién dar de baja.');
+  }
+
+  const definitivo = esVerdadero(cuerpo.definitivo);
+
+  if (definitivo && !esAdministrador(sesion.rol)) {
+    return responderSinPermiso(
+      res,
+      'Solo un administrador puede borrar a un empleado de forma definitiva.'
+    );
+  }
+
+  if (!definitivo && !(await puedeEnModulo(sesion, 'empleados', 'eliminar'))) {
+    return responderSinPermiso(res, 'No tienes permiso para dar de baja empleados.');
+  }
+
+  const empleado = await repositorioEmpleados.obtenerPorId(id, 'id, nombres, apellidos, activo');
+  if (!empleado) {
+    return responderNoEncontrado(res, 'Ese empleado ya no existe.');
+  }
+
+  const nombre = `${empleado.nombres || ''} ${empleado.apellidos || ''}`.trim();
+
+  if (!definitivo) {
+    await repositorioEmpleados.actualizar(id, { activo: NO });
+    return responderOk(res, {
+      ok: true,
+      definitivo: false,
+      nombre,
+      mensaje: `${nombre} quedó dado de baja.`
+    });
+  }
+
+  const dependencias = await contarDependencias(id);
+  const total = dependencias.reduce((suma, d) => suma + d.cantidad, 0);
+
+  if (total > 0) {
+    const detalle = dependencias
+      .filter((d) => d.cantidad > 0)
+      .map((d) => `${d.cantidad} ${d.etiqueta}`)
+      .join(', ');
+
+    return responderSolicitudInvalida(
+      res,
+      `No se puede borrar a ${nombre}: tiene ${detalle}. ` +
+      'Dale de baja en lugar de borrarlo, o vacía esos registros desde Configuración.'
+    );
+  }
+
+  await repositorioEmpleados.eliminar(id);
+
+  console.info(`[empleados] ${sesion.usuario || 'desconocido'} borró definitivamente a ${nombre}`);
+
+  return responderOk(res, {
+    ok: true,
+    definitivo: true,
+    nombre,
+    mensaje: `${nombre} se borró definitivamente.`
+  });
+}
+
+/** Qué hay colgando de este empleado y no deja borrarlo. */
+async function contarDependencias(idEmpleado) {
+  const contar = async (tabla, columna, etiqueta) => {
+    const { count, error } = await supabase
+      .from(tabla)
+      .select('id', { count: 'exact', head: true })
+      .eq(columna, idEmpleado);
+
+    if (error) throw error;
+    return { etiqueta, cantidad: count || 0 };
+  };
+
+  return Promise.all([
+    contar(TABLAS.asistencias, 'empleado', 'asistencias registradas'),
+    contar(TABLAS.ganadores, 'empleado', 'premios ganados'),
+    contar(TABLAS.usuarios, 'empleado', 'cuentas de acceso')
+  ]);
+}
+
 export const controladorEmpleados = crearControladorCatalogo({
   repositorio: repositorioEmpleados,
 
@@ -196,6 +309,7 @@ export const controladorEmpleados = crearControladorCatalogo({
     'GET tarjetas': listarParaTarjetas,
     'GET exportar-csv': exportarCsv,
     'POST importar-csv': importarCsv,
-    'PUT importar-csv': importarCsv
+    'PUT importar-csv': importarCsv,
+    'POST eliminar': eliminarEmpleado
   }
 });

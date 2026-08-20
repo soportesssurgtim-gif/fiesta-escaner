@@ -61,6 +61,14 @@ export const api = {
     },
     importar(csv) {
       return http.enviar('empleados', { csv }, { accion: 'importar-csv' });
+    },
+    /**
+     * Da de baja a alguien, o lo borra del todo.
+     * Con `definitivo` la fila desaparece y solo lo permite un administrador;
+     * sin él, se apaga la bandera `activo` y el historial queda intacto.
+     */
+    eliminar(id, definitivo = false) {
+      return http.enviar('empleados', { id, definitivo }, { accion: 'eliminar' });
     }
   },
 

@@ -13,7 +13,7 @@
 
 import crypto from 'crypto';
 import { supabase } from './supabase.js';
-import { DURACION_SESION_SEGUNDOS, TABLAS, ROLES_ADMINISTRADORES } from './configuracion.js';
+import { DURACION_SESION_SEGUNDOS, TABLAS, ROLES_ADMINISTRADORES, SI } from './configuracion.js';
 
 /**
  * Hash SHA-256.
@@ -116,6 +116,46 @@ export async function purgarSesionesVencidas() {
 /** ¿El nombre de rol corresponde a un administrador con acceso total? */
 export function esAdministrador(rol) {
   return ROLES_ADMINISTRADORES.includes(String(rol || '').trim().toUpperCase());
+}
+
+/**
+ * ¿Este rol puede hacer esta acción en este módulo?
+ *
+ * Hasta ahora el backend solo distinguía administrador de no administrador, y
+ * la matriz de permisos servía únicamente para mostrar u ocultar botones. Eso
+ * alcanza para pantallas de solo lectura, pero no para una baja: hace falta
+ * poder decir "este rol puede dar de baja empleados" y que el servidor lo
+ * respete de verdad.
+ *
+ * Los administradores pasan sin consultar nada: su rol implica acceso total.
+ *
+ * @param {Object} sesion
+ * @param {string} modulo   'empleados', 'eventos'…
+ * @param {string} accion   'ver' | 'agregar' | 'editar' | 'eliminar'
+ */
+export async function puedeEnModulo(sesion, modulo, accion) {
+  if (!sesion) return false;
+  if (esAdministrador(sesion.rol)) return true;
+  if (!sesion.rolId) return false;
+
+  const columna = `puede_${String(accion || '').toLowerCase()}`;
+
+  try {
+    const { data, error } = await supabase
+      .from(TABLAS.permisos)
+      .select(columna)
+      .eq('rol', sesion.rolId)
+      .eq('modulo', modulo)
+      .maybeSingle();
+
+    if (error || !data) return false;
+    return String(data[columna] || '').trim().toUpperCase() === SI;
+  } catch (fallo) {
+    // Ante la duda, no. Un fallo al leer los permisos no puede convertirse en
+    // un permiso concedido.
+    console.error('[seguridad] No se pudieron leer los permisos:', fallo);
+    return false;
+  }
 }
 
 /**
