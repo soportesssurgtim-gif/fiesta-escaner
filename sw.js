@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v2.8.0';
+const VERSION_CACHE = 'v2.9.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -66,6 +66,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/servicios/servicioTarjetas.js',
 
   // Composables
+  '/assets/js/composables/usarBuscadorPersonas.js',
   '/assets/js/composables/usarCatalogo.js',
   '/assets/js/composables/usarEscanerQr.js',
   '/assets/js/composables/usarImportacionCsv.js',
@@ -85,6 +86,7 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/barra-lateral.html',
   '/assets/views/parciales/encabezado.html',
   '/assets/views/parciales/login.html',
+  '/assets/views/parciales/modal-buscar-persona.html',
   '/assets/views/parciales/modal-cambiar-clave.html',
   '/assets/views/parciales/modal-cierre-sesion.html',
   '/assets/views/parciales/modal-guia.html',

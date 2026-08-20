@@ -121,6 +121,23 @@ export function recortar(texto, largoMaximo = 40) {
 }
 
 /**
+ * Fecha en el formato que se lee de un vistazo: "24/03/1985".
+ *
+ * Es el que se usa en las exportaciones y en las plantillas de Excel. En la
+ * base se guarda siempre en ISO (yyyy-mm-dd), que es inequívoco y ordena bien,
+ * pero nadie escribe una fecha así en una planilla.
+ *
+ * Acepta lo que sea que haya en la base: ISO, día/mes/año de los registros
+ * viejos importados desde Excel, o vacío.
+ */
+export function formatearFechaCorta(valor) {
+  const iso = aFechaIso(valor);
+  if (!iso) return '';
+  const [anio, mes, dia] = iso.split('-');
+  return `${dia}/${mes}/${anio}`;
+}
+
+/**
  * Normaliza una fecha al formato ISO "1985-03-24" que espera <input type="date">.
  *
  * Hace falta porque algunos registros viejos se importaron desde Excel con el

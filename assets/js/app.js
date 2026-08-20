@@ -32,6 +32,7 @@ import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
+import { usarBuscadorPersonas } from './composables/usarBuscadorPersonas.js';
 
 import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -473,6 +474,23 @@ async function iniciar() {
       });
 
       // =====================================================================
+      // Buscar a una persona desde la puerta
+      //
+      // El plan C cuando el QR no aparece: no guardó su invitación, se quedó
+      // sin batería, o no se sabe el DUI. Antes, sin el DUI no había forma.
+      // =====================================================================
+
+      const buscador = usarBuscadorPersonas({
+        obtenerEmpleados: () => empleados.lista,
+        obtenerDepartamentos: () => departamentos.lista,
+        obtenerAsistencias: () => asistencias.value,
+        obtenerEventoActivo: () => eventoActivo.value,
+        // Pasa por el mismo camino que un escaneo: misma cola, mismos
+        // reintentos, mismo respaldo local si no hay señal.
+        alElegir: (identificador) => escaner.registrar(identificador)
+      });
+
+      // =====================================================================
       // Refresco periódico de asistencias
       //
       // En la puerta suele haber más de una tablet escaneando. Sin esto cada
@@ -586,7 +604,7 @@ async function iniciar() {
           ],
           ejemplo: [
             'Ana María', 'López Portillo', '01234567-8', 'EMP-001', 'Obras Públicas',
-            'Analista', 'Panchimalco', '1990-03-24', '70001234', 'ana.lopez@ejemplo.sv', 'TRUE'
+            'Analista', 'Panchimalco', '24/03/1990', '70001234', 'ana.lopez@ejemplo.sv', 'TRUE'
           ],
           /**
            * Columnas que se eligen de un desplegable en vez de escribirse.
@@ -621,7 +639,7 @@ async function iniciar() {
             nombreDeDepartamento(persona.dpto),
             persona.cargo || '',
             persona.distrito || '',
-            formato.aFechaIso(persona.fecha_nacimiento),
+            formato.formatearFechaCorta(persona.fecha_nacimiento),
             persona.telefono || '',
             persona.correo || '',
             formato.esVerdadero(persona.activo) ? 'TRUE' : 'FALSE'
@@ -1417,6 +1435,9 @@ async function iniciar() {
 
         // Registros pendientes en el dispositivo
         pendientes,
+
+        // Buscador de personas
+        buscador,
 
         // Refresco periódico
         sincronizacion,

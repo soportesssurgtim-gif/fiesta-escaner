@@ -8,7 +8,7 @@
 import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
 import { TABLAS, NO } from '../configuracion.js';
-import { aTexto, aBandera, esVerdadero, normalizarDui } from '../valores.js';
+import { aTexto, aBandera, esVerdadero, normalizarDui, aFechaIso } from '../valores.js';
 import { generarCsv } from '../csv.js';
 import { leerCuerpo } from '../peticion.js';
 import { esAdministrador, puedeEnModulo } from '../seguridad.js';
@@ -152,7 +152,9 @@ const importarCsv = crearImportadorCsv({
       cargo: aTexto(fila.cargo),
       nombres: aTexto(fila.nombres),
       apellidos: aTexto(fila.apellidos),
-      fecha_nacimiento: aTexto(fila.fecha_nacimiento),
+      // Se normaliza a ISO: a la importación llega en dd/mm/yyyy, en ISO, o
+      // como el número de días de Excel.
+      fecha_nacimiento: aFechaIso(fila.fecha_nacimiento),
       telefono: aTexto(fila.telefono),
       correo: aTexto(fila.correo),
       dui: normalizarDui(fila.dui),
@@ -285,7 +287,7 @@ export const controladorEmpleados = crearControladorCatalogo({
     cargo: aTexto(cuerpo.cargo),
     nombres: aTexto(cuerpo.nombres),
     apellidos: aTexto(cuerpo.apellidos),
-    fecha_nacimiento: aTexto(cuerpo.fechaNacimiento || cuerpo.fecha_nacimiento),
+    fecha_nacimiento: aFechaIso(cuerpo.fechaNacimiento || cuerpo.fecha_nacimiento),
     telefono: aTexto(cuerpo.telefono),
     correo: aTexto(cuerpo.correo),
     dui: normalizarDui(cuerpo.dui),

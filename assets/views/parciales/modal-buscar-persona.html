@@ -1,0 +1,117 @@
+<!--
+  Buscar a una persona por su nombre, desde la puerta.
+
+  Es el plan C cuando el QR no aparece: no guardó la invitación, se quedó sin
+  batería, o no se sabe el DUI. Antes, sin el DUI no había forma de registrarlo.
+
+  Se muestran departamento, cargo y distrito porque en un padrón municipal hay
+  varios "José Hernández", y esos tres datos son los que permiten decidir cuál
+  es el que está parado en la puerta.
+-->
+<div v-if="buscador.abierto" class="modal-fondo" @click.self="buscador.cerrar()">
+  <div class="modal-panel flex max-h-[85vh] w-full max-w-2xl flex-col">
+
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="modal-titulo">Buscar persona</h2>
+        <p class="text-theme-xs text-gray-500 dark:text-gray-400">
+          Para registrar a alguien que no trae su código.
+        </p>
+      </div>
+      <button type="button" @click="buscador.cerrar()" class="boton-icono" aria-label="Cerrar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="shrink-0">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"></i>
+        <input v-model="buscador.termino"
+               type="text"
+               autocomplete="off"
+               class="campo pl-10"
+               placeholder="Nombre, apellido, DUI o código" />
+      </div>
+
+      <label class="mt-3 flex items-center gap-2 text-theme-xs text-gray-500 dark:text-gray-400">
+        <input type="checkbox" v-model="buscador.soloActivos"
+               class="h-4 w-4 rounded border-gray-300 text-brand-500" />
+        Mostrar solo personal activo
+      </label>
+    </div>
+
+    <!-- Sin escribir nada todavía -->
+    <div v-if="!buscador.buscando" class="py-10 text-center">
+      <i class="fa-solid fa-users mb-3 block text-4xl text-gray-300 dark:text-gray-700"></i>
+      <p class="text-theme-sm text-gray-400">
+        Escribe al menos dos letras del nombre.
+      </p>
+    </div>
+
+    <!-- Sin coincidencias -->
+    <div v-else-if="buscador.resultados.length === 0" class="py-10 text-center">
+      <i class="fa-solid fa-user-slash mb-3 block text-4xl text-gray-300 dark:text-gray-700"></i>
+      <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">
+        Nadie coincide con «{{ buscador.termino }}»
+      </p>
+      <p class="mt-1 text-theme-xs text-gray-500 dark:text-gray-400">
+        Prueba con el apellido, o destilda «solo personal activo».
+      </p>
+    </div>
+
+    <template v-else>
+      <div class="-mx-1 mt-4 flex-1 space-y-2 overflow-y-auto px-1">
+        <button v-for="fila in buscador.resultados" :key="fila.id"
+                type="button"
+                @click="buscador.elegir(fila)"
+                class="flex w-full items-start gap-3 rounded-xl border border-gray-200 p-3 text-left transition hover:border-brand-300 hover:bg-brand-50/40 dark:border-gray-800 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/5">
+
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+            {{ iniciales(fila.nombre) }}
+          </span>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">{{ fila.nombre }}</p>
+              <span v-if="!fila.activo" class="insignia insignia-neutra">Inactivo</span>
+              <span v-if="fila.yaRegistrado" class="insignia insignia-alerta">
+                <i class="fa-solid fa-check"></i>
+                Ya ingresó {{ formatearHora(fila.registradoEn) }}
+              </span>
+            </div>
+
+            <p class="mt-0.5 font-mono text-theme-xs text-gray-500 dark:text-gray-400">{{ fila.dui }}</p>
+
+            <!-- Los tres datos que permiten distinguir a dos personas con el
+                 mismo nombre. -->
+            <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-theme-xs text-gray-500 dark:text-gray-400">
+              <span v-if="fila.departamento">
+                <i class="fa-solid fa-building mr-1 text-gray-400"></i>{{ fila.departamento }}
+              </span>
+              <span v-if="fila.cargo">
+                <i class="fa-solid fa-id-badge mr-1 text-gray-400"></i>{{ fila.cargo }}
+              </span>
+              <span v-if="fila.distrito">
+                <i class="fa-solid fa-location-dot mr-1 text-gray-400"></i>{{ fila.distrito }}
+              </span>
+            </div>
+          </div>
+
+          <span class="shrink-0 self-center text-brand-500">
+            <i class="fa-solid fa-arrow-right"></i>
+          </span>
+        </button>
+      </div>
+
+      <div class="mt-4 shrink-0 border-t border-gray-200 pt-3 dark:border-gray-800">
+        <p v-if="buscador.hayRecorte" class="text-center text-theme-xs text-warning-600 dark:text-warning-400">
+          Hay {{ buscador.totalCoincidencias }} coincidencias y se muestran {{ buscador.maximo }}.
+          Escribe más letras para afinar.
+        </p>
+        <p v-else class="text-center text-theme-xs text-gray-400">
+          Toca a la persona para registrar su asistencia.
+        </p>
+      </div>
+    </template>
+  </div>
+</div>

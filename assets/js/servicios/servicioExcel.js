@@ -316,6 +316,96 @@ export async function descargarXlsx({ encabezados, filas, nombreHoja, nombreArch
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+// --- Fechas -----------------------------------------------------------------
+
+/*
+ * Excel no guarda las fechas como texto: guarda un NÚMERO de días y aparte,
+ * en los estilos, el formato con que hay que mostrarlo. Una celda con
+ * 24/03/1990 a la vista contiene un 32955.
+ *
+ * Sin traducirlo, al importar se guardaba ese número en la base. Después
+ * `aFechaIso("32955")` no podía interpretarlo y devolvía vacío, así que la
+ * fecha desaparecía de la ficha, del formulario y de la siguiente exportación.
+ * Parecía que no se había guardado; en realidad se guardaba mal.
+ */
+
+// Formatos de fecha que Excel trae de fábrica. Los personalizados se detectan
+// por su código, más abajo.
+const FORMATOS_FECHA = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 45, 46, 47]);
+
+/**
+ * ¿Este código de formato representa una fecha?
+ * Se ignora lo que esté entre comillas: un formato como `0" días"` lleva una
+ * "d" que no tiene nada que ver con un día.
+ */
+function esFormatoDeFecha(codigo) {
+  const sinLiterales = String(codigo || '')
+    .replace(/"[^"]*"/g, '')
+    .replace(/\\./g, '');
+  return /[dmyhs]/i.test(sinLiterales) && !/^[#0.,%]+$/.test(sinLiterales);
+}
+
+/**
+ * Convierte el número de días de Excel a una fecha dd/mm/yyyy.
+ *
+ * El desfase de 1900:
+ *
+ * Excel cree que 1900 fue bisiesto y reserva el número 60 para un 29 de
+ * febrero que no existió. Es un error heredado de Lotus 1-2-3 que nunca
+ * corrigieron para no romper las hojas de cálculo del mundo.
+ *
+ * La consecuencia práctica: para las series de 61 en adelante la cuenta parte
+ * del 30 de diciembre de 1899, y para las de antes hay que sumar un día. La
+ * 60 no corresponde a ninguna fecha real.
+ *
+ * En fechas de nacimiento esto no se va a cruzar nunca —serían de enero o
+ * febrero de 1900—, pero dejarlo mal sería dejar una resta que da un día menos
+ * sin que nadie sepa por qué.
+ */
+export function fechaDesdeSerie(serie) {
+  const numero = Number(serie);
+  if (!Number.isFinite(numero) || numero <= 0) return '';
+
+  const dias = Math.floor(numero);
+  if (dias === 60) return '';   // el 29 de febrero que Excel inventó
+
+  const base = dias < 60 ? Date.UTC(1899, 11, 31) : Date.UTC(1899, 11, 30);
+  const fecha = new Date(base + dias * 86400000);
+  if (Number.isNaN(fecha.getTime())) return '';
+  const dia = String(fecha.getUTCDate()).padStart(2, '0');
+  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
+  return `${dia}/${mes}/${fecha.getUTCFullYear()}`;
+}
+
+/**
+ * Qué formato usa cada estilo de celda.
+ * Devuelve un arreglo donde el índice es el `s` de la celda y el valor dice si
+ * ese estilo es de fecha.
+ */
+function leerEstilosDeFecha(xml, analizador) {
+  const documento = analizador.parseFromString(xml, 'application/xml');
+
+  // Formatos personalizados: numFmtId propio con su código.
+  const personalizados = new Map();
+  const numFmts = documento.getElementsByTagName('numFmt');
+  for (let i = 0; i < numFmts.length; i++) {
+    const id = Number(numFmts[i].getAttribute('numFmtId'));
+    personalizados.set(id, esFormatoDeFecha(numFmts[i].getAttribute('formatCode')));
+  }
+
+  // cellXfs: la lista que indexa el atributo `s` de cada celda.
+  const bloques = documento.getElementsByTagName('cellXfs');
+  if (bloques.length === 0) return [];
+
+  const estilos = [];
+  const xfs = bloques[0].getElementsByTagName('xf');
+  for (let i = 0; i < xfs.length; i++) {
+    const id = Number(xfs[i].getAttribute('numFmtId') || 0);
+    estilos.push(personalizados.has(id) ? personalizados.get(id) : FORMATOS_FECHA.has(id));
+  }
+  return estilos;
+}
+
 // --- Lectura ----------------------------------------------------------------
 
 /** Saca el texto de un nodo, juntando los <t> que pueda tener adentro. */
@@ -363,6 +453,18 @@ export async function leerXlsx(archivo) {
     for (let i = 0; i < items.length; i++) compartidas.push(textoDeNodo(items[i]));
   }
 
+  // Los estilos dicen qué celdas numéricas son en realidad fechas.
+  let estilosDeFecha = [];
+  const archivoEstilos = zip.file('xl/styles.xml');
+  if (archivoEstilos) {
+    try {
+      estilosDeFecha = leerEstilosDeFecha(await archivoEstilos.async('string'), analizador);
+    } catch {
+      // Sin estilos legibles se sigue: las fechas escritas como texto, que son
+      // las de nuestras propias plantillas, se leen igual.
+    }
+  }
+
   const xmlHoja = analizador.parseFromString(await hoja.async('string'), 'application/xml');
   const filasXml = xmlHoja.getElementsByTagName('row');
   const filas = [];
@@ -390,6 +492,14 @@ export async function leerXlsx(archivo) {
         valor = compartidas[indice] ?? '';
       } else {
         valor = textoDeNodo(celda.getElementsByTagName('v')[0]);
+
+        // Celda numérica con formato de fecha: se traduce a dd/mm/yyyy. Sin
+        // esto llegaría el número de días de Excel y la fecha se perdería.
+        const estilo = Number(celda.getAttribute('s') || 0);
+        if (estilosDeFecha[estilo] && valor !== '') {
+          const comoFecha = fechaDesdeSerie(valor);
+          if (comoFecha) valor = comoFecha;
+        }
       }
 
       fila.push(String(valor).trim());

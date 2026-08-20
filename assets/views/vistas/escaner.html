@@ -98,14 +98,14 @@
           teléfono y apuntar a un QR impreso exigía una puntería que no se
           tiene con gente esperando.
         -->
-        <div class="mb-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-300 py-8 text-center dark:border-gray-700">
+        <!-- <div class="mb-4 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-gray-300 py-8 text-center dark:border-gray-700">
           <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-2xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
             <i class="fa-solid fa-qrcode"></i>
           </span>
           <p class="text-theme-sm text-gray-500 dark:text-gray-400">
             La cámara se abre a pantalla completa
           </p>
-        </div>
+        </div> -->
 
         <div class="flex flex-col gap-3 sm:flex-row">
           <button type="button"
@@ -113,13 +113,18 @@
                   class="boton boton-primario flex-1"
                   :disabled="escaner.iniciandoCamara">
             <i class="fa-solid" :class="escaner.iniciandoCamara ? 'fa-circle-notch animar-girar' : 'fa-camera'"></i>
-            {{ escaner.iniciandoCamara ? 'Abriendo…' : 'Abrir cámara' }}
+            {{ escaner.iniciandoCamara ? 'Abriendo…' : 'Escanear QR' }}
           </button>
 
-          <label class="boton boton-secundario flex-1 cursor-pointer">
-            <i class="fa-solid fa-image"></i> Leer desde una foto
+          <!-- <label class="boton boton-secundario flex-1 cursor-pointer">
+            <i class="fa-solid fa-image"></i> Desde una foto
             <input type="file" accept="image/*" class="hidden" @change="escaner.leerDesdeFoto($event)" />
-          </label>
+          </label> -->
+
+          <!-- Cuando la persona no trae su código. -->
+          <button type="button" @click="buscador.abrir()" class="boton boton-secundario flex-1">
+            <i class="fa-solid fa-magnifying-glass"></i> Buscar por nombre
+          </button>
         </div>
       </div>
     </div>
@@ -306,6 +311,14 @@
         </div>
       </div>
 
+      <!-- Buscar por nombre sin salir de la cámara: la fila no se detiene
+           porque a alguien se le perdió el QR. -->
+      <button type="button" @click="buscador.abrir()"
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-300 transition hover:bg-white/10 hover:text-white"
+              aria-label="Buscar a una persona por su nombre">
+        <i class="fa-solid fa-magnifying-glass text-theme-xl"></i>
+      </button>
+
       <button type="button" @click="escaner.detener()"
               class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-gray-300 transition hover:bg-white/10 hover:text-white"
               aria-label="Cerrar la cámara">
@@ -406,7 +419,7 @@
                type="text"
                inputmode="numeric"
                class="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2.5 text-theme-sm text-white placeholder:text-gray-400 focus:border-brand-400 focus:outline-none"
-               placeholder="DUI o código, si el QR no lee" />
+               placeholder="Ingresa el DUI o el código si no lee el QR" />
         <button type="button"
                 @click="escaner.registrarManual()"
                 class="boton boton-primario shrink-0"
