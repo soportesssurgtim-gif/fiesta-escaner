@@ -412,22 +412,29 @@
       </p>
 
       <div class="mt-6 flex gap-3">
+        <!--
+          Ojo con el `!== ''`: para los atributos booleanos, Vue considera que
+          la cadena vacía SÍ está presente, igual que `disabled=""` en HTML
+          crudo. Como `trabajando` guarda un id y arranca vacío, ligarlo pelado
+          dejaba los dos botones deshabilitados desde el primer momento y el
+          modal no hacía nada.
+        -->
         <button type="button" @click="gestionCuentas.confirmando = null"
                 class="boton boton-secundario flex-1"
-                :disabled="gestionCuentas.trabajando">
+                :disabled="gestionCuentas.trabajando !== ''">
           Cancelar
         </button>
 
         <button type="button"
                 class="boton flex-1"
                 :class="gestionCuentas.confirmando.tipo === 'impersonar' ? 'boton-primario' : 'boton-peligro'"
-                :disabled="gestionCuentas.trabajando"
+                :disabled="gestionCuentas.trabajando !== ''"
                 @click="gestionCuentas.confirmando.tipo === 'impersonar'
                         ? usarCuentaDe(gestionCuentas.confirmando.fila)
                         : gestionCuentas.confirmando.tipo === 'rol'
                           ? cambiarEstadoRol(gestionCuentas.confirmando.fila, false)
                           : cambiarEstadoUsuario(gestionCuentas.confirmando.fila, false)">
-          <i v-if="gestionCuentas.trabajando" class="fa-solid fa-circle-notch animar-girar"></i>
+          <i v-if="gestionCuentas.trabajando !== ''" class="fa-solid fa-circle-notch animar-girar"></i>
           {{ gestionCuentas.confirmando.tipo === 'impersonar' ? 'Usar su cuenta' : 'Sí, desactivar' }}
         </button>
       </div>
