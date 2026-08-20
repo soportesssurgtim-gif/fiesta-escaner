@@ -30,6 +30,15 @@ export const MENU = [
     ]
   },
   {
+    titulo: 'Ayuda',
+    items: [
+      // Sin `modulo`: el manual lo ve cualquiera. Es lo que explica cómo usar
+      // el sistema, así que restringirlo dejaría afuera justo a quien más lo
+      // necesita.
+      { vista: 'manual', etiqueta: 'Manual de usuario', icono: 'fa-book-open' }
+    ]
+  },
+  {
     titulo: 'Administración',
     items: [
       { vista: 'usuarios',      modulo: 'usuarios',      etiqueta: 'Usuarios y roles', icono: 'fa-user-shield' },

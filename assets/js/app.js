@@ -35,8 +35,9 @@ import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
 import { usarBuscadorPersonas } from './composables/usarBuscadorPersonas.js';
 import { usarSorteos } from './composables/usarSorteos.js';
+import { usarManual } from './composables/usarManual.js';
+import { usarLectura } from './composables/usarLectura.js';
 
-import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
 import { registrarComponentes } from './componentes/comunes.js';
 
@@ -221,15 +222,6 @@ async function iniciar() {
         }
       }
 
-      // ---- Guías ----
-      const guiaAbierta = ref(false);
-      const guiaActual = ref(guiaDe('scanner'));
-
-      function abrirGuia() {
-        guiaActual.value = guiaDe(vista.value);
-        guiaAbierta.value = true;
-      }
-
       // =====================================================================
       // Catálogos
       //
@@ -345,6 +337,52 @@ async function iniciar() {
         obtenerRoles: () => roles.lista,
         notificar
       });
+
+      /*
+       * El manual de usuario.
+       *
+       * Antes de esto la ayuda era un modal con cuatro pasos por pantalla que
+       * se cerraba al leerlo. Ahora es una pantalla propia, con el contenido
+       * en dos registros —breve para recordar, detallado para entender— y
+       * lectura en voz alta.
+       *
+       * El botón de ayuda del encabezado no desapareció: abre el manual en el
+       * capítulo de la pantalla donde se estaba, así que la ayuda contextual
+       * se conserva y además se puede seguir leyendo.
+       */
+      const manual = usarManual({
+        puedeVer: (modulo) => permisos.tienePermiso(modulo, 'Ver')
+      });
+
+      const lectura = usarLectura();
+      const opcionesVozAbiertas = ref(false);
+
+      /** El botón de ayuda: manual abierto en lo que corresponde a esta pantalla. */
+      function abrirGuia() {
+        manual.abrirDeVista(vista.value);
+        cambiarVista('manual');
+      }
+
+      /**
+       * Cambia de capítulo y sube la pantalla.
+       *
+       * Sin el scroll, al elegir un capítulo del índice queda a mitad del
+       * anterior y parece que no pasó nada.
+       */
+      function irAlCapitulo(id) {
+        lectura.detener();
+        manual.abrirCapitulo(id);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      /** Escucha el capítulo entero, o lo detiene si ya está sonando. */
+      function escucharCapitulo() {
+        if (lectura.estado.leyendo) {
+          lectura.detener();
+          return;
+        }
+        lectura.leerSeguido(manual.paraEscuchar);
+      }
 
       // =====================================================================
       // Carga de catálogos
@@ -1789,11 +1827,21 @@ async function iniciar() {
       // Navegación
       // =====================================================================
 
-      /** Solo las entradas del menú que el rol actual puede ver. */
+      /**
+       * Solo las entradas del menú que el rol actual puede ver.
+       *
+       * Una entrada sin `modulo` la ve cualquiera. Es el caso del manual: no
+       * hay permiso que valga sobre la ayuda, y filtrarla por permisos la
+       * escondería justo de quien más la necesita. Sin este caso especial
+       * quedaba oculta, porque preguntar por un módulo que no existe devuelve
+       * que no se puede.
+       */
       const menuVisible = computed(() =>
         MENU.map((grupo) => ({
           ...grupo,
-          items: grupo.items.filter((item) => permisos.tienePermiso(item.modulo, 'Ver'))
+          items: grupo.items.filter(
+            (item) => !item.modulo || permisos.tienePermiso(item.modulo, 'Ver')
+          )
         })).filter((grupo) => grupo.items.length > 0)
       );
 
@@ -1806,6 +1854,13 @@ async function iniciar() {
       });
 
       async function cambiarVista(nueva) {
+        // Al salir del manual se corta la lectura en voz alta: seguir
+        // escuchando instrucciones de una pantalla que ya no está a la vista
+        // confunde, y no hay forma de detenerla desde otro lado.
+        if (vista.value === 'manual' && nueva !== 'manual') {
+          lectura.detener();
+        }
+
         // Al salir del escáner apagamos la cámara: si no, sigue encendida y
         // consumiendo batería en segundo plano.
         if (vista.value === 'scanner' && nueva !== 'scanner') {
@@ -1908,6 +1963,8 @@ async function iniciar() {
       });
 
       onBeforeUnmount(() => {
+        // Sin esto la voz sigue sonando despues de cerrar.
+        lectura.limpiar();
         window.removeEventListener('resize', alRedimensionar);
         document.removeEventListener('click', alHacerClicFuera);
         escaner.detener();
@@ -1946,7 +2003,8 @@ async function iniciar() {
         cambiarEstadoUsuario, cambiarEstadoRol, usarCuentaDe, volverAMiCuenta,
 
         // Guías
-        guiaAbierta, guiaActual, abrirGuia,
+        manual, lectura, opcionesVozAbiertas,
+        abrirGuia, irAlCapitulo, escucharCapitulo,
 
         // Cambio de la contraseña propia
         cambioClave, abrirCambioClave, guardarClaveNueva,

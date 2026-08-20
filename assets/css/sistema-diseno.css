@@ -720,3 +720,129 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
   padding: 0.5rem 0.875rem !important;
   font-weight: 500 !important;
 }
+
+/* ---------------------------------------------------------------------
+   Diagramas del manual
+
+   Los SVG los genera assets/js/contenido/diagramas.js. Los colores salen de
+   las variables del tema, así que siguen al color primario que haya
+   configurado la institución y se leen igual en claro y en oscuro.
+
+   Toda la animación vive acá y no en el SVG a propósito: las animaciones
+   propias de SVG (las etiquetas <animate>) no las alcanza la regla que apaga
+   el movimiento, y seguirían moviéndose delante de alguien que pidió que no.
+   --------------------------------------------------------------------- */
+.diagrama {
+  width: 100%;
+  height: auto;
+  /* Los diagramas anchos no deforman la tarjeta: se desplazan dentro de su
+     contenedor, que es lo que hace el bloque .diagrama-marco. */
+  min-width: 520px;
+}
+
+.diagrama-marco {
+  overflow-x: auto;
+  padding: 0.25rem 0;
+}
+
+.diagrama-circulo {
+  fill: var(--tono, var(--marca-500));
+  stroke: none;
+}
+
+.diagrama-numero {
+  fill: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.diagrama-etiqueta {
+  fill: var(--gris-500);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+html.dark .diagrama-etiqueta { fill: var(--gris-400); }
+
+.diagrama-linea {
+  stroke: var(--gris-300);
+  stroke-width: 2;
+}
+
+html.dark .diagrama-linea { stroke: var(--gris-700); }
+
+.diagrama-punta {
+  fill: var(--gris-300);
+}
+
+html.dark .diagrama-punta { fill: var(--gris-700); }
+
+.diagrama-viajero {
+  fill: var(--tono, var(--marca-500));
+  animation: diagrama-viaje 1.6s ease-in-out infinite;
+  animation-delay: var(--retraso, 0s);
+}
+
+@keyframes diagrama-viaje {
+  0%        { transform: translateX(0);           opacity: 0; }
+  12%       { opacity: 1; }
+  85%       { opacity: 1; }
+  100%      { transform: translateX(var(--largo, 0)); opacity: 0; }
+}
+
+/* Los nodos aparecen de izquierda a derecha, que es el orden en que se leen. */
+.diagrama-nodo,
+.diagrama-rama {
+  animation: diagrama-aparecer 420ms ease-out both;
+  animation-delay: var(--retraso, 0s);
+  transform-origin: center;
+}
+
+@keyframes diagrama-aparecer {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* La línea se traza en lugar de aparecer entera de golpe. */
+.diagrama-conector .diagrama-linea {
+  stroke-dasharray: var(--largo, 100) var(--largo, 100);
+  stroke-dashoffset: var(--largo, 100);
+  animation: diagrama-trazar 520ms ease-out forwards;
+  animation-delay: var(--retraso, 0s);
+}
+
+@keyframes diagrama-trazar {
+  to { stroke-dashoffset: 0; }
+}
+
+.diagrama-curva {
+  stroke-dasharray: 200 200;
+  stroke-dashoffset: 200;
+  animation: diagrama-trazar 600ms ease-out forwards;
+  animation-delay: var(--retraso, 0s);
+}
+
+/*
+ * Con el movimiento apagado, el diagrama se muestra armado y quieto. La regla
+ * general deja las animaciones en 0.01ms, lo que ya alcanza para los nodos y
+ * las líneas, pero el punto viajero quedaría clavado a mitad de camino
+ * pareciendo un error de dibujo. Se lo saca.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .diagrama-viajero { display: none; }
+  .diagrama-conector .diagrama-linea,
+  .diagrama-curva { stroke-dashoffset: 0; }
+}
+
+/* ---------------------------------------------------------------------
+   Manual: el bloque que se está escuchando
+   --------------------------------------------------------------------- */
+.bloque-leyendo {
+  background-color: var(--marca-50);
+  box-shadow: inset 3px 0 0 var(--marca-500);
+}
+
+html.dark .bloque-leyendo {
+  background-color: rgb(var(--marca-500-rgb) / 0.12);
+}

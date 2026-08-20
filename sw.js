@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.3.1';
+const VERSION_CACHE = 'v3.4.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -87,11 +87,14 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarSincronizacion.js',
   '/assets/js/composables/usarPermisos.js',
   '/assets/js/composables/usarSorteos.js',
+  '/assets/js/composables/usarManual.js',
+  '/assets/js/composables/usarLectura.js',
 
   // Componentes y contenido
   '/assets/js/componentes/comunes.js',
-  '/assets/js/contenido/guias.js',
   '/assets/js/contenido/menu.js',
+  '/assets/js/contenido/manual.js',
+  '/assets/js/contenido/diagramas.js',
 
   // Plantillas
   '/assets/views/aplicacion.html',
@@ -101,13 +104,13 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/modal-buscar-persona.html',
   '/assets/views/parciales/modal-cambiar-clave.html',
   '/assets/views/parciales/modal-cierre-sesion.html',
-  '/assets/views/parciales/modal-guia.html',
   '/assets/views/parciales/modal-importacion.html',
   '/assets/views/parciales/modal-instalar.html',
   '/assets/views/parciales/modal-pendientes.html',
   '/assets/views/parciales/notificaciones.html',
   '/assets/views/vistas/asistencias.html',
   '/assets/views/vistas/configuracion.html',
+  '/assets/views/vistas/manual.html',
   '/assets/views/vistas/departamentos.html',
   '/assets/views/vistas/empleados.html',
   '/assets/views/vistas/escaner.html',
