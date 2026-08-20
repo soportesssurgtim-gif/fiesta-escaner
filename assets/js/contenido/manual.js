@@ -205,7 +205,7 @@ export const CAPITULOS = [
     ],
     consejos: [
       'Poné a alguien fijo en la puerta con el teléfono. Pasarlo de mano en mano hace que se pierdan lecturas.',
-      'Si hay mucha gente esperando, conviene un segundo dispositivo escaneando en paralelo: los dos registran en el mismo evento sin pisarse.'
+      'Si hay mucha gente esperando, conviene un o más dispositivos escaneando en paralelo: todos registran en el mismo evento sin duplicados y sin dejar invitados sin registrar.'
     ],
     problemas: [
       {
