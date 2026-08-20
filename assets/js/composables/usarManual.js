@@ -26,7 +26,7 @@ function modoGuardado() {
   }
 }
 
-export function usarManual({ puedeVer }) {
+export function usarManual({ puedeVer, esAngosto }) {
   const modo = ref(modoGuardado());
   const capituloId = ref(CAPITULOS[0].id);
   const busqueda = ref('');
@@ -83,7 +83,18 @@ export function usarManual({ puedeVer }) {
     }));
   });
 
-  const diagrama = computed(() => (capitulo.value ? diagramaDe(capitulo.value.diagrama) : ''));
+  /*
+   * El diagrama, en la orientación que entre en la pantalla.
+   *
+   * En un teléfono el flujo horizontal obligaba a desplazarlo a lo ancho para
+   * verlo entero, que es lo peor que se le puede pedir a alguien que está
+   * tratando de entender un proceso. Ahí va la versión apilada.
+   */
+  const diagrama = computed(() => (
+    capitulo.value
+      ? diagramaDe(capitulo.value.diagrama, { vertical: Boolean(esAngosto && esAngosto()) })
+      : ''
+  ));
 
   /** Todo el capítulo como una lista de textos, para escucharlo de corrido. */
   const paraEscuchar = computed(() => {
@@ -105,6 +116,74 @@ export function usarManual({ puedeVer }) {
     return partes;
   });
 
+  /*
+   * El capítulo partido en diapositivas, para la pantalla angosta.
+   *
+   * En un teléfono la lista completa es un rollo larguísimo donde se pierde el
+   * hilo. De a una cosa por vez, con avance visible, se parece a lo que ya
+   * conoce cualquiera que haya abierto una aplicación por primera vez.
+   *
+   * La portada lleva el diagrama, que es el mapa de lo que viene después.
+   */
+  const paso = ref(0);
+
+  const diapositivas = computed(() => {
+    if (!capitulo.value) return [];
+
+    const partes = [{
+      tipo: 'portada',
+      id: 'portada',
+      titulo: capitulo.value.titulo,
+      texto: capitulo.value.resumen,
+      icono: capitulo.value.icono
+    }];
+
+    for (const bloque of bloques.value) {
+      partes.push({ tipo: 'bloque', ...bloque });
+    }
+
+    if ((capitulo.value.consejos || []).length > 0) {
+      partes.push({
+        tipo: 'consejos',
+        id: 'consejos',
+        titulo: 'Conviene saber',
+        icono: 'fa-lightbulb',
+        puntos: capitulo.value.consejos
+      });
+    }
+
+    if ((capitulo.value.problemas || []).length > 0) {
+      partes.push({
+        tipo: 'problemas',
+        id: 'problemas',
+        titulo: 'Si algo sale mal',
+        icono: 'fa-triangle-exclamation',
+        casos: capitulo.value.problemas
+      });
+    }
+
+    return partes;
+  });
+
+  const diapositiva = computed(() =>
+    diapositivas.value[Math.min(paso.value, diapositivas.value.length - 1)] || null
+  );
+
+  const esPrimerPaso = computed(() => paso.value <= 0);
+  const esUltimoPaso = computed(() => paso.value >= diapositivas.value.length - 1);
+
+  function irAPaso(indice) {
+    paso.value = Math.max(0, Math.min(indice, diapositivas.value.length - 1));
+  }
+
+  function pasoSiguiente() {
+    if (!esUltimoPaso.value) paso.value += 1;
+  }
+
+  function pasoAnterior() {
+    if (!esPrimerPaso.value) paso.value -= 1;
+  }
+
   const indice = computed(() =>
     capitulosVisibles.value.findIndex((c) => c.id === (capitulo.value ? capitulo.value.id : ''))
   );
@@ -123,6 +202,10 @@ export function usarManual({ puedeVer }) {
 
   function abrirCapitulo(id) {
     capituloId.value = id;
+    // Volver a la portada. Quedarse en la diapositiva cinco de un capítulo que
+    // recién se abre no tiene sentido, y con capítulos de largos distintos
+    // podría caer directamente en el final.
+    paso.value = 0;
   }
 
   /** Abre el capítulo que corresponde a una pantalla. Lo usa el botón de ayuda. */
@@ -130,10 +213,14 @@ export function usarManual({ puedeVer }) {
     const encontrado = capituloDeVista(vista);
     busqueda.value = '';
     capituloId.value = encontrado.id;
+    paso.value = 0;
   }
 
   function cambiarModo(valor) {
     modo.value = MODOS.some((m) => m.valor === valor) ? valor : 'breve';
+    // El modo no cambia cuántas diapositivas hay, así que se conserva el paso:
+    // quien está en el paso tres y quiere la explicación larga la quiere de ese
+    // paso, no del principio.
     try {
       localStorage.setItem(CLAVE_MODO, modo.value);
     } catch {
@@ -152,6 +239,14 @@ export function usarManual({ puedeVer }) {
     paraEscuchar,
     anterior,
     siguiente,
+    paso,
+    diapositivas,
+    diapositiva,
+    esPrimerPaso,
+    esUltimoPaso,
+    irAPaso,
+    pasoSiguiente,
+    pasoAnterior,
     abrirCapitulo,
     abrirDeVista,
     cambiarModo

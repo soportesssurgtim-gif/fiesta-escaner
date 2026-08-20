@@ -724,25 +724,38 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
 /* ---------------------------------------------------------------------
    Diagramas del manual
 
-   Los SVG los genera assets/js/contenido/diagramas.js. Los colores salen de
-   las variables del tema, así que siguen al color primario que haya
-   configurado la institución y se leen igual en claro y en oscuro.
+   Los SVG los genera assets/js/contenido/diagramas.js. Acá van solo los
+   estilos estáticos —colores, tipografías, el trazado de entrada—; el
+   recorrido del punto lo define cada diagrama en un <style> propio, porque los
+   tiempos dependen de cuántos tramos tenga y los porcentajes de un @keyframes
+   no se pueden calcular con variables CSS.
 
-   Toda la animación vive acá y no en el SVG a propósito: las animaciones
-   propias de SVG (las etiquetas <animate>) no las alcanza la regla que apaga
-   el movimiento, y seguirían moviéndose delante de alguien que pidió que no.
+   Los colores salen de las variables del tema, así que siguen al color
+   primario que haya configurado la institución y se leen igual en claro y en
+   oscuro.
    --------------------------------------------------------------------- */
 .diagrama {
   width: 100%;
   height: auto;
-  /* Los diagramas anchos no deforman la tarjeta: se desplazan dentro de su
-     contenedor, que es lo que hace el bloque .diagrama-marco. */
-  min-width: 520px;
+  display: block;
 }
 
+/*
+ * El horizontal necesita un ancho mínimo para que las etiquetas no se pisen, y
+ * por eso se desplaza dentro de su contenedor. El vertical no: entra completo
+ * en cualquier pantalla, que es justamente para lo que existe.
+ */
 .diagrama-marco {
   overflow-x: auto;
   padding: 0.25rem 0;
+}
+
+.diagrama-marco > .diagrama { min-width: 520px; }
+.diagrama-marco.es-vertical { overflow-x: visible; }
+.diagrama-marco.es-vertical > .diagrama {
+  min-width: 0;
+  max-width: 300px;
+  margin: 0 auto;
 }
 
 .diagrama-circulo {
@@ -756,6 +769,8 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
   font-weight: 600;
   font-family: inherit;
 }
+
+.diagrama-simbolo { font-size: 14px; }
 
 .diagrama-etiqueta {
   fill: var(--gris-500);
@@ -772,43 +787,31 @@ html.dark .diagrama-etiqueta { fill: var(--gris-400); }
 
 html.dark .diagrama-linea { stroke: var(--gris-700); }
 
-.diagrama-punta {
-  fill: var(--gris-300);
-}
-
+.diagrama-punta { fill: var(--gris-300); }
 html.dark .diagrama-punta { fill: var(--gris-700); }
 
 .diagrama-viajero {
-  fill: var(--tono, var(--marca-500));
-  animation: diagrama-viaje 1.6s ease-in-out infinite;
-  animation-delay: var(--retraso, 0s);
+  fill: var(--marca-500);
+  opacity: 0;
 }
 
-@keyframes diagrama-viaje {
-  0%        { transform: translateX(0);           opacity: 0; }
-  12%       { opacity: 1; }
-  85%       { opacity: 1; }
-  100%      { transform: translateX(var(--largo, 0)); opacity: 0; }
-}
-
-/* Los nodos aparecen de izquierda a derecha, que es el orden en que se leen. */
+/* Los nodos aparecen en el orden en que se leen, no todos de golpe. */
 .diagrama-nodo,
 .diagrama-rama {
-  animation: diagrama-aparecer 420ms ease-out both;
+  animation: diagrama-aparecer 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--retraso, 0s);
-  transform-origin: center;
 }
 
 @keyframes diagrama-aparecer {
-  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  from { opacity: 0; transform: translateY(10px) scale(0.9); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* La línea se traza en lugar de aparecer entera de golpe. */
+/* La línea se traza en la dirección del flujo, en lugar de aparecer entera. */
 .diagrama-conector .diagrama-linea {
   stroke-dasharray: var(--largo, 100) var(--largo, 100);
   stroke-dashoffset: var(--largo, 100);
-  animation: diagrama-trazar 520ms ease-out forwards;
+  animation: diagrama-trazar 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: var(--retraso, 0s);
 }
 
@@ -817,22 +820,152 @@ html.dark .diagrama-punta { fill: var(--gris-700); }
 }
 
 .diagrama-curva {
-  stroke-dasharray: 200 200;
-  stroke-dashoffset: 200;
-  animation: diagrama-trazar 600ms ease-out forwards;
+  stroke-dasharray: 240 240;
+  stroke-dashoffset: 240;
+  animation: diagrama-trazar 640ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: var(--retraso, 0s);
 }
 
 /*
- * Con el movimiento apagado, el diagrama se muestra armado y quieto. La regla
- * general deja las animaciones en 0.01ms, lo que ya alcanza para los nodos y
- * las líneas, pero el punto viajero quedaría clavado a mitad de camino
- * pareciendo un error de dibujo. Se lo saca.
+ * Con el movimiento apagado el diagrama se muestra armado y quieto. La regla
+ * general deja las animaciones en 0.01ms, lo que alcanza para los nodos y las
+ * líneas; el punto viajero se esconde desde el <style> de cada SVG, porque
+ * quedaría clavado a mitad de camino pareciendo un error de dibujo.
  */
 @media (prefers-reduced-motion: reduce) {
-  .diagrama-viajero { display: none; }
   .diagrama-conector .diagrama-linea,
   .diagrama-curva { stroke-dashoffset: 0; }
+}
+
+/* ---------------------------------------------------------------------
+   Manual: la capa de pantalla completa
+
+   Tapa la aplicación entera, barra lateral incluida. Un manual no es un lugar
+   donde se trabaja: se entra, se consulta y se vuelve a lo que uno estaba
+   haciendo. Con el menú al costado, cerrarlo obligaba a elegir otra pantalla,
+   que no siempre era la de donde se venía.
+
+   Se usa altura dinámica (dvh) y no vh porque en el navegador del teléfono la
+   barra de direcciones aparece y desaparece al desplazarse: con vh el pie
+   quedaba tapado justo cuando hacía falta pulsar «Siguiente».
+   --------------------------------------------------------------------- */
+.manual-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--gris-50);
+  height: 100vh;
+  height: 100dvh;
+  animation: manual-entrar 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html.dark .manual-capa { background-color: var(--gris-900); }
+
+@keyframes manual-entrar {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.manual-encabezado {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gris-200);
+  background-color: #fff;
+  /* El área táctil del sistema, en los teléfonos con muesca. */
+  padding-top: calc(0.75rem + env(safe-area-inset-top));
+}
+
+html.dark .manual-encabezado {
+  border-color: var(--gris-800);
+  background-color: var(--gris-900);
+}
+
+.manual-cuerpo {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+/*
+ * El índice: fijo al costado en pantalla ancha, cajón deslizante en angosta.
+ * En angosta se sale del flujo para no empujar la diapositiva.
+ */
+.manual-indice {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  width: 17rem;
+  max-width: 85vw;
+  padding: 1rem;
+  overflow-y: auto;
+  background-color: #fff;
+  border-right: 1px solid var(--gris-200);
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html.dark .manual-indice {
+  background-color: var(--gris-900);
+  border-color: var(--gris-800);
+}
+
+.manual-indice.esta-abierto { transform: translateX(0); }
+
+@media (min-width: 1024px) {
+  .manual-indice {
+    position: relative;
+    inset: auto;
+    transform: none;
+    flex-shrink: 0;
+  }
+}
+
+.manual-escenario {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 1.5rem 1rem 2rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+@media (min-width: 640px) {
+  .manual-escenario { padding: 2.5rem 2rem 3rem; align-items: center; }
+}
+
+.manual-pie {
+  flex-shrink: 0;
+  padding: 0.875rem 1rem;
+  border-top: 1px solid var(--gris-200);
+  background-color: #fff;
+  padding-bottom: calc(0.875rem + env(safe-area-inset-bottom));
+}
+
+html.dark .manual-pie {
+  border-color: var(--gris-800);
+  background-color: var(--gris-900);
+}
+
+/* ---------------------------------------------------------------------
+   Manual: la entrada de cada diapositiva
+
+   Entra desplazándose desde la derecha, que es de donde viene al avanzar. Es
+   corta a propósito: una transición de media pantalla se disfruta la primera
+   vez y estorba a partir de la tercera.
+   --------------------------------------------------------------------- */
+.animar-diapositiva {
+  animation: diapositiva-entrar 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes diapositiva-entrar {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 /* ---------------------------------------------------------------------

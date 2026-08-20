@@ -6,13 +6,25 @@
  * haya configurado la institución, se leen bien en claro y en oscuro, y pesan
  * unos pocos kilobytes en vez de unos cuantos cientos.
  *
- * La animación —la línea que se traza y el punto que la recorre— está en
- * assets/css/sistema-diseno.css, no acá, porque tiene que poder apagarse
- * cuando el sistema operativo pide menos movimiento.
+ * Dos orientaciones
+ * -----------------
+ * En pantalla ancha el flujo va de izquierda a derecha. En un teléfono eso
+ * obligaba a desplazar el diagrama a lo ancho para verlo entero, que es lo peor
+ * que se le puede pedir a alguien que está tratando de entender un proceso. En
+ * pantalla angosta el mismo flujo se dibuja de arriba hacia abajo, que además
+ * es la dirección en la que ya se está leyendo.
  *
- * No llevan texto suelto que haya que traducir ni iconos: cada nodo es un
- * número y una etiqueta corta. Un diagrama con demasiada letra a 12 píxeles no
- * lo lee nadie.
+ * La animación
+ * ------------
+ * El punto que recorre las líneas no es un adorno: representa a la persona
+ * avanzando por el proceso. Por eso pasa por los tramos EN ORDEN, uno después
+ * del otro, y no todos a la vez: lo que se quiere mostrar es la secuencia. Al
+ * llegar a un nodo, el nodo late; así el ojo sigue dónde está el proceso.
+ *
+ * Cada diagrama emite sus propios fotogramas porque los tiempos dependen de
+ * cuántos tramos tenga, y los porcentajes de un @keyframes no se pueden
+ * calcular con variables CSS. Los nombres llevan el identificador del diagrama
+ * para que no se pisen entre sí: un <style> dentro de un SVG es global.
  */
 
 /** Colores de las ramas, para los finales que no son todos iguales. */
@@ -23,17 +35,16 @@ const TONOS = {
   error: 'var(--error-500)'
 };
 
+/** Cuánto dura el recorrido de un tramo, en segundos. */
+const DURACION_TRAMO = 1.1;
+
 const escapar = (texto) => String(texto)
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;');
 
-/**
- * Parte una etiqueta en dos renglones si no entra en uno.
- * A doce píxeles, más de catorce caracteres por renglón se pisa con el nodo de
- * al lado.
- */
-function enRenglones(texto, porRenglon = 14) {
+/** Parte una etiqueta en renglones que entren en el ancho disponible. */
+function enRenglones(texto, porRenglon) {
   const palabras = String(texto).split(' ');
   const renglones = [];
   let actual = '';
@@ -51,192 +62,296 @@ function enRenglones(texto, porRenglon = 14) {
   return renglones.slice(0, 2);
 }
 
-function etiqueta(x, y, texto, clase = 'diagrama-etiqueta') {
-  const renglones = enRenglones(texto);
-  return renglones
-    .map((renglon, i) => `<text x="${x}" y="${y + i * 14}" class="${clase}" text-anchor="middle">${escapar(renglon)}</text>`)
+function etiqueta({ x, y, texto, ancla = 'middle', porRenglon = 14 }) {
+  return enRenglones(texto, porRenglon)
+    .map((renglon, i) =>
+      `<text x="${x}" y="${y + i * 15}" class="diagrama-etiqueta" text-anchor="${ancla}">${escapar(renglon)}</text>`)
     .join('');
 }
 
 /**
- * Un nodo del flujo: círculo numerado con su etiqueta debajo.
- * `retraso` escalona la aparición para que el diagrama se arme de izquierda a
- * derecha, que es el orden en que se leen los pasos.
- */
-function nodo({ x, y, numero, texto, tono = TONOS.marca, retraso = 0 }) {
-  return `
-    <g class="diagrama-nodo" style="--retraso: ${retraso}s">
-      <circle cx="${x}" cy="${y}" r="22" class="diagrama-circulo" style="--tono: ${tono}" />
-      <text x="${x}" y="${y + 6}" class="diagrama-numero" text-anchor="middle">${numero}</text>
-      ${etiqueta(x, y + 44, texto)}
-    </g>`;
-}
-
-/**
- * La línea entre dos nodos, con el punto que la recorre.
+ * Los fotogramas de un diagrama.
  *
- * El punto se mueve con una animación CSS y no con las de SVG. Las de SVG
- * —las etiquetas `<animate>`— no las alcanza la regla que apaga el movimiento
- * cuando el sistema operativo lo pide, así que seguirían girando delante de
- * alguien que pidió expresamente que no.
+ * `tramos` es cuántos segmentos recorre el punto. Cada uno se mueve durante su
+ * turno y queda invisible el resto del ciclo, que es lo que produce la
+ * sensación de una sola cosa avanzando en vez de varias moviéndose a la vez.
  */
-function conector({ desde, hasta, y, retraso = 0, tono = TONOS.marca }) {
-  const inicio = desde + 26;
-  const fin = hasta - 26;
-  const largo = fin - inicio;
-  if (largo <= 0) return '';
+function fotogramas(id, tramos, vertical, terminaEnRamas = false) {
+  const total = Math.max(1, tramos) * DURACION_TRAMO;
+  const porcion = 100 / Math.max(1, tramos);
+  const eje = vertical ? 'Y' : 'X';
 
-  return `
-    <g class="diagrama-conector" style="--retraso: ${retraso}s; --largo: ${largo}px">
-      <line x1="${inicio}" y1="${y}" x2="${fin}" y2="${y}" class="diagrama-linea" />
-      <polygon points="${fin},${y} ${fin - 6},${y - 4} ${fin - 6},${y + 4}" class="diagrama-punta" />
-      <circle cx="${inicio}" cy="${y}" r="3.5" class="diagrama-viajero" style="--tono: ${tono}" />
-    </g>`;
-}
+  let css = '';
 
-/**
- * Un flujo lineal de pasos.
- *
- * El ancho se calcula según cuántos pasos haya, y el SVG escala solo al ancho
- * que tenga disponible: en un teléfono se ve más chico pero completo, sin
- * necesidad de una versión aparte.
- */
-export function flujo(pasos, opciones = {}) {
-  const { ramas = [], titulo = '' } = opciones;
+  for (let i = 0; i < tramos; i++) {
+    const desde = i * porcion;
+    const hasta = (i + 1) * porcion;
+    // Un respiro al final de cada tramo, para que el nodo alcance a latir
+    // antes de que arranque el siguiente.
+    const llegada = hasta - porcion * 0.12;
 
-  const separacion = 150;
-  const margen = 70;
-  const y = ramas.length > 0 ? 60 : 58;
-  const ancho = margen * 2 + separacion * (pasos.length - 1);
-  const alto = ramas.length > 0 ? 210 : 130;
+    css += `
+      @keyframes viaje-${id}-${i} {
+        0%, ${desde.toFixed(2)}% { transform: translate${eje}(0); opacity: 0; }
+        ${(desde + porcion * 0.08).toFixed(2)}% { opacity: 1; }
+        ${llegada.toFixed(2)}% { transform: translate${eje}(var(--largo)); opacity: 1; }
+        ${hasta.toFixed(2)}%, 100% { transform: translate${eje}(var(--largo)); opacity: 0; }
+      }
+      #${id} .viajero-${i} {
+        animation: viaje-${id}-${i} ${total.toFixed(2)}s linear infinite;
+      }`;
 
-  let cuerpo = '';
+    /*
+     * Lo que hay al final del tramo late cuando el punto le llega.
+     *
+     * En el último tramo de un diagrama con ramas no hay un nodo numerado sino
+     * el abanico de resultados: laten los tres a la vez, que es justamente lo
+     * que se quiere decir —de acá sale uno de estos—.
+     */
+    const destino = (terminaEnRamas && i === tramos - 1)
+      ? `#${id} .diagrama-rama .diagrama-circulo`
+      : `#${id} .late-${i + 1} .diagrama-circulo`;
 
-  // Conectores primero, para que queden por debajo de los círculos.
-  for (let i = 0; i < pasos.length - 1; i++) {
-    cuerpo += conector({
-      desde: margen + separacion * i,
-      hasta: margen + separacion * (i + 1),
-      y,
-      retraso: i * 0.25
-    });
+    css += `
+      @keyframes latido-${id}-${i} {
+        0%, ${Math.max(0, llegada - 1).toFixed(2)}% { transform: scale(1); }
+        ${llegada.toFixed(2)}% { transform: scale(1.14); }
+        ${Math.min(100, hasta + porcion * 0.15).toFixed(2)}%, 100% { transform: scale(1); }
+      }
+      ${destino} {
+        animation: latido-${id}-${i} ${total.toFixed(2)}s ease-out infinite;
+        transform-box: fill-box;
+        transform-origin: center;
+      }`;
   }
 
-  pasos.forEach((paso, i) => {
-    cuerpo += nodo({
-      x: margen + separacion * i,
-      y,
-      numero: i + 1,
-      texto: typeof paso === 'string' ? paso : paso.texto,
-      tono: (typeof paso === 'object' && paso.tono && TONOS[paso.tono]) || TONOS.marca,
-      retraso: i * 0.25
-    });
-  });
+  return css;
+}
 
-  // Las ramas salen del último nodo y se abren hacia abajo.
-  if (ramas.length > 0) {
-    const origenX = margen + separacion * (pasos.length - 1);
-    const ramaY = 158;
-    const anchoRama = ancho / (ramas.length + 1);
+/**
+ * Un flujo de pasos, en la orientación que se pida.
+ *
+ * `vertical` cambia la disposición entera, no solo el ancho: los nodos se
+ * apilan, la etiqueta pasa al costado —que es donde hay lugar en un teléfono—
+ * y las ramas se abren en abanico hacia abajo.
+ */
+export function flujo(id, pasos, opciones = {}) {
+  const { ramas = [], titulo = '', vertical = false } = opciones;
 
-    ramas.forEach((rama, i) => {
-      const x = anchoRama * (i + 1);
-      const tono = TONOS[rama.tono] || TONOS.marca;
-      const retraso = pasos.length * 0.25 + i * 0.15;
+  const tramos = pasos.length - 1 + (ramas.length > 0 ? 1 : 0);
+  let cuerpo = '';
+  let ancho;
+  let alto;
 
+  if (vertical) {
+    // --- De arriba hacia abajo, con la etiqueta al costado -----------------
+    const separacion = 78;
+    const x = 46;
+    const margen = 34;
+    ancho = 300;
+    alto = margen * 2 + separacion * (pasos.length - 1) + (ramas.length > 0 ? 150 : 0);
+
+    for (let i = 0; i < pasos.length - 1; i++) {
+      const desde = margen + separacion * i + 22;
+      const hasta = margen + separacion * (i + 1) - 22;
       cuerpo += `
-        <g class="diagrama-rama" style="--retraso: ${retraso}s">
-          <path d="M ${origenX} ${y + 26} C ${origenX} ${ramaY - 30}, ${x} ${y + 30}, ${x} ${ramaY - 24}"
-                class="diagrama-linea diagrama-curva" fill="none" />
-          <circle cx="${x}" cy="${ramaY}" r="16" class="diagrama-circulo" style="--tono: ${tono}" />
-          <text x="${x}" y="${ramaY + 5}" class="diagrama-numero" text-anchor="middle">${escapar(rama.simbolo || '')}</text>
-          ${etiqueta(x, ramaY + 36, rama.texto)}
+        <g class="diagrama-conector" style="--largo: ${hasta - desde}px; --retraso: ${i * 0.2}s">
+          <line x1="${x}" y1="${desde}" x2="${x}" y2="${hasta}" class="diagrama-linea" />
+          <circle cx="${x}" cy="${desde}" r="4" class="diagrama-viajero viajero-${i}" />
+        </g>`;
+    }
+
+    pasos.forEach((paso, i) => {
+      const y = margen + separacion * i;
+      const texto = typeof paso === 'string' ? paso : paso.texto;
+      cuerpo += `
+        <g class="diagrama-nodo late-${i}" style="--retraso: ${i * 0.2}s">
+          <circle cx="${x}" cy="${y}" r="20" class="diagrama-circulo" style="--tono: ${TONOS.marca}" />
+          <text x="${x}" y="${y + 6}" class="diagrama-numero" text-anchor="middle">${i + 1}</text>
+          ${etiqueta({ x: x + 34, y: y + (enRenglones(texto, 22).length === 1 ? 5 : -2), texto, ancla: 'start', porRenglon: 22 })}
         </g>`;
     });
+
+    if (ramas.length > 0) {
+      const desdeY = margen + separacion * (pasos.length - 1) + 22;
+      const ramaY = desdeY + 76;
+      const paso = ancho / (ramas.length + 1);
+
+      cuerpo += `
+        <g style="--largo: ${ramaY - 18 - desdeY}px">
+          <circle cx="${x}" cy="${desdeY}" r="4" class="diagrama-viajero viajero-${tramos - 1}" />
+        </g>`;
+
+      ramas.forEach((rama, i) => {
+        const rx = paso * (i + 1);
+        const tono = TONOS[rama.tono] || TONOS.marca;
+        cuerpo += `
+          <g class="diagrama-rama" style="--retraso: ${pasos.length * 0.2 + i * 0.14}s">
+            <path d="M ${x} ${desdeY + 26} C ${x} ${ramaY - 30}, ${rx} ${desdeY + 40}, ${rx} ${ramaY - 16}"
+                  class="diagrama-linea diagrama-curva" fill="none" />
+            <circle cx="${rx}" cy="${ramaY}" r="15" class="diagrama-circulo" style="--tono: ${tono}" />
+            <text x="${rx}" y="${ramaY + 5}" class="diagrama-numero diagrama-simbolo" text-anchor="middle">${escapar(rama.simbolo || '')}</text>
+            ${etiqueta({ x: rx, y: ramaY + 34, texto: rama.texto, porRenglon: 12 })}
+          </g>`;
+      });
+    }
+  } else {
+    // --- De izquierda a derecha --------------------------------------------
+    const separacion = 150;
+    const margen = 70;
+    const y = ramas.length > 0 ? 58 : 56;
+    ancho = margen * 2 + separacion * (pasos.length - 1);
+    alto = ramas.length > 0 ? 208 : 128;
+
+    for (let i = 0; i < pasos.length - 1; i++) {
+      const desde = margen + separacion * i + 26;
+      const hasta = margen + separacion * (i + 1) - 26;
+      cuerpo += `
+        <g class="diagrama-conector" style="--largo: ${hasta - desde}px; --retraso: ${i * 0.2}s">
+          <line x1="${desde}" y1="${y}" x2="${hasta}" y2="${y}" class="diagrama-linea" />
+          <polygon points="${hasta},${y} ${hasta - 6},${y - 4} ${hasta - 6},${y + 4}" class="diagrama-punta" />
+          <circle cx="${desde}" cy="${y}" r="4" class="diagrama-viajero viajero-${i}" />
+        </g>`;
+    }
+
+    pasos.forEach((paso, i) => {
+      const x = margen + separacion * i;
+      const texto = typeof paso === 'string' ? paso : paso.texto;
+      cuerpo += `
+        <g class="diagrama-nodo late-${i}" style="--retraso: ${i * 0.2}s">
+          <circle cx="${x}" cy="${y}" r="22" class="diagrama-circulo" style="--tono: ${TONOS.marca}" />
+          <text x="${x}" y="${y + 6}" class="diagrama-numero" text-anchor="middle">${i + 1}</text>
+          ${etiqueta({ x, y: y + 44, texto })}
+        </g>`;
+    });
+
+    if (ramas.length > 0) {
+      const origenX = margen + separacion * (pasos.length - 1);
+      const ramaY = 156;
+      const anchoRama = ancho / (ramas.length + 1);
+
+      cuerpo += `
+        <g style="--largo: ${ramaY - 16 - (y + 22)}px">
+          <circle cx="${origenX}" cy="${y + 22}" r="4" class="diagrama-viajero viajero-${tramos - 1}" />
+        </g>`;
+
+      ramas.forEach((rama, i) => {
+        const x = anchoRama * (i + 1);
+        const tono = TONOS[rama.tono] || TONOS.marca;
+        cuerpo += `
+          <g class="diagrama-rama" style="--retraso: ${pasos.length * 0.2 + i * 0.14}s">
+            <path d="M ${origenX} ${y + 46} C ${origenX} ${ramaY - 28}, ${x} ${y + 52}, ${x} ${ramaY - 16}"
+                  class="diagrama-linea diagrama-curva" fill="none" />
+            <circle cx="${x}" cy="${ramaY}" r="16" class="diagrama-circulo" style="--tono: ${tono}" />
+            <text x="${x}" y="${ramaY + 5}" class="diagrama-numero diagrama-simbolo" text-anchor="middle">${escapar(rama.simbolo || '')}</text>
+            ${etiqueta({ x, y: ramaY + 36, texto: rama.texto })}
+          </g>`;
+      });
+    }
   }
 
-  return `<svg viewBox="0 0 ${ancho} ${alto}" class="diagrama" role="img"
+  const elemento = `${id}-${vertical ? 'v' : 'h'}`;
+
+  return `<svg id="${elemento}" viewBox="0 0 ${ancho} ${alto}" class="diagrama" role="img"
        aria-label="${escapar(titulo || 'Diagrama de flujo')}"
-       preserveAspectRatio="xMidYMid meet">${cuerpo}
+       preserveAspectRatio="xMidYMid meet">
+    <style>${fotogramas(elemento, tramos, vertical, ramas.length > 0)}
+      @media (prefers-reduced-motion: reduce) {
+        #${elemento} .diagrama-viajero { display: none; }
+        #${elemento} .diagrama-circulo { animation: none !important; }
+      }
+    </style>${cuerpo}
   </svg>`;
 }
 
-export const DIAGRAMAS = {
-  general: flujo(
-    ['Crear el evento', 'Cargar al personal', 'Repartir invitaciones', 'Escanear en la puerta', 'Sortear los premios'],
-    { titulo: 'El orden general: evento, personal, invitaciones, puerta y sorteos' }
-  ),
+/**
+ * Los pasos de cada diagrama.
+ * Se guardan como datos y no como SVG ya armado porque de los mismos pasos
+ * salen las dos orientaciones.
+ */
+export const DEFINICIONES = {
+  general: {
+    titulo: 'El orden general: evento, personal, invitaciones, puerta y sorteos',
+    pasos: ['Crear el evento', 'Cargar al personal', 'Repartir invitaciones',
+            'Escanear en la puerta', 'Sortear los premios']
+  },
 
-  escaner: flujo(
-    ['Abrir la cámara', 'Apuntar al código', 'Se lee solo'],
-    {
-      titulo: 'Escanear una invitación y sus tres resultados posibles',
-      ramas: [
-        { simbolo: '✓', texto: 'Entró bien', tono: 'exito' },
-        { simbolo: '!', texto: 'Ya había entrado', tono: 'alerta' },
-        { simbolo: '✕', texto: 'No está en la lista', tono: 'error' }
-      ]
-    }
-  ),
+  escaner: {
+    titulo: 'Escanear una invitación y sus tres resultados posibles',
+    pasos: ['Abrir la cámara', 'Apuntar al código', 'Se lee solo'],
+    ramas: [
+      { simbolo: '✓', texto: 'Entró bien', tono: 'exito' },
+      { simbolo: '!', texto: 'Ya había entrado', tono: 'alerta' },
+      { simbolo: '✕', texto: 'No está en la lista', tono: 'error' }
+    ]
+  },
 
-  asistencias: flujo(
-    ['Alguien escanea', 'Se guarda', 'Aparece en la lista', 'Participa del sorteo'],
-    { titulo: 'De la puerta a la lista de asistentes' }
-  ),
+  asistencias: {
+    titulo: 'De la puerta a la lista de asistentes',
+    pasos: ['Alguien escanea', 'Se guarda', 'Aparece en la lista', 'Participa del sorteo']
+  },
 
-  sorteo: flujo(
-    ['Elegir el premio', 'Cuántos ganadores', 'Extraer', 'Anunciar', 'Marcar entregado'],
-    { titulo: 'Sacar un ganador y entregarle el premio' }
-  ),
+  sorteo: {
+    titulo: 'Sacar un ganador y entregarle el premio',
+    pasos: ['Elegir el premio', 'Cuántos ganadores', 'Extraer', 'Anunciar', 'Marcar entregado']
+  },
 
-  'preparar-sorteo': flujo(
-    ['Crear el sorteo', 'Agregar premios', 'Poner cantidades', 'Queda listo'],
-    { titulo: 'Armar el sorteo de la fiesta con sus premios' }
-  ),
+  'preparar-sorteo': {
+    titulo: 'Armar el sorteo de la fiesta con sus premios',
+    pasos: ['Crear el sorteo', 'Agregar premios', 'Poner cantidades', 'Queda listo']
+  },
 
-  catalogo: flujo(
-    ['Agregar', 'Completar los datos', 'Guardar', 'Ya se puede usar'],
-    { titulo: 'Cargar un elemento del catálogo' }
-  ),
+  catalogo: {
+    titulo: 'Cargar un elemento del catálogo',
+    pasos: ['Agregar', 'Completar los datos', 'Guardar', 'Ya se puede usar']
+  },
 
-  empleados: flujo(
-    ['Descargar plantilla', 'Llenar en Excel', 'Subir el archivo', 'Revisar el resultado'],
-    {
-      titulo: 'Cargar al personal desde una planilla',
-      ramas: [
-        { simbolo: '✓', texto: 'Filas cargadas', tono: 'exito' },
-        { simbolo: '✕', texto: 'Filas rechazadas', tono: 'error' }
-      ]
-    }
-  ),
+  empleados: {
+    titulo: 'Cargar al personal desde una planilla',
+    pasos: ['Descargar plantilla', 'Llenar en Excel', 'Subir el archivo', 'Revisar el resultado'],
+    ramas: [
+      { simbolo: '✓', texto: 'Filas cargadas', tono: 'exito' },
+      { simbolo: '✕', texto: 'Filas rechazadas', tono: 'error' }
+    ]
+  },
 
-  eventos: flujo(
-    ['Crear el evento', 'Marcarlo activo', 'Todo se guarda ahí'],
-    { titulo: 'Crear un evento y activarlo' }
-  ),
+  eventos: {
+    titulo: 'Crear un evento y activarlo',
+    pasos: ['Crear el evento', 'Marcarlo activo', 'Todo se guarda ahí']
+  },
 
-  invitaciones: flujo(
-    ['Subir el diseño', 'Ubicar el código', 'Guardar', 'Generar', 'Repartir'],
-    { titulo: 'Diseñar y repartir las invitaciones' }
-  ),
+  invitaciones: {
+    titulo: 'Diseñar y repartir las invitaciones',
+    pasos: ['Subir el diseño', 'Ubicar el código', 'Guardar', 'Generar', 'Repartir']
+  },
 
-  usuarios: flujo(
-    ['Crear el rol', 'Darle permisos', 'Crear el usuario', 'Asignarle el rol'],
-    { titulo: 'Dar acceso a alguien' }
-  ),
+  usuarios: {
+    titulo: 'Dar acceso a alguien',
+    pasos: ['Crear el rol', 'Darle permisos', 'Crear el usuario', 'Asignarle el rol']
+  },
 
-  permisos: flujo(
-    ['Elegir el rol', 'Marcar qué puede', 'Guardar', 'Volver a entrar'],
-    { titulo: 'Configurar los permisos de un rol' }
-  ),
+  permisos: {
+    titulo: 'Configurar los permisos de un rol',
+    pasos: ['Elegir el rol', 'Marcar qué puede', 'Guardar', 'Volver a entrar']
+  },
 
-  configuracion: flujo(
-    ['Revisión previa', 'Corregir lo que falta', 'Abrir las puertas'],
-    { titulo: 'Revisar el sistema antes del evento' }
-  )
+  configuracion: {
+    titulo: 'Revisar el sistema antes del evento',
+    pasos: ['Revisión previa', 'Corregir lo que falta', 'Abrir las puertas']
+  }
 };
 
-/** El diagrama de un capítulo, o cadena vacía si no tiene. */
-export function diagramaDe(clave) {
-  return DIAGRAMAS[clave] || '';
+/**
+ * El diagrama de un capítulo, o cadena vacía si no tiene.
+ * `vertical` pide la versión apilada, que es la que entra en un teléfono.
+ */
+export function diagramaDe(clave, { vertical = false } = {}) {
+  const definicion = DEFINICIONES[clave];
+  if (!definicion) return '';
+
+  return flujo(clave, definicion.pasos, {
+    ramas: definicion.ramas || [],
+    titulo: definicion.titulo,
+    vertical
+  });
 }

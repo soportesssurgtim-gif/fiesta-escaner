@@ -1,0 +1,79 @@
+<!--
+  Opciones de la lectura en voz alta.
+
+  Va en un archivo aparte porque el manual tiene dos disposiciones —una para
+  teléfono y otra para escritorio— y este panel es el mismo en las dos. Tenerlo
+  duplicado garantizaba que tarde o temprano quedaran distintos. Los
+  identificadores pueden ser fijos porque las dos disposiciones se excluyen: en
+  el documento hay una sola copia a la vez.
+
+  Quien lo incluye decide cuándo mostrarlo: el parcial es solo el contenido, y
+  la condición vive en un único lugar. Tenerla acá y en el envoltorio la
+  duplicaba, y dos condiciones que dicen lo mismo terminan diciendo cosas
+  distintas.
+
+  Las voces se muestran en dos grupos: las que hablan español, ordenadas por
+  cuál suena mejor para esto, y el resto. Antes se filtraban las que no eran
+  españolas y la lista quedaba en dos o tres opciones, sin forma de elegir otra
+  cosa.
+-->
+<div class="space-y-4">
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div>
+      <label for="voz-manual" class="etiqueta mb-1">Voz</label>
+      <select id="voz-manual" class="campo campo-select"
+              :value="lectura.estado.vozElegida"
+              @change="lectura.cambiarVoz($event.target.value)">
+        <optgroup v-if="lectura.vocesEnEspanol.length > 0" label="En español">
+          <option v-for="voz in lectura.vocesEnEspanol" :key="voz.nombre" :value="voz.nombre">
+            {{ voz.nombre }} ({{ voz.idioma }})
+          </option>
+        </optgroup>
+        <optgroup v-if="lectura.otrasVoces.length > 0" label="Otros idiomas">
+          <option v-for="voz in lectura.otrasVoces" :key="voz.nombre" :value="voz.nombre">
+            {{ voz.nombre }} ({{ voz.idioma }})
+          </option>
+        </optgroup>
+      </select>
+
+      <p v-if="lectura.estado.voces.length === 0" class="mt-1 text-theme-xs text-warning-600 dark:text-warning-400">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        Este dispositivo no tiene voces instaladas.
+      </p>
+      <p v-else class="mt-1 text-theme-xs text-gray-400">
+        {{ lectura.estado.voces.length }}
+        {{ lectura.estado.voces.length === 1 ? 'voz disponible' : 'voces disponibles' }}
+      </p>
+    </div>
+
+    <div>
+      <label for="velocidad-manual" class="etiqueta mb-1 flex justify-between">
+        <span>Velocidad</span>
+        <span class="font-mono text-gray-400">{{ lectura.estado.velocidad.toFixed(2) }}×</span>
+      </label>
+      <input id="velocidad-manual" type="range" min="0.5" max="2" step="0.05"
+             :value="lectura.estado.velocidad"
+             @input="lectura.cambiarVelocidad($event.target.value)"
+             class="w-full accent-brand-500" />
+      <div class="mt-1 flex justify-between text-theme-xs text-gray-400">
+        <span>Lento</span>
+        <button type="button" @click="lectura.cambiarVelocidad(1)"
+                class="text-brand-500 hover:text-brand-600">Normal</button>
+        <span>Rápido</span>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    Probar la voz sin tener que salir de acá. Elegir entre ocho nombres que no
+    dicen nada sobre cómo suenan es imposible sin escucharlas.
+  -->
+  <button type="button"
+          @click="lectura.leer('Así se escucha esta voz. Pulsa escuchar para seguir el manual.', 'prueba-voz')"
+          class="boton boton-secundario w-full sm:w-auto">
+    <i class="fa-solid"
+       :class="lectura.estado.leyendo === 'prueba-voz' ? 'fa-circle-stop' : 'fa-play'"></i>
+    {{ lectura.estado.leyendo === 'prueba-voz' ? 'Detener' : 'Probar la voz' }}
+  </button>
+</div>

@@ -351,16 +351,58 @@ async function iniciar() {
        * se conserva y además se puede seguir leyendo.
        */
       const manual = usarManual({
-        puedeVer: (modulo) => permisos.tienePermiso(modulo, 'Ver')
+        puedeVer: (modulo) => permisos.tienePermiso(modulo, 'Ver'),
+        // El diagrama se dibuja apilado cuando no hay ancho para el horizontal.
+        // Va como función y no como valor para que se recalcule al girar el
+        // teléfono, que cambia `esMovil` sin recargar nada.
+        esAngosto: () => esMovil.value
       });
 
       const lectura = usarLectura();
       const opcionesVozAbiertas = ref(false);
+      // En pantalla angosta el índice ocupa toda la altura, así que aparece
+      // solo cuando se lo pide.
+      const indiceManualAbierto = ref(false);
+
+      /*
+       * El manual es una capa encima de la aplicación, no una pantalla más.
+       *
+       * Se entra a consultar algo y se vuelve a lo que uno estaba haciendo. Si
+       * fuera una vista del menú, cerrarla sería elegir otra del menú, y no
+       * necesariamente la de donde se venía.
+       */
+      const manualAbierto = ref(false);
+
+      function abrirManual(capitulo = null) {
+        if (capitulo) manual.abrirCapitulo(capitulo);
+        manualAbierto.value = true;
+        indiceManualAbierto.value = false;
+        // La barra lateral del teléfono queda debajo de la capa; si se deja
+        // abierta, al cerrar el manual reaparece sin que nadie la haya pedido.
+        sidebarMovil.value = false;
+      }
+
+      function cerrarManual() {
+        lectura.detener();
+        manualAbierto.value = false;
+        indiceManualAbierto.value = false;
+        opcionesVozAbiertas.value = false;
+      }
+
+      function abrirIndiceManual() {
+        indiceManualAbierto.value = true;
+      }
+
+      /** Cierra el manual y lleva a la pantalla que el capítulo explica. */
+      function irALaPantalla(destino) {
+        cerrarManual();
+        cambiarVista(destino);
+      }
 
       /** El botón de ayuda: manual abierto en lo que corresponde a esta pantalla. */
       function abrirGuia() {
         manual.abrirDeVista(vista.value);
-        cambiarVista('manual');
+        abrirManual();
       }
 
       /**
@@ -372,7 +414,59 @@ async function iniciar() {
       function irAlCapitulo(id) {
         lectura.detener();
         manual.abrirCapitulo(id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        indiceManualAbierto.value = false;
+      }
+
+      /*
+       * Deslizar para cambiar de diapositiva.
+       *
+       * En un teléfono, un tutorial que solo avanza con botones se siente
+       * viejo: la mano ya viene entrenada para deslizar. Los botones se
+       * conservan igual, porque el gesto no se descubre solo.
+       */
+      const gesto = { x: 0, y: 0, activo: false };
+
+      function alTocarInicio(evento) {
+        const toque = evento.changedTouches && evento.changedTouches[0];
+        if (!toque) return;
+        gesto.x = toque.clientX;
+        gesto.y = toque.clientY;
+        gesto.activo = true;
+      }
+
+      function alTocarFin(evento) {
+        if (!gesto.activo) return;
+        gesto.activo = false;
+
+        const toque = evento.changedTouches && evento.changedTouches[0];
+        if (!toque) return;
+
+        const dx = toque.clientX - gesto.x;
+        const dy = toque.clientY - gesto.y;
+
+        // Tiene que ser claramente horizontal y de un largo mínimo: si no,
+        // desplazarse hacia abajo por la pantalla cambiaría de diapositiva.
+        if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+
+        lectura.detener();
+        if (dx < 0) manual.pasoSiguiente();
+        else manual.pasoAnterior();
+      }
+
+      /** Cambia de diapositiva cortando la voz, que era de la anterior. */
+      function irAPasoManual(indice) {
+        lectura.detener();
+        manual.irAPaso(indice);
+      }
+
+      function pasoSiguienteManual() {
+        lectura.detener();
+        manual.pasoSiguiente();
+      }
+
+      function pasoAnteriorManual() {
+        lectura.detener();
+        manual.pasoAnterior();
       }
 
       /** Escucha el capítulo entero, o lo detiene si ya está sonando. */
@@ -382,6 +476,33 @@ async function iniciar() {
           return;
         }
         lectura.leerSeguido(manual.paraEscuchar);
+      }
+
+      /**
+       * Escucha la diapositiva que está a la vista.
+       *
+       * En el teléfono no tiene sentido leer el capítulo entero: se ve una cosa
+       * por vez, y la voz se iría de la pantalla que se está mirando.
+       */
+      function escucharDiapositiva() {
+        if (lectura.estado.leyendo) {
+          lectura.detener();
+          return;
+        }
+
+        const actual = manual.diapositiva;
+        if (!actual) return;
+
+        let texto = actual.titulo + '. ';
+        if (actual.tipo === 'consejos') {
+          texto += (actual.puntos || []).join(' ');
+        } else if (actual.tipo === 'problemas') {
+          texto += (actual.casos || []).map((c) => `${c.sintoma} ${c.solucion}`).join(' ');
+        } else {
+          texto += actual.texto || '';
+        }
+
+        lectura.leer(texto, actual.id);
       }
 
       // =====================================================================
@@ -1854,11 +1975,18 @@ async function iniciar() {
       });
 
       async function cambiarVista(nueva) {
-        // Al salir del manual se corta la lectura en voz alta: seguir
-        // escuchando instrucciones de una pantalla que ya no está a la vista
-        // confunde, y no hay forma de detenerla desde otro lado.
-        if (vista.value === 'manual' && nueva !== 'manual') {
-          lectura.detener();
+        /*
+         * El manual no es una vista: es una capa.
+         *
+         * Sigue estando en el menú, porque es donde la gente lo va a buscar,
+         * pero elegirlo abre la capa encima de lo que se estaba haciendo en
+         * lugar de reemplazarlo. Así, al cerrarla, se vuelve exactamente a
+         * donde se estaba.
+         */
+        if (nueva === 'manual') {
+          abrirManual();
+          if (esMovil.value) sidebarMovil.value = false;
+          return;
         }
 
         // Al salir del escáner apagamos la cámara: si no, sigue encendida y
@@ -1931,6 +2059,7 @@ async function iniciar() {
       onMounted(async () => {
         window.addEventListener('resize', alRedimensionar);
         document.addEventListener('click', alHacerClicFuera);
+        document.addEventListener('keydown', alPresionarTecla);
         tema.seguirAlSistema((modo) => { modoOscuro.value = modo === 'oscuro'; });
 
         // El portal público no necesita sesión ni catálogos.
@@ -1962,11 +2091,20 @@ async function iniciar() {
         ocultarPantallaCarga();
       });
 
+      /** Escape cierra el manual, como en cualquier capa que tape la pantalla. */
+      function alPresionarTecla(evento) {
+        if (evento.key !== 'Escape' || !manualAbierto.value) return;
+
+        if (indiceManualAbierto.value) indiceManualAbierto.value = false;
+        else cerrarManual();
+      }
+
       onBeforeUnmount(() => {
         // Sin esto la voz sigue sonando despues de cerrar.
         lectura.limpiar();
         window.removeEventListener('resize', alRedimensionar);
         document.removeEventListener('click', alHacerClicFuera);
+        document.removeEventListener('keydown', alPresionarTecla);
         escaner.detener();
         disenador.desmontar();
       });
@@ -2003,8 +2141,11 @@ async function iniciar() {
         cambiarEstadoUsuario, cambiarEstadoRol, usarCuentaDe, volverAMiCuenta,
 
         // Guías
-        manual, lectura, opcionesVozAbiertas,
-        abrirGuia, irAlCapitulo, escucharCapitulo,
+        manual, lectura, opcionesVozAbiertas, indiceManualAbierto, manualAbierto,
+        abrirGuia, abrirManual, cerrarManual, abrirIndiceManual, irALaPantalla,
+        irAlCapitulo, escucharCapitulo, escucharDiapositiva,
+        alTocarInicio, alTocarFin,
+        irAPasoManual, pasoSiguienteManual, pasoAnteriorManual,
 
         // Cambio de la contraseña propia
         cambioClave, abrirCambioClave, guardarClaveNueva,

@@ -1,0 +1,267 @@
+<!--
+  Manual de usuario, a pantalla completa.
+
+  No es una vista más del sistema: es una capa que se pone encima de lo que se
+  estaba haciendo y se cierra volviendo exactamente a eso. Por eso tapa la
+  barra lateral y el encabezado, y tiene su propio botón de cerrar.
+
+  La razón es que un manual no es un lugar donde se trabaja, es un lugar donde
+  se consulta algo y se vuelve. Con el menú al costado, cerrar el manual era
+  elegir otra pantalla del menú, que no siempre es de la que se venía.
+
+  La forma es la de un onboarding: una cosa por vez, avance a la vista, y
+  botones grandes. En pantalla ancha se le agrega el índice al costado, porque
+  con trece capítulos hace falta poder saltar sin pasar por todos.
+-->
+<div v-if="manualAbierto" class="manual-capa" role="dialog" aria-modal="true"
+     aria-label="Manual de usuario">
+
+  <!-- ==================== ENCABEZADO ==================== -->
+  <header class="manual-encabezado">
+    <button type="button" @click="abrirIndiceManual()"
+            class="boton-icono shrink-0 lg:hidden"
+            aria-label="Ver el índice del manual">
+      <i class="fa-solid fa-list-ul"></i>
+    </button>
+
+    <div class="min-w-0 flex-1">
+      <p class="text-theme-xs text-gray-400">Manual de usuario</p>
+      <p class="truncate text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+        {{ manual.capitulo ? manual.capitulo.titulo : '' }}
+      </p>
+    </div>
+
+    <!-- Cambiar de registro: es lo que más se toca, así que va acá arriba -->
+    <div class="hidden rounded-lg bg-gray-100 p-1 dark:bg-gray-800 sm:flex" role="group"
+         aria-label="Nivel de detalle">
+      <button v-for="opcion in manual.modos" :key="opcion.valor"
+              type="button" @click="manual.cambiarModo(opcion.valor)"
+              :title="opcion.detalle"
+              :aria-pressed="manual.modo === opcion.valor ? 'true' : 'false'"
+              class="rounded-md px-3 py-1.5 text-theme-xs transition"
+              :class="manual.modo === opcion.valor
+                      ? 'bg-white font-medium text-gray-800 shadow-theme-xs dark:bg-gray-900 dark:text-white/90'
+                      : 'text-gray-500 dark:text-gray-400'">
+        <i class="fa-solid" :class="opcion.icono"></i>
+        {{ opcion.etiqueta }}
+      </button>
+    </div>
+
+    <template v-if="lectura.estado.disponible">
+      <button type="button" @click="escucharDiapositiva()" class="boton-icono shrink-0"
+              :aria-label="lectura.estado.leyendo ? 'Detener la lectura' : 'Escuchar esta pantalla'">
+        <i class="fa-solid"
+           :class="lectura.estado.leyendo ? 'fa-circle-stop text-brand-500' : 'fa-volume-high'"></i>
+      </button>
+      <button type="button" @click="opcionesVozAbiertas = !opcionesVozAbiertas"
+              class="boton-icono shrink-0" aria-label="Opciones de voz">
+        <i class="fa-solid fa-sliders"></i>
+      </button>
+    </template>
+
+    <span class="mx-1 hidden h-6 w-px bg-gray-200 dark:bg-gray-700 sm:block"></span>
+
+    <button type="button" @click="cerrarManual()" class="boton-icono shrink-0"
+            aria-label="Cerrar el manual y volver">
+      <i class="fa-solid fa-xmark text-lg"></i>
+    </button>
+  </header>
+
+  <!-- Opciones de voz, desplegables desde el encabezado -->
+  <div v-if="opcionesVozAbiertas && lectura.estado.disponible"
+       class="shrink-0 border-b border-gray-200 bg-white px-4 pb-4 dark:border-gray-800 dark:bg-gray-900">
+    <div class="mx-auto max-w-3xl">
+      <!--#incluir: parciales/manual-opciones-voz.html-->
+    </div>
+  </div>
+
+  <!-- ==================== CUERPO ==================== -->
+  <div class="manual-cuerpo">
+
+    <!-- Índice: fijo en pantalla ancha, desplegable en angosta -->
+    <aside class="manual-indice" :class="{ 'esta-abierto': indiceManualAbierto }">
+      <div class="flex items-center justify-between gap-2 lg:hidden">
+        <p class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">Capítulos</p>
+        <button type="button" @click="indiceManualAbierto = false" class="boton-icono"
+                aria-label="Cerrar el índice">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="relative my-3">
+        <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
+        <input v-model="manual.busqueda" type="search" class="campo pl-9"
+               placeholder="Buscar" aria-label="Buscar en el manual" />
+      </div>
+
+      <p v-if="manual.capitulosVisibles.length === 0"
+         class="py-6 text-center text-theme-sm text-gray-400">
+        No hay nada con esas palabras.
+      </p>
+
+      <nav v-else class="space-y-1" aria-label="Índice del manual">
+        <button v-for="capitulo in manual.capitulosVisibles" :key="capitulo.id"
+                type="button" @click="irAlCapitulo(capitulo.id)"
+                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition"
+                :class="manual.capitulo && manual.capitulo.id === capitulo.id
+                        ? 'bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400'
+                        : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800'">
+          <i class="fa-solid w-4 shrink-0 text-center" :class="capitulo.icono"></i>
+          <span class="min-w-0 flex-1 truncate text-theme-sm">{{ capitulo.titulo }}</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Fondo que cierra el índice al tocarlo, solo en pantalla angosta -->
+    <div v-if="indiceManualAbierto" @click="indiceManualAbierto = false"
+         class="fixed inset-0 z-10 bg-gray-900/40 lg:hidden"></div>
+
+    <!-- La diapositiva -->
+    <main class="manual-escenario"
+          @touchstart.passive="alTocarInicio"
+          @touchend.passive="alTocarFin">
+      <div v-if="manual.capitulo && manual.diapositiva"
+           :key="manual.capitulo.id + '-' + manual.paso"
+           class="animar-diapositiva mx-auto w-full max-w-2xl">
+
+        <!-- Portada: el mapa de lo que viene -->
+        <template v-if="manual.diapositiva.tipo === 'portada'">
+          <div class="text-center">
+            <span class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-brand-50 text-3xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+              <i class="fa-solid" :class="manual.diapositiva.icono"></i>
+            </span>
+            <h1 class="text-title-sm font-bold text-gray-800 dark:text-white/90">
+              {{ manual.diapositiva.titulo }}
+            </h1>
+            <p class="mx-auto mt-3 max-w-md text-theme-sm text-gray-500 dark:text-gray-400">
+              {{ manual.diapositiva.texto }}
+            </p>
+          </div>
+
+          <div v-if="manual.diagrama"
+               class="diagrama-marco mt-8" :class="{ 'es-vertical': esMovil }">
+            <div v-html="manual.diagrama"></div>
+          </div>
+        </template>
+
+        <!-- Un paso -->
+        <template v-else-if="manual.diapositiva.tipo === 'bloque'">
+          <div class="flex items-start gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-2xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+              <i class="fa-solid" :class="manual.diapositiva.icono"></i>
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-theme-xs uppercase tracking-wide text-gray-400">
+                Paso {{ manual.paso }} de {{ manual.bloques.length }}
+              </p>
+              <h2 class="mt-1 text-theme-xl font-semibold text-gray-800 dark:text-white/90">
+                {{ manual.diapositiva.titulo }}
+              </h2>
+            </div>
+          </div>
+          <p class="mt-5 text-theme-sm leading-relaxed text-gray-600 dark:text-gray-400">
+            {{ manual.diapositiva.texto }}
+          </p>
+        </template>
+
+        <!-- Consejos -->
+        <template v-else-if="manual.diapositiva.tipo === 'consejos'">
+          <div class="flex items-start gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-2xl text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+              <i class="fa-solid" :class="manual.diapositiva.icono"></i>
+            </span>
+            <h2 class="min-w-0 flex-1 self-center text-theme-xl font-semibold text-gray-800 dark:text-white/90">
+              {{ manual.diapositiva.titulo }}
+            </h2>
+          </div>
+          <ul class="mt-5 space-y-3">
+            <li v-for="(consejo, i) in manual.diapositiva.puntos" :key="i"
+                class="flex gap-3 rounded-xl border border-brand-200 bg-brand-25 p-4 dark:border-brand-500/30 dark:bg-brand-500/10">
+              <i class="fa-solid fa-circle-check mt-0.5 shrink-0 text-brand-500"></i>
+              <p class="text-theme-sm text-gray-700 dark:text-gray-300">{{ consejo }}</p>
+            </li>
+          </ul>
+        </template>
+
+        <!-- Si algo sale mal -->
+        <template v-else>
+          <div class="flex items-start gap-4">
+            <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-warning-50 text-2xl text-warning-500 dark:bg-warning-500/15">
+              <i class="fa-solid" :class="manual.diapositiva.icono"></i>
+            </span>
+            <h2 class="min-w-0 flex-1 self-center text-theme-xl font-semibold text-gray-800 dark:text-white/90">
+              {{ manual.diapositiva.titulo }}
+            </h2>
+          </div>
+          <div class="mt-5 space-y-3">
+            <div v-for="(caso, i) in manual.diapositiva.casos" :key="i"
+                 class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+              <p class="text-theme-sm font-medium text-gray-800 dark:text-white/90">{{ caso.sintoma }}</p>
+              <p class="mt-1.5 text-theme-sm text-gray-600 dark:text-gray-400">{{ caso.solucion }}</p>
+            </div>
+          </div>
+        </template>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== PIE ==================== -->
+  <footer v-if="manual.capitulo" class="manual-pie">
+    <div class="mx-auto flex w-full max-w-2xl items-center gap-3">
+      <button type="button" @click="pasoAnteriorManual()"
+              class="boton boton-secundario shrink-0"
+              :disabled="manual.esPrimerPaso"
+              aria-label="Paso anterior">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span class="hidden sm:inline">Atrás</span>
+      </button>
+
+      <!-- Avance: cada punto lleva a su diapositiva -->
+      <div class="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto"
+           role="tablist" aria-label="Avance del capítulo">
+        <button v-for="(diapo, i) in manual.diapositivas" :key="diapo.id"
+                type="button" @click="irAPasoManual(i)"
+                class="h-2 shrink-0 rounded-full transition-all"
+                :class="manual.paso === i ? 'w-6 bg-brand-500' : 'w-2 bg-gray-300 dark:bg-gray-700'"
+                :aria-label="'Ir al paso ' + (i + 1)"
+                :aria-selected="manual.paso === i ? 'true' : 'false'"></button>
+      </div>
+
+      <!--
+        El último paso no ofrece «siguiente» sino la salida que corresponda:
+        pasar al capítulo que sigue, o ir a hacer lo que el capítulo explica.
+      -->
+      <button v-if="!manual.esUltimoPaso" type="button" @click="pasoSiguienteManual()"
+              class="boton boton-primario shrink-0">
+        <span class="hidden sm:inline">Siguiente</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+      <button v-else-if="manual.capitulo.vista" type="button"
+              @click="irALaPantalla(manual.capitulo.vista)"
+              class="boton boton-primario shrink-0">
+        <span class="hidden sm:inline">Ir a la pantalla</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+      <button v-else-if="manual.siguiente" type="button"
+              @click="irAlCapitulo(manual.siguiente.id)"
+              class="boton boton-primario shrink-0">
+        <span class="hidden truncate sm:inline">{{ manual.siguiente.titulo }}</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+      <button v-else type="button" @click="cerrarManual()" class="boton boton-primario shrink-0">
+        <i class="fa-solid fa-check"></i>
+        <span class="hidden sm:inline">Listo</span>
+      </button>
+    </div>
+
+    <!-- Avance de la lectura en voz alta -->
+    <div v-if="lectura.estado.leyendo && lectura.estado.progreso.total > 1"
+         class="mx-auto mt-3 h-1 w-full max-w-2xl overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+      <div class="h-full rounded-full bg-brand-500 transition-all"
+           :style="{ width: (lectura.estado.progreso.indice / lectura.estado.progreso.total * 100) + '%' }"></div>
+    </div>
+  </footer>
+</div>

@@ -19,7 +19,7 @@
  *    No hay forma de arrancar sola.
  */
 
-const { reactive } = Vue;
+const { reactive, computed } = Vue;
 
 /**
  * Cuántos caracteres como máximo por locución.
@@ -29,8 +29,39 @@ const { reactive } = Vue;
  */
 const LARGO_MAXIMO = 180;
 
-/** Idiomas aceptables, del más deseado al menos. */
-const IDIOMAS = ['es-SV', 'es-419', 'es-MX', 'es-US', 'es-CO', 'es-AR', 'es-ES', 'es'];
+/**
+ * Voces preferidas por nombre, de la más deseada a la menos.
+ *
+ * El nombre pesa más que el idioma porque una voz concreta suena mejor que
+ * otra aunque compartan variante. Encabeza «Google español», que es la
+ * masculina y la que mejor lee estas instrucciones.
+ *
+ * El nombre exacto vale más que el que solo coincide al principio. Hace falta
+ * porque «Google español de Estados Unidos» empieza igual que «Google
+ * español»: sin esa distinción las dos empatarían y ganaría la otra.
+ */
+const NOMBRES_PREFERIDOS = [
+  'Google español',
+  'Google español de Estados Unidos',
+  'Microsoft Jorge',
+  'Jorge',
+  'Diego',
+  'Microsoft Sabina',
+  'Paulina'
+];
+
+/**
+ * Idiomas aceptables, del más deseado al menos.
+ *
+ * Encabeza es-US, que es el español latinoamericano que traen instalado casi
+ * todos los dispositivos. Detrás van las variantes de la región, y el
+ * castellano de España al final: se entiende igual, pero suena ajeno para
+ * quien va a escuchar estas instrucciones.
+ */
+const IDIOMAS = ['es-US', 'es-SV', 'es-419', 'es-MX', 'es-CO', 'es-AR', 'es-ES', 'es'];
+
+/** El que se le pone a la locución cuando no hay ninguna voz en español. */
+const IDIOMA_POR_DEFECTO = 'es-ES';
 
 /**
  * Parte un texto en pedazos que entren en una locución.
@@ -77,15 +108,37 @@ export function partirEnFrases(texto) {
   return pedazos.filter(Boolean);
 }
 
-/** Puntúa una voz: cuanto más alto, mejor calza con lo que queremos. */
-function puntuar(voz) {
-  const idioma = String(voz.lang || '').replace('_', '-');
-  const posicion = IDIOMAS.findIndex((codigo) => idioma.toLowerCase().startsWith(codigo.toLowerCase()));
-  if (posicion === -1) return -1;
+/** ¿Esta voz habla español? */
+export function esEspanol(voz) {
+  return String(voz.lang || '').replace('_', '-').toLowerCase().startsWith('es');
+}
 
+/**
+ * Puntúa una voz: cuanto más alto, mejor calza con lo que queremos.
+ *
+ * Manda el nombre, después el idioma. Las que no hablan español puntúan
+ * negativo, pero igual se ofrecen: no se descartan, se ordenan al final.
+ */
+export function puntuar(voz) {
+  const nombre = String(voz.name || '');
+  const idioma = String(voz.lang || '').replace('_', '-');
+
+  const enMinuscula = nombre.toLowerCase();
+  const exacto = NOMBRES_PREFERIDOS.findIndex((b) => enMinuscula === b.toLowerCase());
+  const porPrefijo = NOMBRES_PREFERIDOS.findIndex((b) => enMinuscula.startsWith(b.toLowerCase()));
+
+  const porIdioma = IDIOMAS.findIndex(
+    (codigo) => idioma.toLowerCase().startsWith(codigo.toLowerCase())
+  );
+
+  if (porIdioma === -1) return -1;
+
+  const puntosNombre = exacto !== -1
+    ? (NOMBRES_PREFERIDOS.length - exacto) * 1000
+    : (porPrefijo === -1 ? 0 : (NOMBRES_PREFERIDOS.length - porPrefijo) * 100);
   // Las locales suenan peor que las del servicio pero funcionan sin conexión,
   // que es la condición en la que se usa esto.
-  return (IDIOMAS.length - posicion) * 10 + (voz.localService ? 1 : 0);
+  return puntosNombre + (IDIOMAS.length - porIdioma) * 10 + (voz.localService ? 1 : 0);
 }
 
 export function usarLectura() {
@@ -117,19 +170,31 @@ export function usarLectura() {
     if (!disponible) return;
 
     const todas = window.speechSynthesis.getVoices() || [];
-    const enEspanol = todas
+
+    /*
+     * Se ofrecen TODAS las voces del dispositivo, no solo las españolas.
+     *
+     * Filtrarlas dejaba la lista en dos o tres opciones —a veces en una— y no
+     * había forma de elegir otra cosa. Las que hablan español van primero y
+     * ordenadas por preferencia; el resto queda disponible más abajo por si
+     * alguien la prefiere.
+     */
+    const ordenadas = todas
       .map((voz) => ({ voz, puntos: puntuar(voz) }))
-      .filter((fila) => fila.puntos >= 0)
-      .sort((a, b) => b.puntos - a.puntos);
+      .sort((a, b) => b.puntos - a.puntos)
+      .map((fila) => fila.voz);
 
-    // Si el sistema no tiene ninguna voz en español se ofrecen todas: es
-    // preferible escucharlo con acento a no poder escucharlo.
-    const elegibles = enEspanol.length > 0 ? enEspanol.map((f) => f.voz) : todas;
+    estado.voces = ordenadas.map((voz) => ({
+      nombre: voz.name,
+      idioma: voz.lang,
+      esEspanol: esEspanol(voz)
+    }));
 
-    estado.voces = elegibles.map((voz) => ({ nombre: voz.name, idioma: voz.lang }));
-
-    if (!estado.vozElegida && elegibles.length > 0) {
-      estado.vozElegida = elegibles[0].name;
+    // La elegida solo se fija la primera vez, o si la que estaba ya no está
+    // —pasa al desinstalar un paquete de voces—.
+    const sigueDisponible = ordenadas.some((voz) => voz.name === estado.vozElegida);
+    if (!sigueDisponible && ordenadas.length > 0) {
+      estado.vozElegida = ordenadas[0].name;
     }
   }
 
@@ -181,7 +246,7 @@ export function usarLectura() {
       locucion.voice = voz;
       locucion.lang = voz.lang;
     } else {
-      locucion.lang = 'es-ES';
+      locucion.lang = IDIOMA_POR_DEFECTO;
     }
     locucion.rate = estado.velocidad;
 
@@ -283,8 +348,17 @@ export function usarLectura() {
     }
   }
 
+  /*
+   * Las voces separadas en dos grupos, para poder agruparlas en el desplegable.
+   * Con ocho o diez voces mezcladas cuesta encontrar las que sirven.
+   */
+  const vocesEnEspanol = computed(() => estado.voces.filter((voz) => voz.esEspanol));
+  const otrasVoces = computed(() => estado.voces.filter((voz) => !voz.esEspanol));
+
   return reactive({
     estado,
+    vocesEnEspanol,
+    otrasVoces,
     leer,
     leerSeguido,
     detener,

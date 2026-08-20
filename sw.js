@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.4.0';
+const VERSION_CACHE = 'v3.6.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -107,10 +107,11 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/modal-importacion.html',
   '/assets/views/parciales/modal-instalar.html',
   '/assets/views/parciales/modal-pendientes.html',
+  '/assets/views/parciales/manual-opciones-voz.html',
   '/assets/views/parciales/notificaciones.html',
   '/assets/views/vistas/asistencias.html',
   '/assets/views/vistas/configuracion.html',
-  '/assets/views/vistas/manual.html',
+  '/assets/views/parciales/manual.html',
   '/assets/views/vistas/departamentos.html',
   '/assets/views/vistas/empleados.html',
   '/assets/views/vistas/escaner.html',
