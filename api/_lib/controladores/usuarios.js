@@ -10,8 +10,14 @@ import { Repositorio } from '../repositorio.js';
 import { TABLAS, SI, NO } from '../configuracion.js';
 import { aTexto, aBandera } from '../valores.js';
 import { leerCuerpo } from '../peticion.js';
-import { sha256 } from '../seguridad.js';
-import { responderOk, responderSolicitudInvalida, responderNoAutenticado } from '../respuestas.js';
+import { sha256, esAdministrador, cerrarSesionesDeUsuario } from '../seguridad.js';
+import {
+  responderOk,
+  responderSolicitudInvalida,
+  responderNoAutenticado,
+  responderNoEncontrado,
+  responderSinPermiso
+} from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 import { repositorioEmpleados } from './empleados.js';
 import { repositorioRoles } from './roles.js';
@@ -121,11 +127,98 @@ async function cambiarClavePropia({ req, res, sesion }) {
   return responderOk(res, { ok: true, mensaje: 'Tu contraseña quedó actualizada.' });
 }
 
+/**
+ * Activa o desactiva una cuenta.
+ *
+ * No es un borrado: la fila queda, con su historial y su vínculo al empleado.
+ * Una cuenta desactivada no puede entrar, y si estaba dentro se la saca en el
+ * acto cerrando sus sesiones.
+ *
+ * Tres cosas que el servidor no deja hacer, porque cada una deja el sistema
+ * peor de lo que estaba:
+ *
+ *   · Desactivarse a uno mismo. Es un pie de bala: se cierra la sesión y hay
+ *     que entrar con otra cuenta para revertirlo.
+ *   · Dejar al sistema sin ningún administrador activo. Sin eso no habría
+ *     forma de volver a entrar a administrar nada.
+ *   · Tocar cuentas sin ser administrador.
+ */
+async function cambiarEstadoDeUsuario({ req, res, sesion }) {
+  if (!esAdministrador(sesion.rol)) {
+    return responderSinPermiso(res, 'Solo un administrador puede activar o desactivar cuentas.');
+  }
+
+  const cuerpo = await leerCuerpo(req);
+  const id = aTexto(cuerpo.id);
+  const activar = aBandera(cuerpo.activo) === SI;
+
+  if (!id) return responderSolicitudInvalida(res, 'Falta indicar la cuenta.');
+
+  if (id === sesion.usuarioId) {
+    return responderSolicitudInvalida(
+      res,
+      'No puedes desactivar tu propia cuenta. Pídeselo a otro administrador.'
+    );
+  }
+
+  const cuenta = await repositorioUsuarios.obtenerPorId(id, 'id, usuario, rol, activo');
+  if (!cuenta) return responderNoEncontrado(res, 'Esa cuenta ya no existe.');
+
+  if (!activar && (await esElUltimoAdministrador(cuenta))) {
+    return responderSolicitudInvalida(
+      res,
+      `${cuenta.usuario} es el único administrador activo. ` +
+      'Asigna ese rol a otra cuenta antes de desactivarla, o el sistema se queda sin quien lo administre.'
+    );
+  }
+
+  await repositorioUsuarios.actualizar(id, { activo: activar ? SI : NO });
+
+  let sesionesCerradas = 0;
+  if (!activar) {
+    // Sin esto, la baja no tiene efecto hasta que le venza el token.
+    sesionesCerradas = await cerrarSesionesDeUsuario(id);
+  }
+
+  console.info(
+    `[usuarios] ${sesion.usuario || 'desconocido'} ${activar ? 'activó' : 'desactivó'} a ${cuenta.usuario}`
+  );
+
+  return responderOk(res, {
+    ok: true,
+    activo: activar,
+    usuario: cuenta.usuario,
+    sesionesCerradas,
+    mensaje: activar
+      ? `${cuenta.usuario} puede volver a entrar.`
+      : `${cuenta.usuario} quedó desactivado` +
+        (sesionesCerradas > 0 ? ' y se cerró su sesión.' : '.')
+  });
+}
+
+/** ¿Esta cuenta es la única administradora que queda activa? */
+async function esElUltimoAdministrador(cuenta) {
+  const roles = await repositorioRoles.listar({}, 'id, nombre_rol');
+  const idsDeAdministrador = new Set(
+    roles.filter((rol) => esAdministrador(rol.nombre_rol)).map((rol) => rol.id)
+  );
+
+  if (!idsDeAdministrador.has(cuenta.rol)) return false;
+
+  const activos = await repositorioUsuarios.listar({ activo: SI }, 'id, rol');
+  const otros = activos.filter(
+    (fila) => fila.id !== cuenta.id && idsDeAdministrador.has(fila.rol)
+  );
+
+  return otros.length === 0;
+}
+
 export const controladorUsuarios = crearControladorCatalogo({
   repositorio: repositorioUsuarios,
 
   accionesExtra: {
-    'POST cambiar-clave': cambiarClavePropia
+    'POST cambiar-clave': cambiarClavePropia,
+    'POST estado': cambiarEstadoDeUsuario
   },
 
   listar: async ({ res }) => listarUsuariosConDetalle(),

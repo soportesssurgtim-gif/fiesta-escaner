@@ -90,7 +90,9 @@ async function iniciar() {
 
       const sesion = reactive({
         token: null, usuario: null, correo: null,
-        nombreMostrar: null, rol: null, rolId: null
+        nombreMostrar: null, rol: null, rolId: null,
+        // Cuando la sesión es prestada, acá va quién la abrió.
+        impersonadoPor: null
       });
 
       // El sidebar arranca abierto en escritorio y cerrado en móvil, donde
@@ -388,7 +390,8 @@ async function iniciar() {
             correo: respuesta.correo,
             nombreMostrar: respuesta.nombreMostrar,
             rol: respuesta.rol,
-            rolId: respuesta.rolId
+            rolId: respuesta.rolId,
+            impersonadoPor: null
           });
           almacenSesion.guardar(respuesta);
           poblarCatalogos(respuesta.datosIniciales);
@@ -417,7 +420,8 @@ async function iniciar() {
         almacenSesion.limpiar();
         Object.assign(sesion, {
           token: null, usuario: null, correo: null,
-          nombreMostrar: null, rol: null, rolId: null
+          nombreMostrar: null, rol: null, rolId: null,
+          impersonadoPor: null
         });
         formularioLogin.usuario = '';
         formularioLogin.password = '';
@@ -445,6 +449,116 @@ async function iniciar() {
         limpiarSesion();
         notificarAlerta('Tu sesión expiró. Vuelve a iniciar sesión.');
       };
+
+      // =====================================================================
+      // Usuarios y roles: activar, desactivar, y usar otra cuenta
+      // =====================================================================
+
+      const gestionCuentas = reactive({
+        trabajando: '',        // el id sobre el que se está operando
+        confirmando: null      // { tipo: 'usuario'|'rol'|'impersonar', fila }
+      });
+
+      /** ¿Es la cuenta con la que se inició sesión? */
+      function esMiCuenta(cuenta) {
+        return Boolean(cuenta && cuenta.usuario && cuenta.usuario === sesion.usuario);
+      }
+
+      async function cambiarEstadoUsuario(cuenta, activar) {
+        gestionCuentas.trabajando = cuenta.id;
+        try {
+          const resultado = await api.usuarios.cambiarEstado(cuenta.id, activar ? 'TRUE' : 'FALSE');
+          notificar(resultado.mensaje, activar ? 'exito' : 'info');
+          await recargarCatalogos();
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo cambiar el estado.');
+        } finally {
+          gestionCuentas.trabajando = '';
+          gestionCuentas.confirmando = null;
+        }
+      }
+
+      async function cambiarEstadoRol(rol, activar) {
+        gestionCuentas.trabajando = rol.id;
+        try {
+          const resultado = await api.roles.cambiarEstado(rol.id, activar ? 'TRUE' : 'FALSE');
+          notificar(resultado.mensaje, activar ? 'exito' : 'alerta');
+          await recargarCatalogos();
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo cambiar el estado del rol.');
+        } finally {
+          gestionCuentas.trabajando = '';
+          gestionCuentas.confirmando = null;
+        }
+      }
+
+      /**
+       * Empieza a usar otra cuenta.
+       *
+       * Sirve para responder la pregunta que aparece siempre: "¿por qué esta
+       * persona no ve tal botón?". Crear una cuenta de prueba con el mismo rol
+       * es lento y nunca reproduce el caso exacto.
+       *
+       * Se reemplaza el token por el prestado y se recarga todo: la matriz de
+       * permisos, el menú y las vistas pasan a ser las de esa persona.
+       */
+      async function usarCuentaDe(cuenta) {
+        gestionCuentas.trabajando = cuenta.id;
+        try {
+          const respuesta = await api.sesion.impersonar(cuenta.id);
+
+          Object.assign(sesion, {
+            token: respuesta.token,
+            usuario: respuesta.usuario,
+            correo: respuesta.correo,
+            nombreMostrar: respuesta.nombreMostrar,
+            rol: respuesta.rol,
+            rolId: respuesta.rolId,
+            impersonadoPor: respuesta.impersonadoPor || null
+          });
+          almacenSesion.guardar(respuesta);
+          poblarCatalogos(respuesta.datosIniciales);
+
+          vista.value = 'scanner';
+          gestionCuentas.confirmando = null;
+          notificarAlerta(`Estás usando la cuenta de ${respuesta.usuario}.`);
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo usar esa cuenta.');
+        } finally {
+          gestionCuentas.trabajando = '';
+        }
+      }
+
+      /** Vuelve a la cuenta propia y cierra la prestada. */
+      async function volverAMiCuenta() {
+        gestionCuentas.trabajando = 'volviendo';
+        try {
+          const respuesta = await api.sesion.volverDeImpersonar();
+
+          Object.assign(sesion, {
+            token: respuesta.token,
+            usuario: respuesta.usuario,
+            correo: respuesta.correo,
+            nombreMostrar: respuesta.nombreMostrar,
+            rol: respuesta.rol,
+            rolId: respuesta.rolId,
+            impersonadoPor: null
+          });
+          almacenSesion.guardar(respuesta);
+          poblarCatalogos(respuesta.datosIniciales);
+
+          vista.value = 'usuarios';
+          notificarExito(`Volviste a tu cuenta, ${respuesta.usuario}.`);
+        } catch (fallo) {
+          // Si no se puede volver (la cuenta original se desactivó, por
+          // ejemplo) lo correcto es salir del todo, no quedarse con una sesión
+          // prestada que ya no tiene dueño.
+          notificarError(fallo.message || 'No se pudo volver. Inicia sesión otra vez.');
+          limpiarSesion();
+        } finally {
+          gestionCuentas.trabajando = '';
+        }
+      }
 
       // =====================================================================
       // Escáner
@@ -1372,6 +1486,9 @@ async function iniciar() {
         const guardada = almacenSesion.leer();
         if (guardada && guardada.token) {
           Object.assign(sesion, guardada);
+          // Si la sesión guardada era prestada, la franja de aviso vuelve a
+          // aparecer tras recargar la página.
+          sesion.impersonadoPor = guardada.impersonadoPor || null;
           await recargarCatalogos();
           sincronizacion.arrancar();
         }
@@ -1414,6 +1531,10 @@ async function iniciar() {
         // Sesión
         formularioLogin, errorLogin, entrando, verPassword,
         iniciarSesion, modalCierreAbierto, confirmarCierre,
+
+        // Usuarios y roles
+        gestionCuentas, esMiCuenta,
+        cambiarEstadoUsuario, cambiarEstadoRol, usarCuentaDe, volverAMiCuenta,
 
         // Guías
         guiaAbierta, guiaActual, abrirGuia,

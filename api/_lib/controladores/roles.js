@@ -8,11 +8,16 @@
 
 import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
-import { TABLAS, MODULOS } from '../configuracion.js';
+import { TABLAS, MODULOS, SI, NO } from '../configuracion.js';
 import { aTexto, aBandera } from '../valores.js';
 import { leerCuerpo } from '../peticion.js';
 import { esAdministrador } from '../seguridad.js';
-import { responderOk, responderSolicitudInvalida, responderSinPermiso } from '../respuestas.js';
+import {
+  responderOk,
+  responderSolicitudInvalida,
+  responderSinPermiso,
+  responderNoEncontrado
+} from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 
 export const repositorioRoles = new Repositorio(TABLAS.roles, {
@@ -122,6 +127,67 @@ async function guardarMatrizDeRol({ req, res, sesion }) {
   return responderOk(res, { ok: true, guardados: permisos.length });
 }
 
+/**
+ * Activa o desactiva un rol.
+ *
+ * Un rol desactivado sigue existiendo y sus permisos quedan guardados, pero no
+ * debería asignarse a nadie nuevo.
+ *
+ * No se deja desactivar un rol de administrador: las cuentas que lo tengan son
+ * las únicas que pueden volver a activarlo, así que sería cerrar la puerta
+ * desde adentro y tirar la llave.
+ *
+ * Si el rol está en uso se avisa cuántas cuentas lo tienen, pero no se impide:
+ * puede ser justamente lo que se quiere, y esas cuentas siguen funcionando
+ * hasta que se les cambie el rol.
+ */
+async function cambiarEstadoDeRol({ req, res, sesion }) {
+  if (!esAdministrador(sesion.rol)) {
+    return responderSinPermiso(res, 'Solo un administrador puede activar o desactivar roles.');
+  }
+
+  const cuerpo = await leerCuerpo(req);
+  const id = aTexto(cuerpo.id);
+  const activar = aBandera(cuerpo.activo) === SI;
+
+  if (!id) return responderSolicitudInvalida(res, 'Falta indicar el rol.');
+
+  const rol = await repositorioRoles.obtenerPorId(id, 'id, nombre_rol, activo');
+  if (!rol) return responderNoEncontrado(res, 'Ese rol ya no existe.');
+
+  if (!activar && esAdministrador(rol.nombre_rol)) {
+    return responderSolicitudInvalida(
+      res,
+      `"${rol.nombre_rol}" es un rol de administrador y no se puede desactivar: ` +
+      'sería quedarse sin quien pueda volver a activarlo.'
+    );
+  }
+
+  await repositorioRoles.actualizar(id, { activo: activar ? SI : NO });
+
+  const { count } = await supabase
+    .from(TABLAS.usuarios)
+    .select('id', { count: 'exact', head: true })
+    .eq('rol', id);
+
+  const enUso = count || 0;
+
+  console.info(
+    `[roles] ${sesion.usuario || 'desconocido'} ${activar ? 'activó' : 'desactivó'} el rol ${rol.nombre_rol}`
+  );
+
+  return responderOk(res, {
+    ok: true,
+    activo: activar,
+    nombre: rol.nombre_rol,
+    enUso,
+    mensaje: activar
+      ? `El rol "${rol.nombre_rol}" quedó activo.`
+      : `El rol "${rol.nombre_rol}" quedó inactivo` +
+        (enUso > 0 ? `. Ojo: ${enUso} ${enUso === 1 ? 'cuenta lo tiene' : 'cuentas lo tienen'} asignado.` : '.')
+  });
+}
+
 export const controladorRoles = crearControladorCatalogo({
   repositorio: repositorioRoles,
 
@@ -141,6 +207,7 @@ export const controladorRoles = crearControladorCatalogo({
     // "rol" es el nombre que usaba el frontend viejo para el guardado masivo.
     // Mantenemos el alias para no romper cachés del navegador.
     'POST permisos-rol': guardarMatrizDeRol,
+    'POST estado': cambiarEstadoDeRol,
     'POST rol': guardarMatrizDeRol
   }
 });

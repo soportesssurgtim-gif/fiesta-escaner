@@ -35,7 +35,12 @@ export const almacenSesion = {
       correo: datos.correo || '',
       nombreMostrar: datos.nombreMostrar || '',
       rol: datos.rol || '',
-      rolId: datos.rolId || ''
+      rolId: datos.rolId || '',
+      // Quién prestó la cuenta, si es que la sesión es prestada. Se guarda para
+      // que al recargar la página siga viéndose la franja de aviso: olvidarse
+      // de que uno está actuando como otra persona es justo lo que no debe
+      // pasar.
+      impersonadoPor: datos.impersonadoPor || null
     };
 
     respaldoEnMemoria = sesion;

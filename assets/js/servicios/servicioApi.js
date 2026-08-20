@@ -22,6 +22,14 @@ export const api = {
     },
     catalogos() {
       return http.obtener('auth', { accion: 'datos-iniciales' });
+    },
+    /** Empieza a actuar en nombre de otra cuenta. Solo administradores. */
+    impersonar(usuarioId) {
+      return http.enviar('auth', { usuarioId }, { accion: 'impersonar' });
+    },
+    /** Vuelve a la cuenta propia y cierra la prestada. */
+    volverDeImpersonar() {
+      return http.enviar('auth', {}, { accion: 'volver' });
     }
   },
 
@@ -134,6 +142,10 @@ export const api = {
     },
     modulos() {
       return http.obtener('roles', { accion: 'modulos' });
+    },
+    /** Activa o desactiva un rol. */
+    cambiarEstado(id, activo) {
+      return http.enviar('roles', { id, activo }, { accion: 'estado' });
     }
   },
 
@@ -164,6 +176,10 @@ export const api = {
      */
     cambiarMiClave(claveActual, claveNueva) {
       return http.enviar('usuarios', { claveActual, claveNueva }, { accion: 'cambiar-clave' });
+    },
+    /** Activa o desactiva una cuenta. Al desactivar se le cierran las sesiones. */
+    cambiarEstado(id, activo) {
+      return http.enviar('usuarios', { id, activo }, { accion: 'estado' });
     }
   },
 

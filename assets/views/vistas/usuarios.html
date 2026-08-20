@@ -83,11 +83,45 @@
               </div>
             </td>
             <td class="text-right">
-              <button v-if="permisos.tienePermiso('usuarios', 'Editar')"
-                      type="button" @click="usuarios.abrir(cuenta)"
-                      class="boton-icono" aria-label="Editar usuario">
-                <i class="fa-solid fa-pen"></i>
-              </button>
+              <div class="flex items-center justify-end gap-1">
+                <!--
+                  Usar la cuenta de otra persona.
+
+                  Sirve para responder "¿por qué no ve tal botón?" sin tener que
+                  crear una cuenta de prueba con su mismo rol. Solo lo ve un
+                  administrador, no aparece sobre la cuenta propia ni sobre otro
+                  administrador, y el servidor lo vuelve a comprobar todo.
+                -->
+                <button v-if="permisos.esAdministrador && !esMiCuenta(cuenta) && !sesion.impersonadoPor && esVerdadero(cuenta.activo)"
+                        type="button"
+                        @click="gestionCuentas.confirmando = { tipo: 'impersonar', fila: cuenta }"
+                        class="boton-icono"
+                        :disabled="gestionCuentas.trabajando === cuenta.id"
+                        title="Ver el sistema como esta persona">
+                  <i class="fa-solid fa-user-secret"></i>
+                </button>
+
+                <button v-if="permisos.esAdministrador && !esMiCuenta(cuenta)"
+                        type="button"
+                        @click="esVerdadero(cuenta.activo)
+                                ? gestionCuentas.confirmando = { tipo: 'usuario', fila: cuenta }
+                                : cambiarEstadoUsuario(cuenta, true)"
+                        class="boton-icono"
+                        :class="esVerdadero(cuenta.activo) ? 'text-warning-600 dark:text-warning-400' : 'text-success-600 dark:text-success-400'"
+                        :disabled="gestionCuentas.trabajando === cuenta.id"
+                        :title="esVerdadero(cuenta.activo) ? 'Desactivar esta cuenta' : 'Volver a activarla'">
+                  <i class="fa-solid"
+                     :class="gestionCuentas.trabajando === cuenta.id
+                             ? 'fa-circle-notch animar-girar'
+                             : (esVerdadero(cuenta.activo) ? 'fa-user-slash' : 'fa-user-check')"></i>
+                </button>
+
+                <button v-if="permisos.tienePermiso('usuarios', 'Editar')"
+                        type="button" @click="usuarios.abrir(cuenta)"
+                        class="boton-icono" aria-label="Editar usuario">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -145,6 +179,21 @@
                         class="boton-icono" aria-label="Configurar permisos de este rol">
                   <i class="fa-solid fa-shield-halved"></i>
                 </button>
+                <button v-if="permisos.esAdministrador"
+                        type="button"
+                        @click="esVerdadero(rol.activo)
+                                ? gestionCuentas.confirmando = { tipo: 'rol', fila: rol }
+                                : cambiarEstadoRol(rol, true)"
+                        class="boton-icono"
+                        :class="esVerdadero(rol.activo) ? 'text-warning-600 dark:text-warning-400' : 'text-success-600 dark:text-success-400'"
+                        :disabled="gestionCuentas.trabajando === rol.id"
+                        :title="esVerdadero(rol.activo) ? 'Desactivar este rol' : 'Volver a activarlo'">
+                  <i class="fa-solid"
+                     :class="gestionCuentas.trabajando === rol.id
+                             ? 'fa-circle-notch animar-girar'
+                             : (esVerdadero(rol.activo) ? 'fa-toggle-off' : 'fa-toggle-on')"></i>
+                </button>
+
                 <button v-if="permisos.tienePermiso('usuarios', 'Editar')"
                         type="button" @click="roles.abrir(rol)"
                         class="boton-icono" aria-label="Editar rol">
@@ -313,6 +362,75 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!--
+    Confirmación de las tres acciones delicadas de esta pantalla.
+
+    Un solo modal para las tres porque la forma es idéntica y solo cambia el
+    texto; tres modales casi iguales se desincronizan al primer retoque.
+  -->
+  <div v-if="gestionCuentas.confirmando" class="modal-fondo"
+       @click.self="gestionCuentas.confirmando = null">
+    <div class="modal-panel max-w-md">
+
+      <div class="mb-4 flex items-start gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+              :class="gestionCuentas.confirmando.tipo === 'impersonar'
+                      ? 'bg-brand-50 text-brand-500 dark:bg-brand-500/15'
+                      : 'bg-warning-50 text-warning-500 dark:bg-warning-500/15'">
+          <i class="fa-solid text-theme-xl"
+             :class="gestionCuentas.confirmando.tipo === 'impersonar' ? 'fa-user-secret' : 'fa-triangle-exclamation'"></i>
+        </span>
+
+        <div class="min-w-0">
+          <h2 class="modal-titulo">
+            {{ gestionCuentas.confirmando.tipo === 'impersonar'
+               ? 'Usar la cuenta de ' + gestionCuentas.confirmando.fila.usuario
+               : gestionCuentas.confirmando.tipo === 'rol'
+                 ? 'Desactivar el rol ' + gestionCuentas.confirmando.fila.nombre_rol
+                 : 'Desactivar a ' + gestionCuentas.confirmando.fila.usuario }}
+          </h2>
+        </div>
+      </div>
+
+      <p class="text-theme-sm text-gray-600 dark:text-gray-400">
+        <template v-if="gestionCuentas.confirmando.tipo === 'impersonar'">
+          Vas a ver el sistema exactamente como lo ve esta persona, con sus
+          permisos y su menú. Lo que hagas queda registrado a su nombre, así que
+          conviene solo mirar. Puedes volver a tu cuenta cuando quieras.
+        </template>
+        <template v-else-if="gestionCuentas.confirmando.tipo === 'rol'">
+          El rol deja de estar disponible para asignar. Las cuentas que ya lo
+          tienen siguen funcionando hasta que se les cambie el rol.
+        </template>
+        <template v-else>
+          No podrá volver a entrar y, si tiene una sesión abierta, se le cerrará
+          en el acto. La cuenta no se borra: se puede reactivar cuando haga falta.
+        </template>
+      </p>
+
+      <div class="mt-6 flex gap-3">
+        <button type="button" @click="gestionCuentas.confirmando = null"
+                class="boton boton-secundario flex-1"
+                :disabled="gestionCuentas.trabajando">
+          Cancelar
+        </button>
+
+        <button type="button"
+                class="boton flex-1"
+                :class="gestionCuentas.confirmando.tipo === 'impersonar' ? 'boton-primario' : 'boton-peligro'"
+                :disabled="gestionCuentas.trabajando"
+                @click="gestionCuentas.confirmando.tipo === 'impersonar'
+                        ? usarCuentaDe(gestionCuentas.confirmando.fila)
+                        : gestionCuentas.confirmando.tipo === 'rol'
+                          ? cambiarEstadoRol(gestionCuentas.confirmando.fila, false)
+                          : cambiarEstadoUsuario(gestionCuentas.confirmando.fila, false)">
+          <i v-if="gestionCuentas.trabajando" class="fa-solid fa-circle-notch animar-girar"></i>
+          {{ gestionCuentas.confirmando.tipo === 'impersonar' ? 'Usar su cuenta' : 'Sí, desactivar' }}
+        </button>
+      </div>
     </div>
   </div>
 </section>

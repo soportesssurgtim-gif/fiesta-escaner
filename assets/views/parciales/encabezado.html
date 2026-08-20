@@ -4,7 +4,31 @@
   Lleva el control del sidebar, el título de la pantalla actual, y a la derecha
   las tres acciones que siempre están a mano: ayuda, tema y menú de usuario.
 -->
-<header class="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-gray-200 bg-white/95 px-4 backdrop-blur md:px-6 dark:border-gray-800 dark:bg-gray-dark/95">
+<!--
+  Aviso de cuenta prestada.
+
+  Va arriba de todo, ocupa el ancho completo y no se puede cerrar. Es a
+  propósito: olvidarse de que uno está actuando como otra persona es
+  exactamente lo que no debe pasar, y una notificación que desaparece a los
+  tres segundos no alcanza para eso.
+-->
+<div v-if="sesion.impersonadoPor"
+     class="sticky top-0 z-40 flex flex-wrap items-center gap-x-3 gap-y-2 bg-warning-500 px-4 py-2 text-white md:px-6">
+  <i class="fa-solid fa-user-secret shrink-0"></i>
+  <p class="min-w-0 flex-1 text-theme-xs">
+    Estás usando la cuenta de <strong>{{ sesion.usuario }}</strong>.
+    Volverás a {{ sesion.impersonadoPor.usuario }} al salir.
+  </p>
+  <button type="button" @click="volverAMiCuenta()"
+          class="shrink-0 rounded-lg bg-white/20 px-3 py-1 text-theme-xs font-semibold transition hover:bg-white/30"
+          :disabled="gestionCuentas.trabajando === 'volviendo'">
+    <i class="fa-solid" :class="gestionCuentas.trabajando === 'volviendo' ? 'fa-circle-notch animar-girar' : 'fa-arrow-left'"></i>
+    Volver a mi cuenta
+  </button>
+</div>
+
+<header class="sticky z-30 flex h-[72px] items-center gap-3 border-b border-gray-200 bg-white/95 px-4 backdrop-blur md:px-6 dark:border-gray-800 dark:bg-gray-dark/95"
+        :class="sesion.impersonadoPor ? 'top-[40px]' : 'top-0'">
 
   <!-- Alternar sidebar. En móvil abre el panel deslizante; en escritorio
        colapsa a solo iconos. -->

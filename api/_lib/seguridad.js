@@ -101,6 +101,30 @@ export async function eliminarSesion(token) {
 }
 
 /**
+ * Cierra todas las sesiones abiertas de una cuenta.
+ *
+ * Se llama al desactivar un usuario. Sin esto, dar de baja a alguien no lo saca
+ * del sistema: su token sigue vigente hasta seis horas y puede seguir
+ * registrando asistencias como si nada. La baja tiene que tener efecto ya.
+ */
+export async function cerrarSesionesDeUsuario(usuarioId) {
+  if (!usuarioId) return 0;
+  try {
+    const { data, error } = await supabase
+      .from(TABLAS.sesiones)
+      .delete()
+      .eq('usuario_id', usuarioId)
+      .select('token');
+
+    if (error) throw error;
+    return (data || []).length;
+  } catch (fallo) {
+    console.error('[seguridad] No se pudieron cerrar las sesiones:', fallo);
+    return 0;
+  }
+}
+
+/**
  * Limpia sesiones vencidas.
  * La llamamos de vez en cuando desde el login para que la tabla no crezca sin
  * control. Es barato y evita tener que montar un cron aparte.
