@@ -38,6 +38,14 @@ export const api = {
     },
     diagnostico() {
       return http.obtener('asistencias', { accion: 'diagnostico' });
+    },
+    /**
+     * Lo registrado despues de `desde`, mas el total exacto.
+     * Es la llamada que sondea el sincronizador, asi que devuelve lo minimo:
+     * sin `desde` no trae filas, solo el total y la marca de tiempo.
+     */
+    novedades(desde) {
+      return http.obtener('asistencias', desde ? { accion: 'novedades', desde } : { accion: 'novedades' });
     }
   },
 

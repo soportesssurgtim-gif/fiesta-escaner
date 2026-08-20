@@ -6,7 +6,7 @@
       <div class="metrica-icono bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
         <i class="fa-solid fa-user-check"></i>
       </div>
-      <p class="metrica-valor">{{ asistencias.length }}</p>
+      <p class="metrica-valor">{{ resumen.total }}</p>
       <p class="metrica-etiqueta">Personas presentes</p>
     </div>
 
@@ -23,7 +23,7 @@
         <i class="fa-solid fa-chart-simple"></i>
       </div>
       <p class="metrica-valor">
-        {{ empleados.lista.length ? Math.round((asistencias.length / empleados.lista.length) * 100) : 0 }}%
+        {{ empleados.lista.length ? Math.round((resumen.total / empleados.lista.length) * 100) : 0 }}%
       </p>
       <p class="metrica-etiqueta">Nivel de asistencia</p>
     </div>
@@ -37,6 +37,35 @@
           {{ eventoActivo ? eventoActivo.nombre : 'Sin evento activo' }}
         </p>
       </div>
+
+      <!--
+        Estado del refresco automático.
+
+        Con varias tablets escaneando a la vez, saber si esta lista está al día
+        importa tanto como la lista misma: un número quieto puede significar que
+        no entró nadie o que hace rato que no se habla con el servidor, y son
+        cosas muy distintas.
+      -->
+      <button type="button"
+              @click="sincronizacion.sincronizarAhora()"
+              class="flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-theme-xs transition hover:bg-gray-100 dark:hover:bg-white/5"
+              :class="sincronizacion.estado.hayProblema
+                      ? 'text-warning-600 dark:text-warning-400'
+                      : 'text-gray-500 dark:text-gray-400'"
+              title="Actualizar ahora">
+        <span v-if="sincronizacion.estado.consultando">
+          <i class="fa-solid fa-circle-notch animar-girar"></i>
+        </span>
+        <span v-else-if="sincronizacion.estado.hayProblema">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </span>
+        <span v-else class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-400 opacity-75"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-success-500"></span>
+        </span>
+
+        {{ sincronizacion.estado.hayProblema ? 'Sin actualizar' : 'En vivo' }}
+      </button>
 
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div class="relative">

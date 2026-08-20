@@ -29,6 +29,7 @@ import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
+import { usarSincronizacion } from './composables/usarSincronizacion.js';
 
 import { guiaDe } from './contenido/guias.js';
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -346,6 +347,10 @@ async function iniciar() {
           null;
         resumen.total = bundle.resumen?.total ?? asistencias.value.length;
 
+        // La lista viene entera y al día, así que el sincronizador arranca
+        // desde la asistencia más reciente que acaba de llegar.
+        sincronizacion.reiniciar(asistencias.value[0]?.fechaHora || null);
+
         permisos.seleccionarPrimerRol();
       }
 
@@ -387,6 +392,7 @@ async function iniciar() {
 
           formularioLogin.password = '';
           vista.value = 'scanner';
+          sincronizacion.arrancar();
           notificarExito(`Bienvenido, ${respuesta.nombreMostrar || respuesta.usuario}.`);
 
           // Si la clave sigue siendo la temporal, abrimos el cambio de una vez.
@@ -404,6 +410,7 @@ async function iniciar() {
 
       /** Limpia todo rastro de la sesión en el navegador. */
       function limpiarSesion() {
+        sincronizacion.detener();
         almacenSesion.limpiar();
         Object.assign(sesion, {
           token: null, usuario: null, correo: null,
@@ -455,8 +462,64 @@ async function iniciar() {
             dui: respuesta.empleado?.dui || identificador,
             fuente: 'qr'
           });
+
+          // Se pide de inmediato en vez de esperar el turno: así las otras
+          // tablets ven este ingreso en el acto, y de paso llega la fila real
+          // que reemplaza a la optimista de arriba.
+          sincronizacion.sincronizarAhora();
         }
       });
+
+      // =====================================================================
+      // Refresco periódico de asistencias
+      //
+      // En la puerta suele haber más de una tablet escaneando. Sin esto cada
+      // una veía solo lo suyo y el contador quedaba congelado en lo que había
+      // al iniciar sesión.
+      // =====================================================================
+
+      const sincronizacion = usarSincronizacion({
+        haySesion: () => Boolean(sesion.token),
+        vistaActual: () => vista.value,
+        // Registrar tiene prioridad sobre refrescar: con un escaneo en vuelo,
+        // el sincronizador se saltea el turno.
+        estaOcupado: () => escaner.procesando || escaner.estadoRed.sincronizando,
+        alRecibir: fusionarNovedades
+      });
+
+      /**
+       * Mete lo que llegó del servidor en la lista que ya está en pantalla.
+       *
+       * No se reemplaza la lista entera a propósito. Al registrar un escaneo se
+       * agrega una fila optimista con id `local-…` para que el conteo suba en
+       * el acto; si el sondeo pisara la lista, esa fila desaparecería hasta que
+       * el servidor la devolviera, y en la puerta eso se ve como un registro
+       * que se perdió.
+       *
+       * Entonces: se agregan las nuevas que no estén ya, y recién ahí se
+       * descartan las optimistas que el servidor ya confirmó, comparando por
+       * DUI. El total siempre viene del servidor, que es quien sabe.
+       */
+      function fusionarNovedades({ total, nuevas }) {
+        resumen.total = total;
+        if (nuevas.length === 0) return;
+
+        const conocidas = new Set(asistencias.value.map((fila) => fila.id));
+        const frescas = nuevas.filter((fila) => !conocidas.has(fila.id));
+        if (frescas.length === 0) return;
+
+        const duisConfirmados = new Set(frescas.map((fila) => formato.duiPlano(fila.dui)));
+
+        asistencias.value = [
+          ...frescas,
+          ...asistencias.value.filter((fila) => {
+            const esOptimista = String(fila.id || '').startsWith('local-');
+            if (!esOptimista) return true;
+            // La optimista ya tiene su versión real: sobra.
+            return !duisConfirmados.has(formato.duiPlano(fila.dui));
+          })
+        ];
+      }
 
       // =====================================================================
       // Registros pendientes en el dispositivo
@@ -1005,6 +1068,15 @@ async function iniciar() {
         cargarPurgables();
       });
 
+      // Al entrar al escáner o al listado se pide de una. El sondeo de fondo
+      // espera treinta segundos entre turnos, y abrir Asistencias para mirar un
+      // número que tarda medio minuto en despertarse no sirve de nada.
+      watch(vista, (nueva) => {
+        if (nueva === 'scanner' || nueva === 'asistentes') {
+          sincronizacion.sincronizarAhora();
+        }
+      });
+
       // =====================================================================
       // Ciclo de vida
       // =====================================================================
@@ -1044,6 +1116,7 @@ async function iniciar() {
         if (guardada && guardada.token) {
           Object.assign(sesion, guardada);
           await recargarCatalogos();
+          sincronizacion.arrancar();
         }
 
         escaner.vigilarConexion();
@@ -1105,6 +1178,9 @@ async function iniciar() {
 
         // Registros pendientes en el dispositivo
         pendientes,
+
+        // Refresco periódico
+        sincronizacion,
 
         // Importar / exportar
         importacion, importarEmpleados, importarDepartamentos, exportar,

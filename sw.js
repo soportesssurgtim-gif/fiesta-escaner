@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v2.4.0';
+const VERSION_CACHE = 'v2.5.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -70,6 +70,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarNotificaciones.js',
   '/assets/js/composables/usarInstalacionPwa.js',
   '/assets/js/composables/usarPendientes.js',
+  '/assets/js/composables/usarSincronizacion.js',
   '/assets/js/composables/usarPermisos.js',
 
   // Componentes y contenido

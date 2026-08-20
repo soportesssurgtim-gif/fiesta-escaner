@@ -11,7 +11,7 @@ import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
 import { TABLAS, SI } from '../configuracion.js';
 import { aTexto } from '../valores.js';
-import { leerCuerpo } from '../peticion.js';
+import { leerCuerpo, leerParametro } from '../peticion.js';
 import {
   responderOk,
   responderSolicitudInvalida,
@@ -209,7 +209,70 @@ async function listarAsistencias({ res }) {
     eventoNombre: fila.eventos?.nombre || ''
   }));
 
-  return responderOk(res, { asistencias, resumen: { total: asistencias.length } });
+  // El total sale de un COUNT y no de asistencias.length: el listado está
+  // limitado a 1000 filas, así que pasadas las mil el contador se quedaba
+  // clavado en 1000 y nadie entendía por qué dejaba de subir.
+  return responderOk(res, { asistencias, resumen: { total: await contarAsistencias() } });
+}
+
+/** Cuántas asistencias hay, sin traerse ninguna. */
+async function contarAsistencias() {
+  const { count, error } = await supabase
+    .from(TABLAS.asistencias)
+    .select('id', { count: 'exact', head: true });
+
+  if (error) throw error;
+  return count || 0;
+}
+
+/**
+ * Novedades desde un momento dado.
+ *
+ * Es lo que sondea la aplicación para que los escaneos de las otras tablets
+ * aparezcan casi al instante. Tiene que ser barato: se llama cada pocos
+ * segundos en todos los dispositivos abiertos a la vez.
+ *
+ * Por eso devuelve un COUNT (que Postgres resuelve sin leer filas) y solo las
+ * asistencias posteriores a `desde`. En una jornada normal eso son cero o un
+ * puñado de filas por llamada, en vez de las mil del listado completo.
+ *
+ * Sin `desde` no devuelve filas: la primera llamada solo sirve para saber en
+ * qué momento está el servidor y desde dónde pedir la próxima vez.
+ */
+async function listarNovedades({ req, res }) {
+  const desde = aTexto(leerParametro(req, 'desde'));
+  const total = await contarAsistencias();
+
+  if (!desde) {
+    return responderOk(res, { total, nuevas: [], desde: new Date().toISOString() });
+  }
+
+  const { data, error } = await supabase
+    .from(TABLAS.asistencias)
+    .select('id, fecha_hora_asistencia, fuente, empleados!inner(nombres, apellidos, dui), eventos(nombre)')
+    .gt('fecha_hora_asistencia', desde)
+    .order('fecha_hora_asistencia', { ascending: false })
+    .limit(200);
+
+  if (error) throw error;
+
+  const nuevas = (data || []).map((fila) => ({
+    id: fila.id,
+    fechaHora: fila.fecha_hora_asistencia || '',
+    empleadoNombre: fila.empleados
+      ? `${fila.empleados.nombres} ${fila.empleados.apellidos}`.trim()
+      : 'Desconocido',
+    dui: fila.empleados?.dui || 'N/D',
+    fuente: fila.fuente || 'qr',
+    eventoNombre: fila.eventos?.nombre || ''
+  }));
+
+  // La marca para la próxima consulta sale de la fila más reciente, no del
+  // reloj de este servidor: si los relojes van corridos, usar la hora local
+  // se saltea registros o los repite para siempre.
+  const marca = nuevas.length > 0 ? nuevas[0].fechaHora : desde;
+
+  return responderOk(res, { total, nuevas, desde: marca });
 }
 
 /**
@@ -251,6 +314,9 @@ export const controladorAsistencias = {
     }
     if (metodo === 'POST' && accion === 'sincronizar-pendientes') {
       return sincronizarPendientes(contexto);
+    }
+    if (metodo === 'GET' && accion === 'novedades') {
+      return listarNovedades(contexto);
     }
     if (metodo === 'GET' && accion === 'diagnostico') {
       return diagnosticar(contexto);
