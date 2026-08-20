@@ -106,15 +106,30 @@
         </p>
 
         <div class="mt-6 flex flex-col gap-2">
-          <a :href="invitacion.resultado.empleado.qr_url"
-             download="mi-invitacion-qr.png"
-             target="_blank"
-             rel="noopener"
-             class="boton boton-primario w-full">
-            <i class="fa-solid fa-download"></i> Guardar el código
-          </a>
+          <!--
+            Guarda la invitación entera como imagen, no solo el QR.
+
+            Antes esto era un enlace con `download` al PNG de QuickChart, que no
+            descargaba nada: el atributo se ignora entre dominios distintos, así
+            que el navegador abría el código suelto. El empleado se quedaba con
+            un cuadrito negro sin su nombre ni el evento.
+          -->
           <button type="button"
-                  @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.ultimos4 = ''"
+                  @click="guardarInvitacion()"
+                  class="boton boton-primario w-full"
+                  :disabled="invitacion.guardando">
+            <i class="fa-solid"
+               :class="invitacion.guardando ? 'fa-circle-notch animar-girar' : 'fa-download'"></i>
+            {{ invitacion.guardando ? 'Generando…' : 'Guardar mi invitación' }}
+          </button>
+
+          <p v-if="invitacion.avisoGuardado"
+             class="text-center text-theme-xs text-gray-500 dark:text-gray-400">
+            {{ invitacion.avisoGuardado }}
+          </p>
+
+          <button type="button"
+                  @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.ultimos4 = ''; invitacion.avisoGuardado = ''"
                   class="boton boton-secundario w-full">
             Consultar otro DUI
           </button>

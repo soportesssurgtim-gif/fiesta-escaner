@@ -17,6 +17,7 @@ import { tema } from './nucleo/tema.js';
 import * as formato from './nucleo/formato.js';
 
 import { api } from './servicios/servicioApi.js';
+import { servicioInvitacion } from './servicios/servicioInvitacion.js';
 import {
   disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
   urlQr, descargarQr, enlaceInvitacion
@@ -998,12 +999,56 @@ async function iniciar() {
       // =====================================================================
 
       const invitacion = reactive({
-        dui: '', ultimos4: '', resultado: null, error: '', consultando: false
+        dui: '', ultimos4: '', resultado: null, error: '', consultando: false,
+        guardando: false,
+        // Se muestra en iPhone, donde la imagen se abre en otra pestaña en vez
+        // de descargarse: sin explicarlo, parece que el botón no hizo nada.
+        avisoGuardado: ''
       });
+
+      /**
+       * Guarda la invitación completa como imagen.
+       *
+       * Antes esto era un enlace con `download` apuntando al QR de QuickChart,
+       * que no descarga nada: el atributo se ignora entre dominios distintos y
+       * el navegador abría el PNG suelto. El empleado terminaba con un cuadrito
+       * negro sin su nombre ni el evento.
+       */
+      async function guardarInvitacion() {
+        if (!invitacion.resultado) return;
+
+        invitacion.guardando = true;
+        invitacion.avisoGuardado = '';
+
+        try {
+          const persona = invitacion.resultado.empleado;
+          const resultado = await servicioInvitacion.descargar({
+            evento: invitacion.resultado.evento,
+            fecha: invitacion.resultado.fechaEvento
+              ? formato.formatearFechaLarga(invitacion.resultado.fechaEvento)
+              : '',
+            ubicacion: invitacion.resultado.ubicacion || '',
+            nombre: formato.nombreCompleto(persona),
+            dui: formato.formatearDui(persona.dui),
+            urlQr: persona.qr_url
+          });
+
+          invitacion.avisoGuardado = resultado.descargada
+            ? 'Tu invitación se descargó.'
+            : 'Mantén pulsada la imagen y elige "Guardar en Fotos".';
+        } catch (fallo) {
+          console.error('[invitacion]', fallo);
+          invitacion.avisoGuardado =
+            'No se pudo generar la imagen. Toma una captura de pantalla de esta página.';
+        } finally {
+          invitacion.guardando = false;
+        }
+      }
 
       async function consultarInvitacion() {
         invitacion.error = '';
         invitacion.resultado = null;
+        invitacion.avisoGuardado = '';
 
         if (!invitacion.dui || !invitacion.ultimos4) {
           invitacion.error = 'Escribe tu DUI y los últimos 4 dígitos.';
@@ -1212,7 +1257,7 @@ async function iniciar() {
         pedirPurga, cancelarPurga, confirmarPurga,
 
         // Portal público
-        invitacion, consultarInvitacion,
+        invitacion, consultarInvitacion, guardarInvitacion,
 
         // Utilidades de formato disponibles en las plantillas
         ...formato
