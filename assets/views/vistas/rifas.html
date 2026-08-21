@@ -190,11 +190,11 @@
                  :style="{ animationDelay: (indice * 120) + 'ms' }">
               <p class="font-bold leading-tight text-gray-800 dark:text-white/90"
                  :class="sorteos.ultimaExtraccion.ganadores.length > 3 ? 'text-title-sm' : 'text-title-md'">
-                {{ g.empleado.nombre }}
+                {{ aNombrePropio(g.empleado.nombre) }}
               </p>
               <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
                 {{ formatearDui(g.empleado.dui) }}
-                <span v-if="g.empleado.cargo"> · {{ g.empleado.cargo }}</span>
+                <span v-if="g.empleado.cargo"> · {{ aNombrePropio(g.empleado.cargo) }}</span>
               </p>
             </div>
           </div>
@@ -254,7 +254,7 @@
                     <p class="tabla-celda-principal">{{ g.empleado ? g.empleado.nombre : 'Sin datos' }}</p>
                     <p v-if="g.empleado" class="text-theme-xs text-gray-400">
                       {{ formatearDui(g.empleado.dui) }}
-                      <span v-if="g.empleado.cargo"> · {{ g.empleado.cargo }}</span>
+                      <span v-if="g.empleado.cargo"> · {{ aNombrePropio(g.empleado.cargo) }}</span>
                     </p>
                   </td>
                   <td>{{ g.premioNombre || '—' }}</td>

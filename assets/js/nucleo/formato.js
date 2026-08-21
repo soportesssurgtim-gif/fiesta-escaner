@@ -135,10 +135,130 @@ export function aBandera(valor) {
   return valor === true || esVerdadero(valor) ? 'TRUE' : 'FALSE';
 }
 
-/** Nombre completo a partir de un empleado, sin espacios sobrantes. */
+/*
+ * Las palabras que van en minúscula aunque empiecen una palabra.
+ *
+ * En español los enlaces de un nombre no se capitalizan: María de los Ángeles,
+ * José del Carmen, Pérez y Gómez. Capitalizarlos —«María De Los Ángeles»— es el
+ * error típico de aplicar mayúscula a cada palabra sin mirar cuál es.
+ *
+ * Las de cargo van por lo mismo: «Jefe de la Unidad», no «Jefe De La Unidad».
+ */
+const ENLACES = new Set([
+  'de', 'del', 'la', 'las', 'lo', 'los', 'y', 'e', 'en', 'el',
+  'a', 'al', 'con', 'para', 'por', 'the', 'da', 'das', 'do', 'dos',
+  'van', 'von', 'di', 'san'
+]);
+
+/*
+ * Lo que se escribe todo en mayúscula y no es un grito.
+ *
+ * Sin esta lista, «JEFE DE UACI» quedaría «Jefe de Uaci», que se lee peor que
+ * el original. Están las de la municipalidad y las instituciones con las que
+ * trata, más los números romanos, que aparecen en los grados de un cargo
+ * —«Técnico II»— y que sin esto quedarían «Ii».
+ *
+ * Agregar una sigla nueva es agregarla acá. Es una lista y no una regla del
+ * tipo «tres letras o menos» porque esa regla convertiría «Sub» o «Ing» en
+ * siglas.
+ */
+const SIGLAS = new Set([
+  // Unidades y dependencias municipales
+  'UACI', 'UFI', 'UAIP', 'UATM', 'UMA', 'CAM', 'TIC', 'RRHH', 'RH', 'UPAC',
+  // Instituciones
+  'ISSS', 'AFP', 'PNC', 'CNR', 'MINSAL', 'MOP', 'ANDA', 'FODES', 'ISDEM',
+  'COMURES', 'MARN', 'MAG', 'ONG', 'FGR', 'PGR', 'CSJ',
+  // De uso general
+  'DUI', 'NIT', 'ISR', 'IVA', 'SV', 'QR', 'PDF',
+  // Los grados de un cargo
+  'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'
+]);
+
+/** Pone en mayúscula la primera letra y deja el resto como está. */
+function capitalizar(palabra) {
+  if (!palabra) return palabra;
+  return palabra[0].toLocaleUpperCase('es') + palabra.slice(1);
+}
+
+/*
+ * ¿Es una sigla escrita con puntos, tipo «R.E.F.»?
+ *
+ * Va como regla y no como lista porque no hay forma de saber de antemano cuáles
+ * van a aparecer, y la forma sola alcanza para reconocerlas: una letra suelta
+ * entre puntos no es una palabra abreviada, es una inicial.
+ *
+ * Distingue de las abreviaturas, que son otra cosa y sí llevan minúscula:
+ *
+ *   R.E.F.    tres iniciales      -> R.E.F.
+ *   AUX.      una palabra cortada -> Aux.
+ *   MANTTO.   una palabra cortada -> Mantto.
+ *
+ * Lo que las separa es el largo de cada pedazo: si alguno tiene más de una
+ * letra, es una palabra abreviada y no una sigla.
+ */
+function esSiglaConPuntos(palabra) {
+  if (!palabra.includes('.')) return false;
+
+  const pedazos = palabra.split('.').filter(Boolean);
+  return pedazos.length >= 2 && pedazos.every((pedazo) => pedazo.length === 1);
+}
+
+/**
+ * Texto en formato de nombre propio: solo las iniciales en mayúscula.
+ *
+ * La base guarda los nombres y los cargos todo en mayúscula, que es como
+ * vinieron de la planilla. Sirve para buscar y comparar, pero leer «JOSÉ ANTONIO
+ * MEJÍA DE GONZÁLEZ» en una lista de novecientos cansa, y en una invitación
+ * impresa parece un grito.
+ *
+ * Esto es solo para mostrar. Lo que se guarda no cambia: los formularios siguen
+ * escribiendo lo que la persona escriba, y las búsquedas siguen comparando
+ * sobre el dato crudo.
+ *
+ * Lo que no puede hacer: si el dato vino sin tildes —«MEJIA»— no hay forma de
+ * saber que llevaba una. Sale «Mejia», y eso se arregla en el dato, no acá.
+ */
+export function aNombrePropio(valor) {
+  const texto = String(valor ?? '').trim();
+  if (!texto) return '';
+
+  /*
+   * Se corta por espacios, pero también por guiones y apóstrofos, porque cada
+   * pedazo lleva su propia mayúscula: «García-López», «D'Aubuisson». El
+   * separador se conserva en el resultado.
+   */
+  return texto
+    .toLocaleLowerCase('es')
+    .split(/\s+/)
+    .map((palabra, indice) => {
+      const enMayuscula = palabra.toLocaleUpperCase('es');
+
+      // Una sigla se reconoce entera, antes de partirla por guiones.
+      if (SIGLAS.has(enMayuscula)) return enMayuscula;
+      if (esSiglaConPuntos(palabra)) return enMayuscula;
+
+      // Un enlace va en minúscula, salvo que arranque el texto: un apellido que
+      // empieza con «de» sí se capitaliza, como «De León».
+      if (indice > 0 && ENLACES.has(palabra)) return palabra;
+
+      return palabra
+        .split(/([-'’])/)
+        .map((parte) => (/^[-'’]$/.test(parte) ? parte : capitalizar(parte)))
+        .join('');
+    })
+    .join(' ');
+}
+
+/**
+ * Nombre completo a partir de un empleado, listo para mostrar.
+ *
+ * Devuelve el nombre en formato propio porque no hay ningún lugar donde se
+ * quiera mostrar el original a los gritos. Para el dato crudo están los campos
+ * del empleado, que es lo que usan las búsquedas y lo que se guarda.
+ */
 export function nombreCompleto(persona) {
   if (!persona) return '';
-  return `${persona.nombres || ''} ${persona.apellidos || ''}`.trim();
+  return aNombrePropio(`${persona.nombres || ''} ${persona.apellidos || ''}`.trim());
 }
 
 /**

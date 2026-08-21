@@ -75,7 +75,7 @@
             <td>
               {{ (departamentos.lista.find(d => d.id === persona.dpto) || {}).nombre_dpto || '—' }}
             </td>
-            <td>{{ persona.cargo || '—' }}</td>
+            <td>{{ aNombrePropio(persona.cargo) || '—' }}</td>
             <td>
               <span class="insignia" :class="esVerdadero(persona.activo) ? 'insignia-exito' : 'insignia-neutra'">
                 {{ esVerdadero(persona.activo) ? 'Activo' : 'Inactivo' }}
@@ -145,7 +145,7 @@
           </div>
           <div>
             <dt class="etiqueta">Cargo</dt>
-            <dd class="text-theme-sm text-gray-800 dark:text-gray-200">{{ detalle.persona.cargo || '—' }}</dd>
+            <dd class="text-theme-sm text-gray-800 dark:text-gray-200">{{ aNombrePropio(detalle.persona.cargo) || '—' }}</dd>
           </div>
           <div>
             <dt class="etiqueta">Distrito</dt>

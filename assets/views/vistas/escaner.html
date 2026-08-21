@@ -188,7 +188,7 @@
               </p>
               <p v-if="escaner.ultimoResultado.empleado?.cargo"
                  class="text-theme-sm text-gray-500 dark:text-gray-400">
-                {{ escaner.ultimoResultado.empleado.cargo }}
+                {{ aNombrePropio(escaner.ultimoResultado.empleado.cargo) }}
               </p>
               <span class="insignia-exito mt-4">Asistencia registrada</span>
             </div>
