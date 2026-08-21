@@ -996,7 +996,12 @@ html.dark .bloque-leyendo {
 }
 
 .mapa-evento {
-  height: 15rem;
+  /*
+   * Mas alto que antes. Los campos de latitud y longitud se fueron, asi que el
+   * mapa es la unica forma de marcar el lugar, y ademas tiene que hacerle sitio
+   * a la barra de busqueda sin quedarse sin mapa debajo.
+   */
+  height: 18rem;
   width: 100%;
   border-radius: 0.75rem;
   border: 1px solid var(--gris-200);
@@ -1085,3 +1090,126 @@ html.dark .mapa-evento { border-color: var(--gris-800); }
 }
 
 .mapa-evento .leaflet-control-layers-selector { margin: 0; }
+
+/*
+ * El buscador de lugares.
+ *
+ * Va pegado arriba y de lado a lado. Ocupa el lugar donde Leaflet pone sus
+ * controles, asi que a esos se los baja: sin eso, el boton de acercar y el
+ * selector de capas quedarian debajo de la barra, tocables a medias.
+ */
+.mapa-evento .leaflet-top { top: 3rem; }
+
+.mapa-buscador {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  /* Los controles de Leaflet estan en 800; la lista tiene que taparlos. */
+  z-index: 900;
+}
+
+.mapa-buscador-campo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.25rem 0 0.625rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gris-200);
+  background: #fff;
+  box-shadow: var(--sombra-sm);
+}
+
+.mapa-buscador-lupa { color: var(--gris-400); font-size: 12px; }
+
+.mapa-buscador-entrada {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  padding: 0.5rem 0;
+  font-size: 13px;
+  color: var(--texto-fuerte);
+}
+
+.mapa-buscador-entrada::placeholder { color: var(--gris-400); }
+
+.mapa-buscador-ir {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+  background: var(--marca-500);
+  color: #fff;
+  font-size: 11px;
+}
+
+.mapa-buscador-ir:hover:not(:disabled) { background: var(--marca-600); }
+.mapa-buscador-ir:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mapa-buscador-lista {
+  margin-top: 0.375rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gris-200);
+  background: #fff;
+  box-shadow: var(--sombra-sm);
+  overflow: hidden auto;
+  /* Que la lista no tape el mapa entero: se elige mirando tambien el fondo. */
+  max-height: 9rem;
+}
+
+.mapa-buscador-lista button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.625rem;
+  font-size: 12px;
+  color: var(--texto-fuerte);
+}
+
+.mapa-buscador-lista button:hover { background: var(--gris-50); }
+.mapa-buscador-lista li + li { border-top: 1px solid var(--gris-100); }
+
+.mapa-buscador-titulo { display: block; font-weight: 500; }
+
+.mapa-buscador-detalle {
+  display: block;
+  color: var(--gris-500);
+  font-size: 11px;
+  /* Una sola linea: el nombre completo de Nominatim es larguisimo. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mapa-buscador-vacio {
+  margin-top: 0.375rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--gris-200);
+  background: #fff;
+  box-shadow: var(--sombra-sm);
+  padding: 0.4rem 0.625rem;
+  font-size: 12px;
+  color: var(--gris-500);
+}
+
+/* Cuadrado, para que se lea como accion secundaria al lado del boton ancho. */
+.mapa-boton-limpiar {
+  flex: none;
+  width: 2.75rem;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+html.dark .mapa-buscador-campo,
+html.dark .mapa-buscador-lista,
+html.dark .mapa-buscador-vacio {
+  background: var(--gris-900);
+  border-color: var(--gris-700);
+}
+
+html.dark .mapa-buscador-lista button { color: var(--gris-100); }
+html.dark .mapa-buscador-lista button:hover { background: var(--gris-800); }
+html.dark .mapa-buscador-lista li + li { border-top-color: var(--gris-800); }
+html.dark .mapa-buscador-entrada { color: var(--gris-100); }

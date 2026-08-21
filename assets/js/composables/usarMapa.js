@@ -44,7 +44,8 @@
  * necesita las coordenadas ya guardadas para armar el enlace.
  *
  * Por eso todo acá comprueba que Leaflet exista antes de usarlo: si no cargó,
- * quedan los campos de coordenadas y el sistema sigue andando.
+ * el evento se guarda igual —sin coordenadas, que es un estado válido— y el
+ * sistema sigue andando.
  */
 
 const { reactive, ref } = Vue;
@@ -214,12 +215,18 @@ export function usarMapa() {
     alCambiar = cuandoCambie;
     error.value = '';
 
+    // El composable se crea una sola vez y se reusa en cada evento que se abre.
+    // Sin esto, la busqueda del evento anterior seguiria escrita en el campo.
+    busqueda.texto = '';
+    busqueda.buscando = false;
+    cerrarResultados();
+
     const yaTenia = esCoordenadaValida(latitud, longitud);
     marcado.value = yaTenia;
 
     if (typeof window.L === 'undefined') {
       disponible.value = false;
-      error.value = 'El mapa no cargó. Puedes escribir las coordenadas a mano.';
+      error.value = 'El mapa no cargó. Revisa la conexión y vuelve a abrir el evento.';
       // Aunque no haya mapa, lo que ya estaba guardado se conserva.
       if (yaTenia) {
         punto.latitud = Number(latitud);
@@ -355,14 +362,140 @@ export function usarMapa() {
     );
   }
 
-  /** Para cuando alguien escribe las coordenadas a mano. */
-  function escribirCoordenadas(latitud, longitud) {
-    if (!esCoordenadaValida(latitud, longitud)) {
-      error.value = 'Esas coordenadas no son válidas.';
-      return;
-    }
+  /*
+   * Buscar un lugar por su nombre.
+   *
+   * Quien organiza sabe cómo se llama el salón, no en qué coordenada está.
+   * Arrastrar el mapa desde el centro del municipio hasta dar con él es
+   * trabajoso; escribir «Casa de la Cultura» y que el pin vaya solo, no.
+   *
+   * El buscador es Nominatim, el de OpenStreetMap, que no pide clave. Encuentra
+   * lo del municipio —Parque Balboa, la Puerta del Diablo, la Casa de la
+   * Cultura, la Alcaldía de Panchimalco— aunque no conoce cada negocio como
+   * Google. Cuando no encuentra algo queda el mapa, que es como se hacía antes.
+   *
+   * Su política de uso pide no pasar de un pedido por segundo. Por eso se busca
+   * al pulsar Enter o el botón, y no mientras se escribe: buscar por cada tecla
+   * serían diez pedidos para una sola palabra.
+   *
+   * La búsqueda se inclina hacia el municipio con `viewbox`, pero sin
+   * encerrarla ahí (`bounded=0`): a veces la fiesta es en un hotel de la
+   * capital.
+   */
+  const CAJA_MUNICIPIO = '-89.35,13.75,-89.05,13.50';
+  const ESPERA_MINIMA = 1100;
+  const MINIMO_A_ESCRIBIR = 3;
+
+  const busqueda = reactive({
+    texto: '',
+    buscando: false,
+    resultados: [],
+    sinResultados: false
+  });
+
+  let ultimoPedido = 0;
+  let enCurso = null;
+
+  /*
+   * Nominatim devuelve el nombre entero y larguísimo: «Casa de la Cultura, 1a
+   * Avenida Norte, Barrio El Centro, Panchimalco, …». Lo de antes de la primera
+   * coma es el lugar; lo que sigue, dónde queda. Mostrar el nombre completo en
+   * una lista angosta lo vuelve ilegible.
+   */
+  function partirNombre(completo) {
+    const partes = String(completo || '').split(',').map((parte) => parte.trim());
+    return {
+      titulo: partes[0] || String(completo || ''),
+      detalle: partes.slice(1, 4).join(', ')
+    };
+  }
+
+  function cerrarResultados() {
+    busqueda.resultados = [];
+    busqueda.sinResultados = false;
+  }
+
+  async function buscarLugar() {
+    const texto = String(busqueda.texto || '').trim();
+
+    cerrarResultados();
+    if (texto.length < MINIMO_A_ESCRIBIR) return;
+
+    /*
+     * La búsqueda anterior se abandona antes de esperar, no después: si se
+     * abandonara al final, dos búsquedas seguidas se quedarían las dos paradas
+     * el segundo de cortesía y recién ahí una mataría a la otra.
+     */
+    if (enCurso) enCurso.abort();
+    const propio = new AbortController();
+    enCurso = propio;
+
+    busqueda.buscando = true;
     error.value = '';
-    marcar(latitud, longitud);
+
+    const desdeElUltimo = Date.now() - ultimoPedido;
+    if (desdeElUltimo < ESPERA_MINIMA) {
+      await new Promise((seguir) => setTimeout(seguir, ESPERA_MINIMA - desdeElUltimo));
+    }
+
+    // Mientras se esperaba pudo entrar otra búsqueda. Manda la nueva, y es ella
+    // la que va a apagar el «buscando»: acá no se toca nada.
+    if (propio !== enCurso) return;
+
+    ultimoPedido = Date.now();
+
+    const parametros = new URLSearchParams({
+      q: texto,
+      format: 'jsonv2',
+      limit: '6',
+      countrycodes: 'sv',
+      viewbox: CAJA_MUNICIPIO,
+      bounded: '0',
+      'accept-language': 'es'
+    });
+
+    try {
+      const respuesta = await fetch(
+        `https://nominatim.openstreetmap.org/search?${parametros.toString()}`,
+        { signal: propio.signal, headers: { Accept: 'application/json' } }
+      );
+
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+
+      const crudos = await respuesta.json();
+      if (propio !== enCurso) return;
+
+      busqueda.resultados = (Array.isArray(crudos) ? crudos : [])
+        .filter((sitio) => esCoordenadaValida(sitio.lat, sitio.lon))
+        .map((sitio) => Object.assign(partirNombre(sitio.display_name), {
+          latitud: Number(sitio.lat),
+          longitud: Number(sitio.lon)
+        }));
+
+      busqueda.sinResultados = busqueda.resultados.length === 0;
+    } catch (fallo) {
+      // Abandonar una búsqueda vieja no es un error que mostrar.
+      if (fallo && fallo.name === 'AbortError') return;
+      busqueda.resultados = [];
+      error.value = 'No se pudo buscar. Revisa la conexión, o mueve el mapa a mano.';
+    } finally {
+      if (propio === enCurso) {
+        busqueda.buscando = false;
+        enCurso = null;
+      }
+    }
+  }
+
+  /** Lleva el pin al lugar elegido de la lista. */
+  function irAResultado(resultado) {
+    if (!resultado) return;
+
+    marcar(resultado.latitud, resultado.longitud);
+
+    // El nombre queda escrito para que se vea qué se eligió; la lista se cierra
+    // porque ya cumplió.
+    busqueda.texto = resultado.titulo;
+    cerrarResultados();
   }
 
   return reactive({
@@ -371,11 +504,14 @@ export function usarMapa() {
     buscandoUbicacion,
     marcado,
     punto,
+    busqueda,
     montar,
     desmontar,
     marcar,
     limpiar,
     usarMiUbicacion,
-    escribirCoordenadas
+    buscarLugar,
+    irAResultado,
+    cerrarResultados
   });
 }

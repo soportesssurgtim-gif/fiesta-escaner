@@ -216,6 +216,49 @@
             <div class="mapa-marco">
               <div id="mapa-evento" class="mapa-evento"></div>
 
+              <!--
+                El buscador va encima del mapa, no dentro.
+
+                Es hermano del contenedor de Leaflet, igual que el pin, así que
+                lo que se escribe y lo que se toca acá no llega nunca al mapa:
+                no hay que ir apagando gestos uno por uno.
+
+                Se busca al pulsar Enter o el botón, no mientras se escribe. Lo
+                pide la política de uso de Nominatim, y además evita mandar un
+                pedido por cada tecla.
+              -->
+              <div v-if="mapa.disponible" class="mapa-buscador">
+                <div class="mapa-buscador-campo">
+                  <i class="fa-solid fa-magnifying-glass mapa-buscador-lupa"></i>
+                  <input v-model="mapa.busqueda.texto" type="text"
+                         class="mapa-buscador-entrada"
+                         placeholder="Buscar un lugar…"
+                         aria-label="Buscar un lugar en el mapa"
+                         @keydown.enter.prevent="mapa.buscarLugar()"
+                         @keydown.esc="mapa.cerrarResultados()" />
+                  <button type="button" class="mapa-buscador-ir"
+                          :disabled="mapa.busqueda.buscando"
+                          @click="mapa.buscarLugar()"
+                          aria-label="Buscar este lugar">
+                    <i class="fa-solid"
+                       :class="mapa.busqueda.buscando ? 'fa-circle-notch animar-girar' : 'fa-arrow-right'"></i>
+                  </button>
+                </div>
+
+                <ul v-if="mapa.busqueda.resultados.length" class="mapa-buscador-lista">
+                  <li v-for="(sitio, i) in mapa.busqueda.resultados" :key="i">
+                    <button type="button" @click="mapa.irAResultado(sitio)">
+                      <span class="mapa-buscador-titulo">{{ sitio.titulo }}</span>
+                      <span v-if="sitio.detalle" class="mapa-buscador-detalle">{{ sitio.detalle }}</span>
+                    </button>
+                  </li>
+                </ul>
+
+                <p v-else-if="mapa.busqueda.sinResultados" class="mapa-buscador-vacio">
+                  No se encontró ese lugar. Mueve el mapa hasta él.
+                </p>
+              </div>
+
               <div v-if="mapa.disponible" class="mapa-pin" aria-hidden="true">
                 <i class="fa-solid fa-location-dot"
                    :class="mapa.marcado ? 'text-error-500' : 'text-gray-400'"></i>
@@ -225,40 +268,38 @@
 
             <p v-if="!mapa.disponible" class="texto-ayuda text-warning-600 dark:text-warning-400">
               <i class="fa-solid fa-triangle-exclamation"></i>
-              El mapa necesita conexión. Puedes escribir las coordenadas a mano.
+              El mapa necesita conexión. El evento se guarda igual, pero sin
+              ubicación: vuelve a abrirlo con señal para marcarla.
             </p>
             <p v-else-if="mapa.marcado" class="texto-ayuda">
               El lugar queda donde está el pin. Mueve el mapa para corregirlo.
             </p>
             <p v-else class="texto-ayuda">
-              Mueve el mapa hasta que el lugar quede debajo del pin.
+              Busca el lugar por su nombre, o mueve el mapa hasta que quede
+              debajo del pin.
             </p>
 
-            <div class="mt-2 grid grid-cols-2 gap-2">
-              <div>
-                <label for="lat-evento" class="etiqueta text-theme-xs">Latitud</label>
-                <input id="lat-evento" v-model="eventos.formulario.latitud" type="number" step="any"
-                       class="campo font-mono text-theme-xs" placeholder="13.610900"
-                       @change="mapa.escribirCoordenadas(eventos.formulario.latitud, eventos.formulario.longitud)" />
-              </div>
-              <div>
-                <label for="lng-evento" class="etiqueta text-theme-xs">Longitud</label>
-                <input id="lng-evento" v-model="eventos.formulario.longitud" type="number" step="any"
-                       class="campo font-mono text-theme-xs" placeholder="-89.188900"
-                       @change="mapa.escribirCoordenadas(eventos.formulario.latitud, eventos.formulario.longitud)" />
-              </div>
-            </div>
+            <!--
+              «Usar mi ubicación» ocupa el ancho y va en verde porque es la vía
+              rápida y la que más se usa: estando parado en el salón, resuelve
+              todo de un toque.
 
-            <div class="mt-2 flex flex-wrap gap-2">
+              Quitar la marca es lo contrario —se hace rara vez y deshace algo—,
+              así que va al lado, cuadrado y sin texto. Solo aparece cuando hay
+              algo que quitar, que es la mitad de lo que explica para qué sirve.
+            -->
+            <div class="mt-2 flex items-stretch gap-2">
               <button type="button" @click="mapa.usarMiUbicacion()"
-                      class="boton boton-secundario text-theme-xs"
+                      class="boton boton-exito flex-1 text-theme-sm"
                       :disabled="mapa.buscandoUbicacion">
                 <i class="fa-solid" :class="mapa.buscandoUbicacion ? 'fa-circle-notch animar-girar' : 'fa-crosshairs'"></i>
                 {{ mapa.buscandoUbicacion ? 'Buscando…' : 'Usar mi ubicación' }}
               </button>
               <button v-if="mapa.marcado" type="button" @click="mapa.limpiar()"
-                      class="boton boton-secundario text-theme-xs">
-                <i class="fa-solid fa-eraser"></i> Quitar marca
+                      class="boton boton-secundario mapa-boton-limpiar"
+                      title="Quitar la ubicación marcada"
+                      aria-label="Quitar la ubicación marcada">
+                <i class="fa-solid fa-eraser"></i>
               </button>
             </div>
 
