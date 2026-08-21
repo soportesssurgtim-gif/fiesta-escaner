@@ -2,10 +2,27 @@
  * El mapa para marcar dónde es el evento.
  *
  * Se usa Leaflet, que es la librería de mapas que no pide clave ni cobra por
- * uso. Las imágenes vienen de Esri, en dos capas superpuestas: la foto de
- * satélite abajo y las etiquetas —calles, nombres de lugares— encima. Una sola
- * capa de satélite se ve bonita pero no sirve para ubicarse: sin los nombres,
- * un salón de fiestas es un techo más entre los techos.
+ * uso.
+ *
+ * Las tres vistas
+ * ---------------
+ * Ninguna fuente gratuita rotula los comercios como Google Maps, así que en
+ * lugar de una sola vista hay tres, y cada una sirve para algo distinto:
+ *
+ *   Híbrido    la foto de satélite con los nombres encima. Es la de entrada:
+ *              se reconoce el edificio y además se lee en qué calle está.
+ *   Satélite   la foto sola, para confirmar la forma del techo y el patio.
+ *   Callejero  el mapa de OpenStreetMap, que es el único de los tres que
+ *              rotula negocios por su nombre. Es el que sirve para encontrar
+ *              «Salón Los Almendros» sin saber dónde queda.
+ *
+ * Lo habitual es buscar el nombre en el callejero y pasar a híbrido para
+ * confirmar que el pin quedó sobre el edificio y no sobre la calle de enfrente.
+ *
+ * Una aclaración sobre Google: existen direcciones de sus tiles que funcionan
+ * sin clave, pero están fuera de su API y de sus términos. No se usan, y la
+ * razón práctica pesa más que la legal: Google las corta sin aviso, y el día
+ * que lo haga el mapa quedaría en blanco sin que nadie sepa por qué.
  *
  * Cómo se marca el lugar
  * ----------------------
@@ -115,8 +132,28 @@ export function usarMapa() {
    * movió. Sin esta bandera, centrar el mapa al abrirlo contaría como que la
    * persona eligió ese lugar, y todos los eventos quedarían marcados en el
    * centro del municipio sin que nadie lo pidiera.
+   *
+   * Se levanta y se baja alrededor de la llamada, sin temporizadores. Se puede
+   * porque los movimientos del código se piden sin animación, y así Leaflet
+   * dispara sus eventos en el acto: para cuando la llamada retorna, ya pasó
+   * todo lo que había que ignorar.
+   *
+   * La primera versión bajaba la bandera con un `setTimeout`, y eso dejaba unas
+   * décimas en las que un gesto real se habría descartado. Se veía como una
+   * prueba que fallaba una de cada tres veces, que es exactamente lo que sería
+   * en la vida real: raro, silencioso y muy difícil de reproducir.
    */
   let movimientoPropio = false;
+
+  /** Corre algo que mueve el mapa sin que cuente como elección de nadie. */
+  function sinQueCuente(accion) {
+    movimientoPropio = true;
+    try {
+      accion();
+    } finally {
+      movimientoPropio = false;
+    }
+  }
 
   function avisar() {
     if (typeof alCambiar !== 'function') return;
@@ -139,13 +176,15 @@ export function usarMapa() {
   function centrarEn(latitud, longitud, acercamiento) {
     if (!mapa) return;
 
-    movimientoPropio = true;
-    mapa.setView([Number(latitud), Number(longitud)],
-      acercamiento || Math.max(mapa.getZoom(), ACERCAMIENTO_AL_MARCAR));
-
-    // La bandera se levanta en el siguiente turno, cuando Leaflet ya disparó
-    // los eventos del movimiento.
-    setTimeout(() => { movimientoPropio = false; }, 0);
+    sinQueCuente(() => {
+      // Sin animación: así los eventos salen antes de que retorne la llamada y
+      // la bandera todavía está en alto para atajarlos.
+      mapa.setView(
+        [Number(latitud), Number(longitud)],
+        acercamiento || Math.max(mapa.getZoom(), ACERCAMIENTO_AL_MARCAR),
+        { animate: false }
+      );
+    });
   }
 
   /** Deja el lugar elegido en estas coordenadas y lleva el mapa ahí. */
@@ -199,56 +238,94 @@ export function usarMapa() {
 
     const partida = yaTenia ? [Number(latitud), Number(longitud)] : CENTRO_POR_DEFECTO;
 
-    movimientoPropio = true;
-    mapa = window.L.map(idElemento, { scrollWheelZoom: true }).setView(
-      partida,
-      yaTenia ? ACERCAMIENTO_AL_MARCAR : ACERCAMIENTO_INICIAL
+    sinQueCuente(() => {
+      mapa = window.L.map(idElemento, { scrollWheelZoom: true }).setView(
+        partida,
+        yaTenia ? ACERCAMIENTO_AL_MARCAR : ACERCAMIENTO_INICIAL,
+        { animate: false }
+      );
+    });
+
+    /*
+     * Las capas.
+     *
+     * `foto` y `rotulos` se combinan en la vista híbrida con un grupo: Leaflet
+     * solo deja una capa base activa a la vez, así que las dos tienen que
+     * viajar juntas o al elegir híbrido se apagaría una.
+     */
+    const foto = () => window.L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      { maxZoom: 19, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' }
     );
 
-    // La foto abajo...
-    window.L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    // Etiquetas sobre fondo transparente, derivadas de OpenStreetMap.
+    const rotulos = () => window.L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/light_only_labels/{z}/{x}/{y}{r}.png',
       {
         maxZoom: 19,
-        attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics'
+        subdomains: 'abcd',
+        attribution: '© OpenStreetMap, © CARTO'
       }
-    ).addTo(mapa);
+    );
 
-    // ...y los nombres encima. Sin esto, la foto de satélite no permite
-    // reconocer una calle ni un edificio: todo es techo.
-    window.L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, pane: 'overlayPane' }
-    ).addTo(mapa);
+    const capas = {
+      // La de entrada: se reconoce el edificio y se lee en qué calle está.
+      'Híbrido': window.L.layerGroup([foto(), rotulos()]),
+
+      'Satélite': foto(),
+
+      // El único de los tres que rotula negocios por su nombre.
+      'Callejero': window.L.tileLayer(
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxZoom: 19, attribution: '© colaboradores de OpenStreetMap' }
+      )
+    };
+
+    capas['Híbrido'].addTo(mapa);
+    window.L.control.layers(capas, null, { position: 'topright', collapsed: false }).addTo(mapa);
 
     // Mientras se arrastra, las coordenadas de la pantalla van siguiendo al
     // pin. Es lo que da la sensación de estar apuntando a algo.
     mapa.on('move', leerCentro);
 
-    // Y al soltar, queda elegido. Vale tanto arrastrar como acercar: las dos
-    // cosas son alguien buscando un lugar.
-    const alTerminarElGesto = () => {
+    /*
+     * Arrastrar SIEMPRE cuenta como elegir, sin mirar la bandera.
+     *
+     * Un arrastre solo puede venir de una mano: el código nunca lo produce. La
+     * bandera existe para los movimientos que sí puede producir el código, y
+     * consultarla acá abría una ventana de unas décimas —justo después de abrir
+     * el formulario, mientras se recalcula el tamaño— en la que un arrastre se
+     * habría ignorado. Poco probable, pero silencioso: la persona mueve el mapa
+     * y el lugar no queda marcado, sin ninguna señal de por qué.
+     */
+    mapa.on('dragend', () => {
+      leerCentro();
+      marcado.value = true;
+      avisar();
+    });
+
+    /*
+     * Acercar también es alguien buscando un lugar, pero acá sí hay que mirar
+     * la bandera: `setView` cambia el acercamiento y dispara este mismo evento.
+     */
+    mapa.on('zoomend', () => {
       leerCentro();
       if (movimientoPropio) return;
       marcado.value = true;
       avisar();
-    };
-
-    mapa.on('dragend', alTerminarElGesto);
-    mapa.on('zoomend', alTerminarElGesto);
+    });
 
     leerCentro();
-    movimientoPropio = false;
 
     // Leaflet mide mal cuando el contenedor aparece dentro de algo que se abre
     // —un modal, una pestaña— porque en ese instante todavía tiene alto cero.
     // Un recálculo en cuanto el navegador termina de dibujar lo acomoda.
     setTimeout(() => {
       if (!mapa) return;
-      movimientoPropio = true;
-      mapa.invalidateSize();
-      leerCentro();
-      setTimeout(() => { movimientoPropio = false; }, 0);
+      sinQueCuente(() => {
+        mapa.invalidateSize();
+        leerCentro();
+      });
     }, 60);
   }
 
