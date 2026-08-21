@@ -27,6 +27,11 @@
             Un PNG con fondo transparente en la zona donde irá el código QR.
             Mínimo 800 × 600 px.
           </p>
+          <p class="mb-5 max-w-sm text-theme-xs text-gray-400">
+            La tarjeta sale del tamaño de tu diseño, así que no se deforma.
+            Después puedes cambiarlo si necesitas una medida de impresión
+            concreta.
+          </p>
           <label class="boton boton-primario cursor-pointer">
             <i class="fa-solid fa-upload"></i> Elegir archivo PNG
             <input type="file" accept="image/png" class="hidden" @change="subirPlantilla($event)" />
@@ -54,12 +59,64 @@
               </option>
             </select>
 
+            <select @change="aplicarMedidaSugerida($event.target.value)"
+                    class="campo campo-select w-auto" aria-label="Medida sugerida de la tarjeta">
+              <option value="">Medida sugerida…</option>
+              <option v-for="(medida, nombre) in MEDIDAS_SUGERIDAS" :key="nombre" :value="nombre">
+                {{ nombre }} — {{ medida.ancho }} × {{ medida.alto }}
+              </option>
+            </select>
+
             <select :value="campoQr" @change="cambiarCampoQr($event.target.value)"
                     class="campo campo-select w-auto" aria-label="Dato que codifica el QR">
               <option value="dui">El QR lleva el DUI</option>
               <option value="codigo">El QR lleva el código interno</option>
               <option value="url">El QR lleva un enlace al portal</option>
             </select>
+          </div>
+
+          <!--
+            Las medidas de la tarjeta.
+
+            Salen del diseño que se sube, que es lo que evita cualquier
+            deformación. Se pueden cambiar para una medida de impresión
+            concreta; ahí el diseño se centra y se escala, nunca se estira.
+          -->
+          <div class="mt-4 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <div class="flex flex-wrap items-end gap-3">
+              <div>
+                <label for="ancho-tarjeta" class="etiqueta text-theme-xs">Ancho</label>
+                <input id="ancho-tarjeta" type="number" min="800" max="6000" step="10"
+                       :value="medidasTarjeta.ancho"
+                       @change="cambiarMedidas($event.target.value, medidasTarjeta.alto)"
+                       class="campo w-28 text-theme-sm" />
+              </div>
+              <span class="pb-2 text-gray-400">×</span>
+              <div>
+                <label for="alto-tarjeta" class="etiqueta text-theme-xs">Alto</label>
+                <input id="alto-tarjeta" type="number" min="600" max="6000" step="10"
+                       :value="medidasTarjeta.alto"
+                       @change="cambiarMedidas(medidasTarjeta.ancho, $event.target.value)"
+                       class="campo w-28 text-theme-sm" />
+              </div>
+              <span class="pb-2 text-theme-xs text-gray-400">píxeles</span>
+
+              <button type="button" @click="medidasDelDiseno()"
+                      class="boton boton-secundario mb-0.5 text-theme-xs">
+                <i class="fa-solid fa-arrows-to-circle"></i>
+                Usar las del diseño
+              </button>
+            </div>
+
+            <p v-if="hayFranjas"
+               class="mt-3 flex items-start gap-2 text-theme-xs text-warning-600 dark:text-warning-400">
+              <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+              <span>
+                La medida elegida no tiene la misma proporción que el diseño, así
+                que va a quedar transparente alrededor. Se ve en la vista previa;
+                el diseño no se deforma.
+              </span>
+            </p>
           </div>
         </div>
       </div>
@@ -120,7 +177,12 @@
                 <p class="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
                   {{ plantilla.nombre }}
                 </p>
-                <p class="text-theme-xs text-gray-400">QR con {{ plantilla.campo_qr }}</p>
+                <p class="text-theme-xs text-gray-400">
+                  QR con {{ plantilla.campo_qr }}
+                  <span v-if="plantilla.ancho && plantilla.alto">
+                    · {{ plantilla.ancho }} × {{ plantilla.alto }}
+                  </span>
+                </p>
               </div>
 
               <button v-if="permisos.tienePermiso('tarjetas', 'Eliminar')"

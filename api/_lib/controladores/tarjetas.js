@@ -16,6 +16,21 @@ import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
 import { TABLAS, BUCKET_PLANTILLAS, SI } from '../configuracion.js';
 import { aTexto, aEntero, aBandera, nuevoUuid } from '../valores.js';
+
+/*
+ * Las medidas de la tarjeta.
+ *
+ * Van repetidas acá y en el navegador a propósito: el navegador las necesita
+ * para acotar mientras alguien teclea, y el servidor no puede confiar en que lo
+ * que llega haya pasado por ese navegador.
+ *
+ * Las de por defecto son las que el sistema usaba antes de que cada plantilla
+ * tuviera las suyas, y son las que quedan para las que ya existían.
+ */
+const ANCHO_POR_DEFECTO = 1200;
+const ALTO_POR_DEFECTO = 1800;
+const MEDIDA_MINIMA = { ancho: 800, alto: 600 };
+const MEDIDA_MAXIMA = 6000;
 import { leerCuerpo } from '../peticion.js';
 import { esAdministrador } from '../seguridad.js';
 import {
@@ -130,6 +145,22 @@ async function guardarPlantilla({ req, res, sesion }) {
     return responderSolicitudInvalida(res, 'Falta la imagen de fondo de la plantilla.');
   }
 
+  /*
+   * Las medidas de salida.
+   *
+   * Se acotan acá además de en la base. La base es la que manda —su CHECK no lo
+   * puede saltear nadie— pero rebotar con un error de Postgres le muestra a
+   * quien está guardando un mensaje que no dice nada; acotando primero, un
+   * número absurdo se convierte en el más cercano que sí sirve y la plantilla
+   * se guarda.
+   *
+   * Los topes son los mismos que la migración 009: por debajo del mínimo la
+   * tarjeta impresa se ve pixelada, y por encima del máximo cien tarjetas no
+   * entran en la memoria del navegador que arma el ZIP.
+   */
+  const acotar = (valor, porDefecto, minimo) =>
+    Math.max(minimo, Math.min(MEDIDA_MAXIMA, aEntero(valor, porDefecto)));
+
   const datos = {
     nombre: aTexto(cuerpo.nombre) || `Plantilla ${new Date().toLocaleDateString('es-SV')}`,
     imagen_url: rutaImagen,
@@ -137,6 +168,8 @@ async function guardarPlantilla({ req, res, sesion }) {
     qr_y: aEntero(cuerpo.qr_y, 0),
     qr_w: aEntero(cuerpo.qr_w, 200),
     qr_h: aEntero(cuerpo.qr_h, 200),
+    ancho: acotar(cuerpo.ancho, ANCHO_POR_DEFECTO, MEDIDA_MINIMA.ancho),
+    alto: acotar(cuerpo.alto, ALTO_POR_DEFECTO, MEDIDA_MINIMA.alto),
     campo_qr: campoQr,
     activo: aBandera(cuerpo.activo ?? 'TRUE')
   };

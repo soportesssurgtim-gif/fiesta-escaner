@@ -21,7 +21,7 @@ import { api } from './servicios/servicioApi.js';
 import { servicioInvitacion } from './servicios/servicioInvitacion.js';
 import { descargarXlsx } from './servicios/servicioExcel.js';
 import {
-  disenador, ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
+  disenador, ZONAS_PREDEFINIDAS, MEDIDAS_SUGERIDAS, MAXIMO_POR_LOTE,
   urlQr, descargarQr, enlaceInvitacion
 } from './servicios/servicioTarjetas.js';
 
@@ -1448,6 +1448,40 @@ async function iniciar() {
       const plantillaElegida = ref('');
       const nombrePlantilla = ref('');
       const campoQr = ref('dui');
+
+      /*
+       * Las medidas de la tarjeta, reflejadas para la pantalla.
+       *
+       * El diseñador es el que manda: acá solo se copia lo suyo después de cada
+       * cambio. Tener dos fuentes de verdad para lo mismo termina siempre en
+       * que una queda vieja, y acá la que dibuja es la del diseñador.
+       */
+      const medidasTarjeta = reactive({ ancho: 1200, alto: 1800 });
+      const hayFranjas = ref(false);
+
+      function refrescarMedidas() {
+        medidasTarjeta.ancho = disenador.medidas.ancho;
+        medidasTarjeta.alto = disenador.medidas.alto;
+        hayFranjas.value = disenador.hayFranjas;
+      }
+
+      /** Fija la medida a mano y redibuja. */
+      function cambiarMedidas(ancho, alto) {
+        disenador.establecerMedidas(ancho, alto);
+        disenador.dibujarPrevia();
+        refrescarMedidas();
+      }
+
+      /** Vuelve a la medida del diseño subido, que es la que no deforma nada. */
+      function medidasDelDiseno() {
+        if (!disenador.plantilla) return;
+        cambiarMedidas(disenador.plantilla.width, disenador.plantilla.height);
+      }
+
+      function aplicarMedidaSugerida(nombre) {
+        const medida = MEDIDAS_SUGERIDAS[nombre];
+        if (medida) cambiarMedidas(medida.ancho, medida.alto);
+      }
       const guardandoPlantilla = ref(false);
       const hayPlantillaCargada = ref(false);
 
@@ -1484,6 +1518,7 @@ async function iniciar() {
         try {
           await disenador.cargarPlantillaDesdeArchivo(archivo);
           hayPlantillaCargada.value = true;
+          refrescarMedidas();
           notificarExito('Plantilla lista. Arrastra el QR hasta su lugar.');
         } catch (fallo) {
           notificarError(fallo.message);
@@ -1525,6 +1560,7 @@ async function iniciar() {
         const plantilla = plantillas.value.find((fila) => fila.id === plantillaElegida.value);
         if (!plantilla) throw new Error('Elige una plantilla primero.');
         await disenador.usarPlantillaGuardada(plantilla);
+        refrescarMedidas();
         return plantilla;
       }
 
@@ -2499,7 +2535,8 @@ async function iniciar() {
         modalGenerarAbierto, seleccionEmpleados, busquedaTarjetas, generando,
         progresoTarjetas, empleadosParaTarjetas, abrirGeneracionMasiva,
         alternarSeleccion, seleccionarTodosVisibles, generarUna, generarLote,
-        ZONAS_PREDEFINIDAS, MAXIMO_POR_LOTE,
+        ZONAS_PREDEFINIDAS, MEDIDAS_SUGERIDAS, MAXIMO_POR_LOTE,
+        medidasTarjeta, hayFranjas, cambiarMedidas, medidasDelDiseno, aplicarMedidaSugerida,
         aplicarZona: (nombre) => disenador.aplicarZona(nombre),
         cambiarCampoQr: (campo) => { campoQr.value = campo; disenador.establecerCampoQr(campo); },
 
