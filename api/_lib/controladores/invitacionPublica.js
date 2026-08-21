@@ -182,6 +182,15 @@ async function consultarInvitacion(req, res) {
     // pantalla no muestra el botón si falta alguna.
     latitud: evento.latitud ?? null,
     longitud: evento.longitud ?? null,
+    /*
+     * Como se ve la invitacion de este evento, o null si no se configuro.
+     *
+     * Es informacion publica: colores y textos de una invitacion que se
+     * reparte. Va en la misma respuesta y no en un pedido aparte para que la
+     * pantalla no tenga que dibujar dos veces, una con el diseño de siempre y
+     * otra con el del evento.
+     */
+    invitacionConfig: evento.invitacion_config ?? null,
     empleado: {
       nombres: empleado.nombres,
       apellidos: empleado.apellidos,

@@ -33,6 +33,10 @@ import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
 import { usarDesafio } from './composables/usarDesafio.js';
+import {
+  construirModelo, bloquesDe, normalizar as normalizarDiseno,
+  esLaDeSiempre, POR_DEFECTO, DISPOSICIONES
+} from './nucleo/disenoInvitacion.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
@@ -315,7 +319,10 @@ async function iniciar() {
          */
         formularioVacio: {
           id: null, nombre: '', fechaEvento: '', ubicacion: '',
-          latitud: '', longitud: '', activo: 'FALSE'
+          latitud: '', longitud: '', activo: 'FALSE',
+          // El diseño de la invitación, siempre completo en el formulario
+          // aunque en la base se guarde como nada cuando no cambia nada.
+          invitacionConfig: { ...POR_DEFECTO }
         },
         alAbrir: (registro) => ({
           id: registro.id,
@@ -324,7 +331,8 @@ async function iniciar() {
           ubicacion: registro.ubicacion || '',
           latitud: registro.latitud ?? '',
           longitud: registro.longitud ?? '',
-          activo: String(registro.activo || 'FALSE').toUpperCase()
+          activo: String(registro.activo || 'FALSE').toUpperCase(),
+          invitacionConfig: normalizarDiseno(registro.invitacion_config)
         }),
         camposBusqueda: ['nombre', 'ubicacion']
       });
@@ -364,6 +372,46 @@ async function iniciar() {
        * capítulo de la pantalla donde se estaba, así que la ayuda contextual
        * se conserva y además se puede seguir leyendo.
        */
+      /*
+       * La vista previa del editor del evento.
+       *
+       * Usa datos de muestra y no los de un empleado real: quien configura el
+       * diseño está en el escritorio, sin nadie a mano, y lo que necesita ver es
+       * cómo quedan los colores y los textos.
+       */
+      const vistaPreviaInvitacion = computed(() => construirModelo(
+        eventos.formulario.invitacionConfig,
+        {
+          evento: eventos.formulario.nombre || 'Nombre del evento',
+          fecha: eventos.formulario.fechaEvento
+            ? formato.formatearFechaLarga(eventos.formulario.fechaEvento)
+            : '',
+          ubicacion: eventos.formulario.ubicacion || '',
+          nombre: 'Nombre del Empleado',
+          dui: '01234567-8',
+          urlQr: ''
+        }
+      ));
+
+      const bloquesPrevia = computed(() => bloquesDe(vistaPreviaInvitacion.value, 'evento'));
+
+      /** Vuelve el diseño al de siempre. */
+      function reiniciarDiseno() {
+        eventos.formulario.invitacionConfig = { ...POR_DEFECTO };
+      }
+
+      /**
+       * Copia el diseño de otro evento.
+       *
+       * Es lo que reemplaza a tener un catálogo de plantillas: con cuatro o
+       * cinco fiestas al año, «como la del año pasado» resuelve el caso.
+       */
+      function copiarDisenoDe(idEvento) {
+        const otro = eventos.lista.find((fila) => fila.id === idEvento);
+        if (!otro) return;
+        eventos.formulario.invitacionConfig = normalizarDiseno(otro.invitacion_config);
+      }
+
       const manual = usarManual({
         puedeVer: (modulo) => permisos.tienePermiso(modulo, 'Ver'),
         // El diagrama se dibuja apilado cuando no hay ancho para el horizontal.
@@ -2216,6 +2264,39 @@ async function iniciar() {
        */
       const desafio = usarDesafio(() => api.invitacion.desafio());
 
+      /** El QR a pantalla completa, para mostrarlo en la puerta del evento. */
+      const qrAmpliado = ref(false);
+
+      /*
+       * El diseño de la invitación que se está mostrando.
+       *
+       * Es el mismo modelo que pinta la imagen descargable. Que los dos salgan
+       * de acá es lo que impide que la pantalla diga una cosa y el archivo otra.
+       *
+       * Sin resultado devuelve el modelo por defecto en lugar de null: así la
+       * plantilla no tiene que preguntar si existe antes de leer un color.
+       */
+      const diseno = computed(() => {
+        const resultado = invitacion.resultado;
+        if (!resultado) return construirModelo(null, {});
+
+        return construirModelo(resultado.invitacionConfig, {
+          evento: resultado.evento,
+          fecha: resultado.fechaEvento ? formato.formatearFechaLarga(resultado.fechaEvento) : '',
+          ubicacion: resultado.ubicacion || '',
+          nombre: formato.nombreCompleto(resultado.empleado),
+          dui: formato.formatearDui(resultado.empleado.dui),
+          urlQr: resultado.empleado.qr_url
+        });
+      });
+
+      const bloquesDelEvento = computed(() => bloquesDe(diseno.value, 'evento'));
+      const muestraDui = computed(() => diseno.value.bloques.some((b) => b.papel === 'dui'));
+      const textoDelPie = computed(() => {
+        const pie = diseno.value.bloques.find((b) => b.papel === 'pie');
+        return pie ? pie.texto : '';
+      });
+
       /**
        * Guarda la invitación completa como imagen.
        *
@@ -2240,7 +2321,9 @@ async function iniciar() {
             ubicacion: invitacion.resultado.ubicacion || '',
             nombre: formato.nombreCompleto(persona),
             dui: formato.formatearDui(persona.dui),
-            urlQr: persona.qr_url
+            urlQr: persona.qr_url,
+            // El mismo diseño que se está viendo en pantalla.
+            config: invitacion.resultado.invitacionConfig
           });
 
           invitacion.avisoGuardado = resultado.descargada
@@ -2264,6 +2347,8 @@ async function iniciar() {
           invitacion.error = 'Escribe tu DUI.';
           return;
         }
+
+        qrAmpliado.value = false;
 
         invitacion.consultando = true;
         try {
@@ -2495,6 +2580,7 @@ async function iniciar() {
 
         // Catálogos
         departamentos, empleados, premios, usuarios, roles, eventos,
+        vistaPreviaInvitacion, bloquesPrevia, reiniciarDiseno, copiarDisenoDe, DISPOSICIONES,
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
         recargarCatalogos, DISTRITOS,
@@ -2560,6 +2646,7 @@ async function iniciar() {
 
         // Portal público
         invitacion, consultarInvitacion, guardarInvitacion, desafio,
+        diseno, bloquesDelEvento, muestraDui, textoDelPie, qrAmpliado,
 
         // Utilidades de formato disponibles en las plantillas
         ...formato

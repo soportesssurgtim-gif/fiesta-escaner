@@ -68,16 +68,49 @@
       </div>
     </div>
 
+    <!--
+      El QR a pantalla completa.
+
+      Fondo blanco y el código lo más grande que entre. No es un modal del
+      sistema a propósito: acá no hay nada que decidir ni que leer, se muestra y
+      se cierra tocando en cualquier lado.
+    -->
+    <div v-if="qrAmpliado && invitacion.resultado"
+         class="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-white p-6"
+         @click="qrAmpliado = false">
+      <img :src="invitacion.resultado.empleado.qr_url"
+           alt="Código QR de tu invitación"
+           class="w-full max-w-sm object-contain" />
+      <p class="mt-6 text-theme-sm font-medium text-gray-800">
+        {{ nombreCompleto(invitacion.resultado.empleado) }}
+      </p>
+      <p class="mt-6 text-theme-xs text-gray-400">Toca en cualquier lado para volver</p>
+    </div>
+
     <!-- Resultado con el QR -->
     <div v-else class="animar-aparecer tarjeta overflow-hidden">
-      <div class="bg-brand-500 px-6 py-5 text-center">
-        <p class="text-theme-xs uppercase tracking-widest text-brand-100">Estás invitado a</p>
-        <p class="mt-1 text-theme-xl font-bold text-white">{{ invitacion.resultado.evento }}</p>
-        <p v-if="invitacion.resultado.fechaEvento" class="mt-1 text-theme-sm text-brand-100">
-          {{ formatearFechaLarga(invitacion.resultado.fechaEvento) }}
-        </p>
-        <p v-if="invitacion.resultado.ubicacion" class="text-theme-sm text-brand-100">
-          <i class="fa-solid fa-location-dot"></i> {{ invitacion.resultado.ubicacion }}
+      <!--
+        La franja del evento.
+
+        Los textos y los colores salen del modelo, el mismo que dibuja la imagen
+        que se descarga. Por eso van con `:style` y no con clases de Tailwind:
+        el color lo elige cada evento y no se puede saber al escribir el CSS.
+
+        En la disposición compacta no hay franja de color, y ahí el modelo ya
+        devolvió colores oscuros para que los textos se lean sobre el blanco.
+      -->
+      <div class="px-6 py-5 text-center"
+           :style="{ backgroundColor: diseno.conFranja ? diseno.colores.franja : '#ffffff' }">
+        <p v-for="bloque in bloquesDelEvento" :key="bloque.papel"
+           :class="{
+             'text-theme-xs uppercase tracking-widest': bloque.papel === 'encabezado',
+             'mt-1 text-theme-xl font-bold': bloque.papel === 'evento',
+             'mt-1 text-theme-sm': bloque.papel === 'fecha',
+             'text-theme-sm': bloque.papel === 'lugar'
+           }"
+           :style="{ color: bloque.color }">
+          <i v-if="bloque.papel === 'lugar'" class="fa-solid fa-location-dot"></i>
+          {{ bloque.texto }}
         </p>
 
         <!--
@@ -100,20 +133,32 @@
         <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">
           {{ nombreCompleto(invitacion.resultado.empleado) }}
         </p>
-        <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
+        <p v-if="muestraDui" class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
           <strong>{{ formatearDui(invitacion.resultado.empleado.dui) }}</strong>
         </p>
 
-        <!-- El QR sobre fondo blanco siempre, incluso en modo oscuro: los
-             lectores necesitan el contraste original para leerlo bien. -->
-        <div class="mx-auto mt-6 w-fit rounded-2xl bg-white p-4 shadow-theme-md">
+        <!--
+          El QR sobre fondo blanco siempre, incluso en modo oscuro: los lectores
+          necesitan el contraste original para leerlo bien.
+
+          Se puede tocar para verlo a pantalla completa. Hace falta en la puerta
+          del evento: con sol de frente, un lector engancha antes contra un QR
+          grande y con el brillo al máximo que contra este, que comparte
+          pantalla con el resto de la invitación.
+        -->
+        <button type="button" @click="qrAmpliado = true"
+                class="mx-auto mt-6 block w-fit rounded-2xl bg-white p-4 shadow-theme-md"
+                aria-label="Ver el código QR a pantalla completa">
           <img :src="invitacion.resultado.empleado.qr_url"
                alt="Código QR de tu invitación"
                class="h-56 w-56 object-contain" />
-        </div>
+        </button>
+        <p class="mt-2 text-theme-xs text-gray-400">
+          <i class="fa-solid fa-expand"></i> Toca el código para agrandarlo
+        </p>
 
-        <p class="mt-5 text-theme-sm text-gray-500 dark:text-gray-400">
-          Muestra este código en la entrada del evento.
+        <p v-if="textoDelPie" class="mt-5 text-theme-sm text-gray-500 dark:text-gray-400">
+          {{ textoDelPie }}
         </p>
 
         <div class="mt-6 flex flex-col gap-2">

@@ -22,11 +22,17 @@
 // excepción de seguridad. El de assets/iconos salió del mismo logo.
 const LOGO = '/assets/iconos/icono-192.png';
 
-const MARCA = '#465fff';
-const MARCA_CLARA = '#c2d6ff';
-const FONDO = '#f9fafb';
-const TEXTO_FUERTE = '#101828';
-const TEXTO_TENUE = '#667085';
+/*
+ * Los colores y los textos ya no viven acá.
+ *
+ * Los decide `disenoInvitacion.js` a partir de la configuración del evento, y
+ * la pantalla del portal usa ese mismo modelo. Es lo que impide que la imagen
+ * descargada diga una cosa y la pantalla otra.
+ *
+ * Lo que sigue acá son las medidas, porque son de esta técnica: el navegador
+ * acomoda el HTML solo y el lienzo necesita cada número.
+ */
+import { construirModelo, bloquesDe } from '../nucleo/disenoInvitacion.js';
 
 // Medidas en píxeles lógicos; el lienzo real se dibuja al doble para que no se
 // vea pixelado en pantallas de alta densidad ni al imprimirlo.
@@ -124,9 +130,24 @@ async function esperarTipografia() {
  * @param {string} datos.nombre
  * @param {string} datos.dui          Ya formateado.
  * @param {string} datos.urlQr
+ * @param {Object} [datos.config]   Cómo se ve la invitación de este evento.
  */
 async function dibujar(datos) {
   await esperarTipografia();
+
+  /*
+   * El modelo decide qué se dice y de qué color; acá solo se pinta.
+   *
+   * Sin configuración devuelve el diseño de siempre, así que este archivo no
+   * necesita un camino de respaldo: pinta el modelo y ya.
+   */
+  const modelo = construirModelo(datos.config, datos);
+  const { colores } = modelo;
+  const textoDe = (papel) => {
+    const bloque = modelo.bloques.find((b) => b.papel === papel);
+    return bloque ? bloque.texto : '';
+  };
+  const hay = (papel) => modelo.bloques.some((b) => b.papel === papel);
 
   const lienzo = document.createElement('canvas');
   lienzo.width = ANCHO * ESCALA;
@@ -135,7 +156,7 @@ async function dibujar(datos) {
   const ctx = lienzo.getContext('2d');
   ctx.scale(ESCALA, ESCALA);
 
-  ctx.fillStyle = FONDO;
+  ctx.fillStyle = colores.fondo;
   ctx.fillRect(0, 0, ANCHO, ALTO_MAXIMO);
 
   const centro = ANCHO / 2;
@@ -144,13 +165,14 @@ async function dibujar(datos) {
 
   // --- Encabezado: logo y título -------------------------------------------
   try {
+    if (!hay('logo')) throw new Error('sin logo');
     const logo = await cargarImagen(LOGO);
     const lado = 72;
     ctx.save();
     ctx.beginPath();
     ctx.arc(centro, y + lado / 2, lado / 2, 0, Math.PI * 2);
     ctx.closePath();
-    ctx.fillStyle = MARCA;
+    ctx.fillStyle = colores.franja;
     ctx.fill();
     ctx.clip();
     ctx.drawImage(logo, centro - lado / 2, y, lado, lado);
@@ -161,14 +183,14 @@ async function dibujar(datos) {
     y += 12;
   }
 
-  y = escribir(ctx, 'Tu invitación', {
+  y = escribir(ctx, textoDe('titulo'), {
     x: centro, y, anchoMaximo: anchoUtil,
-    fuente: `700 26px ${TIPOGRAFIA}`, color: TEXTO_FUERTE, interlineado: 32
+    fuente: `700 26px ${TIPOGRAFIA}`, color: colores.texto, interlineado: 32
   });
 
-  y = escribir(ctx, 'Alcaldía Municipal de San Salvador Sur', {
+  y = escribir(ctx, textoDe('subtitulo'), {
     x: centro, y: y + 4, anchoMaximo: anchoUtil,
-    fuente: `400 13px ${TIPOGRAFIA}`, color: TEXTO_TENUE, interlineado: 18
+    fuente: `400 13px ${TIPOGRAFIA}`, color: colores.textoTenue, interlineado: 18
   });
 
   y += 22;
@@ -183,11 +205,11 @@ async function dibujar(datos) {
   // líneas ocupen el nombre del evento y la ubicación.
   const medirFranja = () => {
     let alto = 20;
-    alto += 16;                                              // "ESTÁS INVITADO A"
+    if (textoDe('encabezado')) alto += 16;
     ctx.font = `700 20px ${TIPOGRAFIA}`;
-    alto += contarLineas(ctx, datos.evento, anchoTexto) * 26;
-    if (datos.fecha) alto += 20;
-    if (datos.ubicacion) alto += 20;
+    alto += contarLineas(ctx, textoDe('evento'), anchoTexto) * 26;
+    if (hay('fecha')) alto += 20;
+    if (hay('lugar')) alto += 20;
     return alto + 18;
   };
 
@@ -199,50 +221,51 @@ async function dibujar(datos) {
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(tarjetaX, tarjetaY, tarjetaAncho, ALTO_MAXIMO);
-  ctx.fillStyle = MARCA;
-  ctx.fillRect(tarjetaX, tarjetaY, tarjetaAncho, altoFranja);
+  // En la compacta no hay banda de color: los textos del evento van sobre el
+  // blanco de la tarjeta, y por eso el modelo ya les dio colores oscuros.
+  if (modelo.conFranja) {
+    ctx.fillStyle = colores.franja;
+    ctx.fillRect(tarjetaX, tarjetaY, tarjetaAncho, altoFranja);
+  }
   ctx.restore();
 
   let yFranja = tarjetaY + 30;
 
   // El espaciado entre letras no existe en canvas, así que se simula con
   // espacios: es lo que le da al rótulo el aire del diseño de la pantalla.
-  yFranja = escribir(ctx, 'E S T Á S   I N V I T A D O   A', {
-    x: centro, y: yFranja, anchoMaximo: anchoTexto,
-    fuente: `600 10px ${TIPOGRAFIA}`, color: MARCA_CLARA, interlineado: 16
-  });
-
-  yFranja = escribir(ctx, datos.evento, {
-    x: centro, y: yFranja + 12, anchoMaximo: anchoTexto,
-    fuente: `700 20px ${TIPOGRAFIA}`, color: '#ffffff', interlineado: 26
-  });
-
-  if (datos.fecha) {
-    yFranja = escribir(ctx, datos.fecha, {
-      x: centro, y: yFranja + 4, anchoMaximo: anchoTexto,
-      fuente: `400 13px ${TIPOGRAFIA}`, color: MARCA_CLARA, interlineado: 20
-    });
-  }
-
-  if (datos.ubicacion) {
-    yFranja = escribir(ctx, datos.ubicacion, {
-      x: centro, y: yFranja + 2, anchoMaximo: anchoTexto,
-      fuente: `400 13px ${TIPOGRAFIA}`, color: MARCA_CLARA, interlineado: 20
-    });
+  for (const bloque of bloquesDe(modelo, 'evento')) {
+    if (bloque.papel === 'encabezado') {
+      yFranja = escribir(ctx, espaciar(bloque.texto), {
+        x: centro, y: yFranja, anchoMaximo: anchoTexto,
+        fuente: `600 10px ${TIPOGRAFIA}`, color: bloque.color, interlineado: 16
+      });
+    } else if (bloque.papel === 'evento') {
+      yFranja = escribir(ctx, bloque.texto, {
+        x: centro, y: yFranja + 12, anchoMaximo: anchoTexto,
+        fuente: `700 20px ${TIPOGRAFIA}`, color: bloque.color, interlineado: 26
+      });
+    } else {
+      // Fecha y lugar comparten tamaño; se distinguen solo por el aire de
+      // arriba, que es el que tenían en el diseño original.
+      yFranja = escribir(ctx, bloque.texto, {
+        x: centro, y: yFranja + (bloque.papel === 'fecha' ? 4 : 2), anchoMaximo: anchoTexto,
+        fuente: `400 13px ${TIPOGRAFIA}`, color: bloque.color, interlineado: 20
+      });
+    }
   }
 
   // --- Cuerpo: nombre, DUI y QR --------------------------------------------
   y = tarjetaY + altoFranja + 34;
 
-  y = escribir(ctx, datos.nombre, {
+  y = escribir(ctx, textoDe('nombre'), {
     x: centro, y, anchoMaximo: anchoTexto,
-    fuente: `700 20px ${TIPOGRAFIA}`, color: TEXTO_FUERTE, interlineado: 26
+    fuente: `700 20px ${TIPOGRAFIA}`, color: colores.texto, interlineado: 26
   });
 
-  if (datos.dui) {
-    y = escribir(ctx, `DUI ${datos.dui}`, {
+  if (hay('dui')) {
+    y = escribir(ctx, `DUI ${textoDe('dui')}`, {
       x: centro, y: y + 4, anchoMaximo: anchoTexto,
-      fuente: `400 13px ${TIPOGRAFIA}`, color: TEXTO_TENUE, interlineado: 18
+      fuente: `400 13px ${TIPOGRAFIA}`, color: colores.textoTenue, interlineado: 18
     });
   }
 
@@ -270,9 +293,9 @@ async function dibujar(datos) {
 
   y += cajaQr + 28;
 
-  y = escribir(ctx, 'Muestra este código en la entrada del evento.', {
+  y = escribir(ctx, textoDe('pie'), {
     x: centro, y, anchoMaximo: anchoTexto,
-    fuente: `400 13px ${TIPOGRAFIA}`, color: TEXTO_TENUE, interlineado: 18
+    fuente: `400 13px ${TIPOGRAFIA}`, color: colores.textoTenue, interlineado: 18
   });
 
   y += 26;
@@ -289,6 +312,23 @@ async function dibujar(datos) {
   );
 
   return recortado;
+}
+
+/**
+ * Separa las letras de un texto.
+ *
+ * El lienzo no tiene `letter-spacing`, así que el aire del rótulo se simula
+ * metiendo espacios: una letra, un espacio; entre palabras, tres. Es lo que le
+ * daba al «E S T Á S   I N V I T A D O   A» del diseño original su aspecto, y
+ * ahora se calcula porque ese texto lo elige cada evento.
+ */
+function espaciar(texto) {
+  return String(texto || '')
+    .trim()
+    .toLocaleUpperCase('es')
+    .split(/\s+/)
+    .map((palabra) => palabra.split('').join(' '))
+    .join('   ');
 }
 
 /** Cuántas líneas ocupa un texto con la fuente que ya tiene el contexto. */

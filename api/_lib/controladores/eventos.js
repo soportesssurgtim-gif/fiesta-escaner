@@ -126,6 +126,18 @@ async function contarDependencias(eventoId) {
   ]);
 }
 
+
+/**
+ * Un objeto, o nada.
+ *
+ * Una lista tambien es un objeto para JavaScript, y una configuracion nunca es
+ * una lista: por eso se descarta aparte.
+ */
+function aObjeto(valor) {
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return null;
+  return valor;
+}
+
 /**
  * Borra un evento.
  *
@@ -197,6 +209,19 @@ export const controladorEventos = crearControladorCatalogo({
       // Las dos van juntas o ninguna: media coordenada no ubica nada.
       latitud: aCoordenada(cuerpo.latitud, 90),
       longitud: aCoordenada(cuerpo.longitud, 180),
+      /*
+       * Cómo se ve la invitación de este evento.
+       *
+       * Se guarda tal como llega, sin mirar qué campos trae. Quien lo lee
+       * completa lo que falte y descarta lo que no entienda, así que validar
+       * acá seria repetir esa logica en un segundo lugar y arriesgarse a que
+       * los dos se separen.
+       *
+       * Lo unico que se comprueba es que sea un objeto: cualquier otra cosa
+       * —un texto, un numero, una lista— no es una configuracion y se guarda
+       * como nada, que significa «el diseño de siempre».
+       */
+      invitacion_config: aObjeto(cuerpo.invitacionConfig ?? cuerpo.invitacion_config),
       activo: aBandera(cuerpo.activo ?? 'FALSE')
     };
 
