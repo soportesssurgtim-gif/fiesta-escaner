@@ -96,32 +96,12 @@ export function usarManual({ puedeVer, esAngosto }) {
       : ''
   ));
 
-  /** Todo el capítulo como una lista de textos, para escucharlo de corrido. */
-  const paraEscuchar = computed(() => {
-    if (!capitulo.value) return [];
-
-    const partes = [{
-      id: 'capitulo-intro',
-      texto: `${capitulo.value.titulo}. ${capitulo.value.resumen}`
-    }];
-
-    for (const bloque of bloques.value) {
-      partes.push({ id: bloque.id, texto: `${bloque.titulo}. ${bloque.texto}` });
-    }
-
-    (capitulo.value.consejos || []).forEach((consejo, i) => {
-      partes.push({ id: `consejo-${i}`, texto: `Consejo. ${consejo}` });
-    });
-
-    return partes;
-  });
-
   /*
-   * El capítulo partido en diapositivas, para la pantalla angosta.
+   * El capítulo partido en diapositivas.
    *
-   * En un teléfono la lista completa es un rollo larguísimo donde se pierde el
-   * hilo. De a una cosa por vez, con avance visible, se parece a lo que ya
-   * conoce cualquiera que haya abierto una aplicación por primera vez.
+   * Se ve una cosa por vez, con avance visible, que es lo que se parece a lo
+   * que ya conoce cualquiera que haya abierto una aplicación por primera vez.
+   * La lista completa es un rollo larguísimo donde se pierde el hilo.
    *
    * La portada lleva el diagrama, que es el mapa de lo que viene después.
    */
@@ -236,7 +216,6 @@ export function usarManual({ puedeVer, esAngosto }) {
     capitulosVisibles,
     bloques,
     diagrama,
-    paraEscuchar,
     anterior,
     siguiente,
     paso,

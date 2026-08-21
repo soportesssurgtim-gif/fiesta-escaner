@@ -385,6 +385,7 @@ async function iniciar() {
 
       function cerrarManual() {
         lectura.detener();
+        lecturaContinua.value = false;
         manualAbierto.value = false;
         indiceManualAbierto.value = false;
         opcionesVozAbiertas.value = false;
@@ -413,9 +414,11 @@ async function iniciar() {
        * anterior y parece que no pasó nada.
        */
       function irAlCapitulo(id) {
-        lectura.detener();
         manual.abrirCapitulo(id);
         indiceManualAbierto.value = false;
+        // Saltar de capítulo mientras se escucha también sigue leyendo: quien
+        // eligió otro capítulo lo eligió para oírlo.
+        seguirLeyendo();
       }
 
       /*
@@ -449,50 +452,48 @@ async function iniciar() {
         // desplazarse hacia abajo por la pantalla cambiaría de diapositiva.
         if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
 
-        lectura.detener();
-        if (dx < 0) manual.pasoSiguiente();
-        else manual.pasoAnterior();
+        if (dx < 0) pasoSiguienteManual();
+        else pasoAnteriorManual();
       }
 
-      /** Cambia de diapositiva cortando la voz, que era de la anterior. */
+      /*
+       * Cambiar de diapositiva corta lo que suena —era de la anterior— y
+       * retoma en la nueva si se estaba escuchando.
+       */
       function irAPasoManual(indice) {
-        lectura.detener();
         manual.irAPaso(indice);
+        seguirLeyendo();
       }
 
       function pasoSiguienteManual() {
-        lectura.detener();
+        if (manual.esUltimoPaso) return;
         manual.pasoSiguiente();
+        seguirLeyendo();
       }
 
       function pasoAnteriorManual() {
-        lectura.detener();
+        if (manual.esPrimerPaso) return;
         manual.pasoAnterior();
+        seguirLeyendo();
       }
 
-      /** Escucha el capítulo entero, o lo detiene si ya está sonando. */
-      function escucharCapitulo() {
-        if (lectura.estado.leyendo) {
-          lectura.detener();
-          return;
-        }
-        lectura.leerSeguido(manual.paraEscuchar);
-      }
-
-      /**
-       * Escucha la diapositiva que está a la vista.
+      /*
+       * ¿La voz tiene que seguir al pasar de diapositiva?
        *
-       * En el teléfono no tiene sentido leer el capítulo entero: se ve una cosa
-       * por vez, y la voz se iría de la pantalla que se está mirando.
+       * Quien está escuchando el manual con las manos ocupadas pulsa
+       * «Siguiente» y espera que siga leyendo; tener que pulsar el altavoz de
+       * nuevo en cada pantalla arruina la razón de escucharlo. Pero quien lo
+       * detuvo a propósito no quiere que vuelva solo.
+       *
+       * La diferencia es esa: se apaga solo cuando alguien la detiene, no
+       * cuando la lectura termina por su cuenta.
        */
-      function escucharDiapositiva() {
-        if (lectura.estado.leyendo) {
-          lectura.detener();
-          return;
-        }
+      const lecturaContinua = ref(false);
 
+      /** El texto de la diapositiva que está a la vista, como se escucha. */
+      function textoDeLaDiapositiva() {
         const actual = manual.diapositiva;
-        if (!actual) return;
+        if (!actual) return null;
 
         let texto = actual.titulo + '. ';
         if (actual.tipo === 'consejos') {
@@ -503,7 +504,42 @@ async function iniciar() {
           texto += actual.texto || '';
         }
 
-        lectura.leer(texto, actual.id);
+        return { texto, id: actual.id };
+      }
+
+      /**
+       * Empieza o detiene la lectura de la diapositiva a la vista.
+       *
+       * En el teléfono no tiene sentido leer el capítulo entero de corrido: se
+       * ve una cosa por vez, y la voz se iría de la pantalla que se mira.
+       */
+      function escucharDiapositiva() {
+        if (lectura.estado.leyendo) {
+          // Detenida a mano: no vuelve sola en la siguiente.
+          lecturaContinua.value = false;
+          lectura.detener();
+          return;
+        }
+
+        const actual = textoDeLaDiapositiva();
+        if (!actual) return;
+
+        lecturaContinua.value = true;
+        lectura.leer(actual.texto, actual.id);
+      }
+
+      /**
+       * Retoma la lectura en la diapositiva nueva, si venía leyendo.
+       *
+       * Se corta primero lo que suena: es de la diapositiva anterior y ya no
+       * corresponde a lo que se está viendo.
+       */
+      function seguirLeyendo() {
+        lectura.detener();
+        if (!lecturaContinua.value) return;
+
+        const actual = textoDeLaDiapositiva();
+        if (actual) lectura.leer(actual.texto, actual.id);
       }
 
       // =====================================================================
@@ -2199,7 +2235,7 @@ async function iniciar() {
         // Guías
         manual, lectura, opcionesVozAbiertas, indiceManualAbierto, manualAbierto,
         abrirGuia, abrirManual, cerrarManual, abrirIndiceManual, irALaPantalla,
-        irAlCapitulo, escucharCapitulo, escucharDiapositiva,
+        irAlCapitulo, escucharDiapositiva, lecturaContinua,
         alTocarInicio, alTocarFin,
         irAPasoManual, pasoSiguienteManual, pasoAnteriorManual,
 

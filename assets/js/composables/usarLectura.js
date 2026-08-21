@@ -292,25 +292,6 @@ export function usarLectura() {
     decirSiguiente(turno);
   }
 
-  /**
-   * Lee varios bloques seguidos, marcando cada uno mientras suena.
-   * Es el "escuchar el capítulo entero" de la pantalla.
-   */
-  function leerSeguido(bloques) {
-    if (!disponible || bloques.length === 0) return;
-
-    detener();
-
-    let indice = 0;
-    const siguiente = () => {
-      if (indice >= bloques.length) return;
-      const bloque = bloques[indice++];
-      leer(bloque.texto, bloque.id, siguiente);
-    };
-
-    siguiente();
-  }
-
   function pausar() {
     if (!disponible || !estado.leyendo) return;
     window.speechSynthesis.pause();
@@ -360,7 +341,6 @@ export function usarLectura() {
     vocesEnEspanol,
     otrasVoces,
     leer,
-    leerSeguido,
     detener,
     pausar,
     reanudar,
