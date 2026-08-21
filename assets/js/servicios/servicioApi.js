@@ -115,6 +115,13 @@ export const api = {
     },
     activar(eventoId) {
       return http.enviar('eventos', { eventoId }, { accion: 'set-activo' });
+    },
+    /** Apaga el evento sin poner otro: queda el sistema sin evento en curso. */
+    desactivar(eventoId) {
+      return http.enviar('eventos', { eventoId }, { accion: 'desactivar' });
+    },
+    eliminar(id) {
+      return http.enviar('eventos', { id }, { accion: 'eliminar' });
     }
   },
 

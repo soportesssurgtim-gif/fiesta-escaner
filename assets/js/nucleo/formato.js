@@ -56,10 +56,48 @@ export function coincide(texto, busqueda) {
   return paraBuscar(texto).includes(aguja);
 }
 
+/**
+ * Convierte un valor a Date sin que una fecha sin hora se corra de día.
+ *
+ * `new Date('2026-08-28')` no da el 28 a medianoche local: el estándar manda
+ * interpretar una fecha sola como UTC, y en El Salvador —seis horas atrás— eso
+ * cae el 27 a las seis de la tarde. El evento del 28 se mostraba como 27.
+ *
+ * Cuando el valor trae hora, en cambio, sí es un instante y hay que respetar la
+ * zona: una asistencia registrada a las 21:45 tiene que decir 21:45.
+ *
+ * Así que se separan los dos casos: la fecha sola se arma con los números
+ * puestos a mano, que construyen medianoche local; lo demás se deja como está.
+ */
+function aFecha(valor) {
+  const texto = String(valor ?? '').trim();
+
+  const soloFecha = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  if (soloFecha) {
+    const [, anio, mes, dia] = soloFecha.map(Number);
+    const fecha = new Date(anio, mes - 1, dia);
+
+    /*
+     * JavaScript acomoda lo que no existe: pedirle el 45 de diciembre le da
+     * mediados de enero sin quejarse, y el 29 de febrero de un año que no es
+     * bisiesto le da el 1 de marzo. Una fecha imposible tiene que verse como lo
+     * que es —un dato mal cargado— y no como una fecha plausible de otro mes,
+     * así que se comprueba que los números hayan sobrevivido.
+     */
+    const sobrevivio = fecha.getFullYear() === anio &&
+                       fecha.getMonth() === mes - 1 &&
+                       fecha.getDate() === dia;
+
+    return sobrevivio ? fecha : new Date(NaN);
+  }
+
+  return new Date(valor);
+}
+
 /** Fecha y hora en formato salvadoreño: "06/08/2026, 21:45" */
 export function formatearFechaHora(valor) {
   if (!valor) return '';
-  const fecha = new Date(valor);
+  const fecha = aFecha(valor);
   if (Number.isNaN(fecha.getTime())) return String(valor);
   return fecha.toLocaleString('es-SV', {
     day: '2-digit',
@@ -73,7 +111,7 @@ export function formatearFechaHora(valor) {
 /** Solo la hora, para la lista de asistencias del día. */
 export function formatearHora(valor) {
   if (!valor) return '';
-  const fecha = new Date(valor);
+  const fecha = aFecha(valor);
   if (Number.isNaN(fecha.getTime())) return '';
   return fecha.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' });
 }
@@ -81,7 +119,7 @@ export function formatearHora(valor) {
 /** Fecha sola: "6 de agosto de 2026" */
 export function formatearFechaLarga(valor) {
   if (!valor) return '';
-  const fecha = new Date(valor);
+  const fecha = aFecha(valor);
   if (Number.isNaN(fecha.getTime())) return String(valor);
   return fecha.toLocaleDateString('es-SV', { day: 'numeric', month: 'long', year: 'numeric' });
 }
@@ -159,4 +197,30 @@ export function aFechaIso(valor) {
     return `${partes[2]}-${String(partes[1]).padStart(2, '0')}-${String(partes[0]).padStart(2, '0')}`;
   }
   return '';
+}
+
+/**
+ * El enlace de WhatsApp de un telefono salvadoreño, o cadena vacia.
+ *
+ * En El Salvador los moviles empiezan con 6, 7, 8 o 9, y los fijos con 2. A un
+ * fijo no se le puede escribir, asi que ahi no se ofrece el enlace: un boton
+ * que no va a funcionar es peor que no tener boton.
+ *
+ * El pais es el 503 y los numeros locales son de ocho digitos. Si ya viene con
+ * el codigo de pais se respeta, que es como los guarda quien copio el contacto
+ * del telefono.
+ */
+export function enlaceWhatsapp(valor) {
+  const digitos = String(valor ?? '').replace(/[^0-9]/g, '');
+  if (!digitos) return '';
+
+  // Con el codigo de pais adelante, se le quita para mirar el numero local.
+  const local = digitos.length === 11 && digitos.startsWith('503')
+    ? digitos.slice(3)
+    : digitos;
+
+  if (local.length !== 8) return '';
+  if (!/^[6789]/.test(local)) return '';
+
+  return `https://wa.me/503${local}`;
 }

@@ -1128,6 +1128,105 @@ async function iniciar() {
         }
       }
 
+
+      /*
+       * Apaga el evento en curso sin poner otro.
+       *
+       * Queda el sistema sin evento activo, que es un estado válido: entre una
+       * fiesta y la siguiente no hay ninguna, y con el escáner apagado nadie
+       * registra entradas por error en el evento del año pasado.
+       */
+      async function desactivarEvento(evento) {
+        try {
+          const respuesta = await api.eventos.desactivar(evento.id);
+          notificarExito(respuesta.mensaje || 'El evento ya no está activo.');
+          await recargarCatalogos();
+        } catch (fallo) {
+          notificarError(fallo.message || 'No se pudo desactivar el evento.');
+        }
+      }
+
+      /*
+       * Borrado de un evento, con confirmación.
+       *
+       * El servidor vuelve a revisar que no tenga asistencias ni sorteos: esto
+       * es comodidad, no la salvaguarda. Su mensaje se muestra tal cual porque
+       * explica qué hay colgando y cuánto.
+       */
+      const bajaEvento = reactive({
+        abierta: false,
+        evento: null,
+        trabajando: false,
+        error: ''
+      });
+
+      function pedirBajaEvento(evento) {
+        Object.assign(bajaEvento, {
+          abierta: true,
+          evento,
+          trabajando: false,
+          error: ''
+        });
+      }
+
+      function cancelarBajaEvento() {
+        bajaEvento.abierta = false;
+        bajaEvento.error = '';
+      }
+
+      async function confirmarBajaEvento() {
+        if (!bajaEvento.evento) return;
+
+        bajaEvento.trabajando = true;
+        bajaEvento.error = '';
+
+        try {
+          const respuesta = await api.eventos.eliminar(bajaEvento.evento.id);
+          notificarExito(respuesta.mensaje || 'El evento se borró.');
+          bajaEvento.abierta = false;
+          await recargarCatalogos();
+        } catch (fallo) {
+          bajaEvento.error = fallo.message || 'No se pudo borrar el evento.';
+        } finally {
+          bajaEvento.trabajando = false;
+        }
+      }
+
+      /*
+       * Comparte el enlace del portal público de invitaciones.
+       *
+       * Es el mismo al que lleva «Consulta tu código QR aquí» de la pantalla de
+       * entrada, y lo que más se pide mientras hay un evento en curso: cada vez
+       * que alguien pregunta por su invitación, la respuesta es este enlace.
+       *
+       * Donde el dispositivo tiene el menú de compartir del sistema —los
+       * teléfonos— se usa ese, que es de donde sale mandarlo por WhatsApp. En el
+       * escritorio se copia al portapapeles, que es lo único que hay.
+       */
+      const enlaceCopiado = ref(false);
+
+      async function compartirInvitacion() {
+        const enlace = new URL('/?invitacion=1', window.location.origin).href;
+        const texto = eventoActivo.value
+          ? `Consulta tu invitación para ${eventoActivo.value.nombre}`
+          : 'Consulta tu invitación';
+
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: texto, text: texto, url: enlace });
+            return;
+          }
+
+          await navigator.clipboard.writeText(enlace);
+          enlaceCopiado.value = true;
+          notificarExito('Enlace copiado. Ya puedes pegarlo donde lo necesites.');
+          setTimeout(() => { enlaceCopiado.value = false; }, 2500);
+        } catch (fallo) {
+          // Cancelar el menú de compartir lanza AbortError y no es un problema.
+          if (fallo && fallo.name === 'AbortError') return;
+          notificarError('No se pudo compartir el enlace. Cópialo desde la barra del navegador.');
+        }
+      }
       // =====================================================================
       // Sorteos
       //
@@ -2269,7 +2368,9 @@ async function iniciar() {
         cerrarConciliacion, importarDepartamentos, exportar, descargarPlantilla,
 
         // Eventos
-        activarEvento,
+        activarEvento, desactivarEvento,
+        bajaEvento, pedirBajaEvento, cancelarBajaEvento, confirmarBajaEvento,
+        compartirInvitacion, enlaceCopiado,
 
         // Sorteos
         sorteos, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,

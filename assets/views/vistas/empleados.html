@@ -159,7 +159,22 @@
           </div>
           <div>
             <dt class="etiqueta">Teléfono</dt>
-            <dd class="text-theme-sm text-gray-800 dark:text-gray-200">{{ detalle.persona.telefono || '—' }}</dd>
+            <dd class="text-theme-sm text-gray-800 dark:text-gray-200">
+              <!--
+                El enlace solo aparece en los móviles. A un fijo —los que
+                empiezan con 2— no se le puede escribir, y un botón que no va a
+                funcionar es peor que no tener botón.
+              -->
+              <a v-if="enlaceWhatsapp(detalle.persona.telefono)"
+                 :href="enlaceWhatsapp(detalle.persona.telefono)"
+                 target="_blank" rel="noopener"
+                 class="inline-flex items-center gap-2 font-medium text-success-600 hover:text-success-700 dark:text-success-400"
+                 :title="'Escribir a ' + nombreCompleto(detalle.persona) + ' por WhatsApp'">
+                <i class="fa-brands fa-whatsapp"></i>
+                {{ detalle.persona.telefono }}
+              </a>
+              <span v-else>{{ detalle.persona.telefono || '—' }}</span>
+            </dd>
           </div>
           <div class="min-w-0">
             <dt class="etiqueta">Correo</dt>
@@ -171,32 +186,25 @@
         <div class="lg:col-span-2">
           <label class="etiqueta">Código QR</label>
 
-          <div class="mb-3 flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-            <button type="button" @click="detalle.campoQr = 'dui'"
-                    class="flex-1 rounded-md px-2 py-1.5 text-theme-xs font-medium transition"
-                    :class="detalle.campoQr === 'dui' ? 'bg-white text-brand-600 shadow-theme-xs dark:bg-gray-900 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'">
-              DUI
-            </button>
-            <button type="button" @click="detalle.campoQr = 'codigo'"
-                    class="flex-1 rounded-md px-2 py-1.5 text-theme-xs font-medium transition"
-                    :class="detalle.campoQr === 'codigo' ? 'bg-white text-brand-600 shadow-theme-xs dark:bg-gray-900 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'">
-              Código
-            </button>
-            <button type="button" @click="detalle.campoQr = 'url'"
-                    class="flex-1 rounded-md px-2 py-1.5 text-theme-xs font-medium transition"
-                    :class="detalle.campoQr === 'url' ? 'bg-white text-brand-600 shadow-theme-xs dark:bg-gray-900 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'">
-              Enlace
-            </button>
-          </div>
+          <!--
+            El QR se genera siempre con el DUI.
 
+            Antes se podia elegir entre DUI, codigo interno y enlace, pero eso
+            deja tres invitaciones distintas circulando para la misma persona y
+            solo una funciona en la puerta si el escaner esta configurado de
+            otra forma. Con una sola manera no hay nada que confundir.
+
+            Si mas adelante hace falta, la eleccion tiene mas sentido como
+            configuracion del evento —todas las invitaciones de esa fiesta se
+            generan igual— que como decision suelta por empleado.
+          -->
           <div class="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
             <img :src="qrDetalle" :alt="'QR de ' + nombreCompleto(detalle.persona)"
                  class="h-auto w-full max-w-[220px]" />
           </div>
 
           <p class="texto-ayuda">
-            El escáner acepta DUI y código. El enlace abre el portal público con
-            el DUI ya escrito.
+            El código lleva el DUI, que es lo que lee el escáner de la puerta.
           </p>
 
           <div class="mt-4 grid grid-cols-1 gap-2">

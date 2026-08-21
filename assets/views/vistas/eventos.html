@@ -66,6 +66,17 @@
                     class="boton boton-exito flex-1 text-theme-xs">
               <i class="fa-solid fa-power-off"></i> Activar
             </button>
+            <!--
+              El que está en curso se apaga desde acá. Queda el sistema sin
+              evento activo, que es un estado válido: entre una fiesta y la
+              siguiente no hay ninguna, y con el escáner apagado nadie registra
+              entradas por error en el evento del año pasado.
+            -->
+            <button v-else-if="esVerdadero(evento.activo) && permisos.tienePermiso('eventos', 'Editar')"
+                    type="button" @click="desactivarEvento(evento)"
+                    class="boton flex-1 border border-success-300 bg-success-100 text-theme-xs text-success-700 hover:bg-success-200 dark:border-success-500/40 dark:bg-success-500/15 dark:text-success-400">
+              <i class="fa-solid fa-check"></i> En curso
+            </button>
             <span v-else-if="esVerdadero(evento.activo)"
                   class="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success-100 py-2.5 text-theme-xs font-medium text-success-700 dark:bg-success-500/15 dark:text-success-400">
               <i class="fa-solid fa-check"></i> En curso
@@ -76,12 +87,69 @@
                     class="boton boton-secundario" aria-label="Editar evento">
               <i class="fa-solid fa-pen"></i>
             </button>
+
+            <!--
+              Borrar solo lo ve un administrador, y el servidor además se niega
+              si el evento tiene asistencias o sorteos: eso es la historia de esa
+              fiesta y borrarla se la lleva.
+            -->
+            <button v-if="permisos.esAdministrador && !esVerdadero(evento.activo)"
+                    type="button" @click="pedirBajaEvento(evento)"
+                    class="boton boton-secundario text-error-600 hover:border-error-300 dark:text-error-400"
+                    aria-label="Borrar evento">
+              <i class="fa-solid fa-trash"></i>
+            </button>
           </div>
         </article>
       </div>
     </div>
 
     <paginacion-tabla :catalogo="eventos"></paginacion-tabla>
+  </div>
+
+  <!--
+    Confirmación de borrado.
+
+    Se muestra qué se va a borrar y se pide confirmar. El servidor vuelve a
+    revisar que no tenga nada colgando: esto es comodidad, no la salvaguarda.
+  -->
+  <div v-if="bajaEvento.abierta" class="modal-fondo" @click.self="cancelarBajaEvento()">
+    <div class="modal-panel max-w-md">
+      <div class="mb-4 flex items-start gap-4">
+        <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-error-50 text-xl text-error-500 dark:bg-error-500/15">
+          <i class="fa-solid fa-trash"></i>
+        </span>
+        <div class="min-w-0">
+          <h2 class="modal-titulo">Borrar el evento</h2>
+          <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+            Esto no se puede deshacer.
+          </p>
+        </div>
+      </div>
+
+      <p class="text-theme-sm text-gray-700 dark:text-gray-300">
+        Se va a borrar <strong>{{ bajaEvento.evento ? bajaEvento.evento.nombre : '' }}</strong>.
+      </p>
+
+      <p v-if="bajaEvento.error"
+         class="mt-4 flex gap-3 rounded-xl border border-error-200 bg-error-50 p-3 text-theme-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+        <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
+        <span>{{ bajaEvento.error }}</span>
+      </p>
+
+      <div class="mt-6 flex gap-3">
+        <button type="button" @click="cancelarBajaEvento()" class="boton boton-secundario flex-1"
+                :disabled="bajaEvento.trabajando">
+          Cancelar
+        </button>
+        <button type="button" @click="confirmarBajaEvento()" class="boton boton-peligro flex-1"
+                :disabled="bajaEvento.trabajando">
+          <i v-if="bajaEvento.trabajando" class="fa-solid fa-circle-notch animar-girar"></i>
+          <i v-else class="fa-solid fa-trash"></i>
+          {{ bajaEvento.trabajando ? 'Borrando…' : 'Borrar' }}
+        </button>
+      </div>
+    </div>
   </div>
 
   <div v-if="eventos.modalAbierto" class="modal-fondo" @click.self="eventos.cerrar()">

@@ -8,10 +8,15 @@
 import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
 import { TABLAS, SI, NO } from '../configuracion.js';
-import { aTexto, aBandera } from '../valores.js';
+import { aTexto, aBandera, esVerdadero } from '../valores.js';
 import { leerCuerpo, leerParametro } from '../peticion.js';
-import { esAdministrador } from '../seguridad.js';
-import { responderOk, responderSolicitudInvalida, responderSinPermiso } from '../respuestas.js';
+import { esAdministrador, puedeEnModulo } from '../seguridad.js';
+import {
+  responderOk,
+  responderSolicitudInvalida,
+  responderSinPermiso,
+  responderNoEncontrado
+} from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 
 export const repositorioEventos = new Repositorio(TABLAS.eventos, {
@@ -66,6 +71,120 @@ async function activarEvento({ req, res, sesion }) {
   });
 }
 
+/**
+ * Apaga el evento activo sin poner otro en su lugar.
+ *
+ * Queda el sistema sin evento activo, que es un estado valido: entre una fiesta
+ * y la siguiente no hay ninguna en curso. Con el escaner apagado nadie registra
+ * entradas por error en el evento del anio pasado.
+ */
+async function desactivarEvento({ req, res, sesion }) {
+  if (!(await puedeEnModulo(sesion, 'eventos', 'editar'))) {
+    return responderSinPermiso(res, 'No tienes permiso para cambiar el evento activo.');
+  }
+
+  const cuerpo = await leerCuerpo(req);
+  const eventoId = aTexto(cuerpo.eventoId) || leerParametro(req, 'eventoId');
+
+  if (!eventoId) {
+    return responderSolicitudInvalida(res, 'Falta indicar cual evento desactivar.');
+  }
+
+  const evento = await repositorioEventos.obtenerPorId(eventoId, 'id, nombre');
+  if (!evento) {
+    return responderNoEncontrado(res, 'Ese evento ya no existe.');
+  }
+
+  await repositorioEventos.actualizar(eventoId, { activo: NO });
+
+  return responderOk(res, {
+    ok: true,
+    mensaje: `"${evento.nombre}" ya no esta activo. No hay ningun evento en curso.`
+  });
+}
+
+/**
+ * Cuantos registros dependen de un evento.
+ *
+ * Se cuenta antes de borrar porque las llaves foraneas rechazarian el borrado
+ * con un error de base de datos que no le dice nada a nadie. Mejor explicar que
+ * hay colgando y cuanto.
+ */
+async function contarDependencias(eventoId) {
+  const contar = async (tabla, etiqueta) => {
+    const { count } = await supabase
+      .from(tabla)
+      .select('id', { count: 'exact', head: true })
+      .eq('evento', eventoId);
+    return { etiqueta, cantidad: count || 0 };
+  };
+
+  return Promise.all([
+    contar(TABLAS.asistencias, 'asistencias registradas'),
+    contar(TABLAS.sorteos, 'sorteos'),
+    contar(TABLAS.ganadores, 'ganadores')
+  ]);
+}
+
+/**
+ * Borra un evento.
+ *
+ * Solo un administrador, y solo si no tiene nada colgando: un evento con
+ * asistencias es el registro de quienes entraron a esa fiesta, y borrarlo se
+ * lleva esa historia. Para sacarlo de en medio esta desactivarlo.
+ */
+async function eliminarEvento({ req, res, sesion }) {
+  if (!esAdministrador(sesion.rol)) {
+    return responderSinPermiso(res, 'Solo un administrador puede borrar un evento.');
+  }
+
+  const cuerpo = await leerCuerpo(req);
+  const eventoId = aTexto(cuerpo.id) || aTexto(cuerpo.eventoId);
+
+  if (!eventoId) {
+    return responderSolicitudInvalida(res, 'Falta indicar cual evento borrar.');
+  }
+
+  const evento = await repositorioEventos.obtenerPorId(eventoId, 'id, nombre, activo');
+  if (!evento) {
+    return responderNoEncontrado(res, 'Ese evento ya no existe.');
+  }
+
+  if (esVerdadero(evento.activo)) {
+    return responderSolicitudInvalida(
+      res,
+      `"${evento.nombre}" es el evento activo. Desactivalo antes de borrarlo.`
+    );
+  }
+
+  const dependencias = await contarDependencias(eventoId);
+  const total = dependencias.reduce((suma, d) => suma + d.cantidad, 0);
+
+  if (total > 0) {
+    const detalle = dependencias
+      .filter((d) => d.cantidad > 0)
+      .map((d) => `${d.cantidad} ${d.etiqueta}`)
+      .join(', ');
+
+    return responderSolicitudInvalida(
+      res,
+      `No se puede borrar "${evento.nombre}": tiene ${detalle}. ` +
+      'Esos registros son la historia de esa fiesta. Si de verdad hay que borrarlos, ' +
+      'vacialos primero desde Configuracion.'
+    );
+  }
+
+  await repositorioEventos.eliminar(eventoId);
+
+  console.info(`[eventos] ${sesion.usuario || 'desconocido'} borro el evento "${evento.nombre}"`);
+
+  return responderOk(res, {
+    ok: true,
+    nombre: evento.nombre,
+    mensaje: `"${evento.nombre}" se borro.`
+  });
+}
+
 export const controladorEventos = crearControladorCatalogo({
   repositorio: repositorioEventos,
 
@@ -86,6 +205,8 @@ export const controladorEventos = crearControladorCatalogo({
 
   accionesExtra: {
     'POST set-activo': activarEvento,
-    'POST activar': activarEvento
+    'POST activar': activarEvento,
+    'POST desactivar': desactivarEvento,
+    'POST eliminar': eliminarEvento
   }
 });
