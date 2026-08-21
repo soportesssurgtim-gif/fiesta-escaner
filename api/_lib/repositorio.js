@@ -58,6 +58,37 @@ export class Repositorio {
     return resto;
   }
 
+  /**
+   * Aplica un filtro simple, sin distinguir mayúsculas en las banderas.
+   *
+   * La base guarda los booleanos como texto, y ese texto no siempre viene de
+   * este sistema: una carga hecha desde el panel de Supabase, o un archivo
+   * armado en otro lado, puede dejar «true» en minúscula. Con una comparación
+   * exacta esas filas desaparecen sin error ni aviso —el escáner no encuentra
+   * al empleado, el portal dice que no está invitado— y no hay nada en pantalla
+   * que explique por qué.
+   *
+   * Pasó de verdad: ochocientos veintiséis empleados quedaron invisibles con
+   * «true» en lugar de «TRUE».
+   *
+   * `ilike` sin comodines es una comparación exacta que ignora mayúsculas, así
+   * que las dos formas encuentran lo mismo. Para el resto de los campos se
+   * mantiene la comparación estricta: un nombre o un identificador sí tienen
+   * que coincidir tal cual.
+   */
+  _filtrar(consulta, filtros) {
+    for (const [campo, valor] of Object.entries(filtros)) {
+      const texto = String(valor ?? '').toUpperCase();
+
+      if (texto === 'TRUE' || texto === 'FALSE') {
+        consulta = consulta.ilike(campo, texto);
+      } else {
+        consulta = consulta.eq(campo, valor);
+      }
+    }
+    return consulta;
+  }
+
   /** Consulta base con el orden ya aplicado. */
   _consulta(columnas = '*') {
     let consulta = supabase.from(this.tabla).select(columnas);
@@ -69,10 +100,7 @@ export class Repositorio {
 
   /** Trae todo. `filtros` es un objeto plano tipo { activo: 'TRUE' }. */
   async listar(filtros = {}, columnas = '*') {
-    let consulta = this._consulta(columnas);
-    for (const [campo, valor] of Object.entries(filtros)) {
-      consulta = consulta.eq(campo, valor);
-    }
+    const consulta = this._filtrar(this._consulta(columnas), filtros);
     const { data, error } = await consulta;
     if (error) throw error;
     return data || [];
@@ -91,10 +119,7 @@ export class Repositorio {
 
   /** Busca la primera fila que cumpla un filtro simple. */
   async buscarUno(filtros = {}, columnas = '*') {
-    let consulta = supabase.from(this.tabla).select(columnas);
-    for (const [campo, valor] of Object.entries(filtros)) {
-      consulta = consulta.eq(campo, valor);
-    }
+    const consulta = this._filtrar(supabase.from(this.tabla).select(columnas), filtros);
     const { data, error } = await consulta.limit(1).maybeSingle();
     if (error) throw error;
     return data || null;
@@ -102,10 +127,10 @@ export class Repositorio {
 
   /** Cuenta filas sin traérselas (head: true no descarga el contenido). */
   async contar(filtros = {}) {
-    let consulta = supabase.from(this.tabla).select('*', { count: 'exact', head: true });
-    for (const [campo, valor] of Object.entries(filtros)) {
-      consulta = consulta.eq(campo, valor);
-    }
+    const consulta = this._filtrar(
+      supabase.from(this.tabla).select('*', { count: 'exact', head: true }),
+      filtros
+    );
     const { count, error } = await consulta;
     if (error) throw error;
     return count || 0;
