@@ -45,6 +45,21 @@ export function responderMetodoNoPermitido(res) {
 }
 
 /**
+ * Se pidió de más en poco tiempo.
+ *
+ * `Retry-After` va en segundos y es la parte que le sirve a un cliente honesto:
+ * le dice cuándo volver, en lugar de dejarlo reintentando a ciegas.
+ */
+export function responderDemasiadasSolicitudes(res, mensaje, esperaSegundos) {
+  if (esperaSegundos && typeof res.setHeader === 'function') {
+    res.setHeader('Retry-After', String(Math.ceil(esperaSegundos)));
+  }
+  return responderJson(res, 429, {
+    error: mensaje || 'Demasiadas consultas seguidas. Espera un momento y vuelve a intentar.'
+  });
+}
+
+/**
  * Códigos con los que Postgres y PostgREST avisan que el esquema no tiene algo.
  *
  * Los cuatro significan lo mismo para nosotros: el código va más adelantado que

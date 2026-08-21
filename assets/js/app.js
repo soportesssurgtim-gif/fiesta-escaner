@@ -32,6 +32,7 @@ import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
+import { usarDesafio } from './composables/usarDesafio.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
@@ -2109,12 +2110,23 @@ async function iniciar() {
       // =====================================================================
 
       const invitacion = reactive({
-        dui: '', ultimos4: '', resultado: null, error: '', consultando: false,
+        dui: '', resultado: null, error: '', consultando: false,
         guardando: false,
+        // Campo opcional del formulario. Viaja siempre, vacio o no.
+        // El porque esta en api/_lib/controladores/invitacionPublica.js.
+        reserva: '',
         // Se muestra en iPhone, donde la imagen se abre en otra pestaña en vez
         // de descargarse: sin explicarlo, parece que el botón no hizo nada.
         avisoGuardado: ''
       });
+
+      /*
+       * El acertijo que hay que resolver para poder consultar.
+       *
+       * Se empieza a resolver al abrir la pantalla, no al pulsar «Consultar»:
+       * mientras la persona escribe sus diez digitos, la cuenta ya termino.
+       */
+      const desafio = usarDesafio(() => api.invitacion.desafio());
 
       /**
        * Guarda la invitación completa como imagen.
@@ -2160,14 +2172,21 @@ async function iniciar() {
         invitacion.resultado = null;
         invitacion.avisoGuardado = '';
 
-        if (!invitacion.dui || !invitacion.ultimos4) {
-          invitacion.error = 'Escribe tu DUI y los últimos 4 dígitos.';
+        if (!invitacion.dui) {
+          invitacion.error = 'Escribe tu DUI.';
           return;
         }
 
         invitacion.consultando = true;
         try {
-          invitacion.resultado = await api.invitacion.consultar(invitacion.dui, invitacion.ultimos4);
+          // Si ya se resolvio mientras escribia, esto vuelve al instante.
+          const resuelto = await desafio.obtener();
+
+          invitacion.resultado = await api.invitacion.consultar(
+            invitacion.dui,
+            resuelto,
+            invitacion.reserva
+          );
         } catch (fallo) {
           invitacion.error = fallo.message || 'No se pudo consultar la invitación.';
         } finally {
@@ -2300,6 +2319,11 @@ async function iniciar() {
           vista.value = 'invitacion-publica';
           const duiPrecargado = parametros.get('dui');
           if (duiPrecargado) invitacion.dui = duiPrecargado.replace(/[^0-9]/g, '');
+
+          // El acertijo se empieza a resolver ya, mientras la persona escribe.
+          // Para cuando pulse «Consultar», la cuenta suele estar terminada.
+          desafio.preparar();
+
           cargando.value = false;
           ocultarPantallaCarga();
           return;
@@ -2446,7 +2470,7 @@ async function iniciar() {
         pedirPurga, cancelarPurga, confirmarPurga,
 
         // Portal público
-        invitacion, consultarInvitacion, guardarInvitacion,
+        invitacion, consultarInvitacion, guardarInvitacion, desafio,
 
         // Utilidades de formato disponibles en las plantillas
         ...formato

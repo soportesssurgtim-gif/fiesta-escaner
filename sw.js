@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.9.3';
+const VERSION_CACHE = 'v3.10.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -91,6 +91,8 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarManual.js',
   '/assets/js/composables/usarConciliacion.js',
   '/assets/js/composables/usarMapa.js',
+  '/assets/js/composables/usarDesafio.js',
+  '/assets/js/nucleo/sha256.js',
   '/assets/js/composables/usarLectura.js',
 
   // Componentes y contenido

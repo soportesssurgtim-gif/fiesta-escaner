@@ -1195,6 +1195,20 @@ html.dark .mapa-evento { border-color: var(--gris-800); }
 }
 
 /* Cuadrado, para que se lea como accion secundaria al lado del boton ancho. */
+/*
+ * Se saca de la pantalla en lugar de usar `display: none`, y no se lo hace
+ * invisible en el lugar porque seguiría ocupando su espacio y empujando el
+ * formulario. El porqué de todo esto está en el servidor.
+ */
+.campo-reserva {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 .mapa-boton-limpiar {
   flex: none;
   width: 2.75rem;

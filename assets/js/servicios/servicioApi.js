@@ -259,10 +259,16 @@ export const api = {
     }
   },
 
-  /** Portal público: es la única llamada que funciona sin sesión. */
+  /** Portal público: son las únicas llamadas que funcionan sin sesión. */
   invitacion: {
-    consultar(dui, ultimos4) {
-      return http.obtener('invitacion-publica', { dui, ultimos4 });
+    /** El acertijo que hay que resolver antes de poder consultar. */
+    desafio() {
+      return http.obtener('invitacion-publica', { accion: 'desafio' });
+    },
+
+    /** `reserva` viaja siempre, aunque esté vacío. Ver el controlador. */
+    consultar(dui, desafio, reserva = '') {
+      return http.obtener('invitacion-publica', { dui, desafio, segundo_apellido: reserva });
     }
   }
 };

@@ -112,12 +112,6 @@ export function aFechaIso(valor) {
   return '';
 }
 
-/** Los últimos 4 dígitos del DUI: es la "contraseña" del portal público. */
-export function ultimosCuatroDigitos(valor) {
-  const digitos = String(valor ?? '').replace(/[^0-9]/g, '');
-  return digitos.length < 4 ? '' : digitos.slice(-4);
-}
-
 /** Un UUID de verdad, no el generador casero a base de Math.random() de antes. */
 export function nuevoUuid() {
   return crypto.randomUUID();

@@ -2,7 +2,7 @@
   Portal público de invitaciones.
 
   Es la única pantalla sin sesión: el empleado entra desde su teléfono, escribe
-  su DUI y los últimos 4 dígitos, y obtiene el QR con el que ingresa al evento.
+  su DUI y obtiene el QR con el que ingresa al evento.
 
   Todo el diseño está pensado para móvil: es donde va a usarse el 99% de las
   veces, en la fila de entrada y con una mano ocupada.
@@ -25,7 +25,7 @@
     <div v-if="!invitacion.resultado" class="tarjeta">
       <div class="tarjeta-cuerpo">
         <p class="mb-5 text-theme-sm text-gray-600 dark:text-gray-400">
-          Escribe tu número de DUI y los últimos 4 dígitos para ver tu código QR.
+          Escribe tu número de DUI para ver tu código QR.
         </p>
 
         <form @submit.prevent="consultarInvitacion" novalidate>
@@ -42,18 +42,14 @@
             <p class="texto-ayuda text-center">Solo los números, sin guion.</p>
           </div>
 
-          <div class="mb-5">
-            <label for="verificacion" class="etiqueta">Últimos 4 dígitos</label>
-            <input id="verificacion"
-                   v-model="invitacion.ultimos4"
-                   @input="invitacion.ultimos4 = invitacion.ultimos4.replace(/[^0-9]/g, '').slice(0, 4)"
+          <!-- Campo opcional. Ver invitacionPublica.js en el servidor. -->
+          <div class="campo-reserva" aria-hidden="true">
+            <label for="segundo-apellido">Segundo apellido</label>
+            <input id="segundo-apellido"
+                   v-model="invitacion.reserva"
                    type="text"
-                   inputmode="numeric"
-                   maxlength="4"
-                   autocomplete="off"
-                   class="campo text-center text-lg tracking-[0.5em]"
-                   placeholder="0000" />
-            <p class="texto-ayuda text-center">Es para confirmar que el documento es tuyo.</p>
+                   tabindex="-1"
+                   autocomplete="off" />
           </div>
 
           <div v-if="invitacion.error"
@@ -144,7 +140,7 @@
           </p>
 
           <button type="button"
-                  @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.ultimos4 = ''; invitacion.avisoGuardado = ''"
+                  @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.reserva = ''; invitacion.avisoGuardado = ''"
                   class="boton boton-secundario w-full">
             Consultar otro DUI
           </button>
