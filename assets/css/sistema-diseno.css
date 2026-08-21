@@ -827,6 +827,30 @@ html.dark .diagrama-punta { fill: var(--gris-700); }
 }
 
 /*
+ * Cuando Anime.js toma el control.
+ *
+ * El SVG trae sus propias animaciones escritas en un <style> interno, y las
+ * escribe con el id del diagrama —`#flujo-h .viajero-0 { … }`—. Un selector con
+ * id le gana a cualquier clase, así que apagarlas desde acá necesita
+ * `!important`; es de los pocos lugares donde está justificado.
+ *
+ * Sin esto se verían dos puntos recorriendo el mismo tramo, desfasados: el de
+ * CSS y el de Anime.js, cada uno con su reloj.
+ *
+ * El punto que agrega Anime.js empieza en el origen del dibujo y se mueve con
+ * `transform`, por eso necesita que el sistema de coordenadas sea el suyo y no
+ * la caja del elemento.
+ */
+.diagrama.con-anime .diagrama-viajero { animation: none !important; }
+.diagrama.con-anime .diagrama-circulo { animation: none !important; }
+
+.diagrama .diagrama-viajero[class*="viajero-anime"],
+.diagrama .diagrama-viajero[class*="viajero-rama"] {
+  opacity: 0;
+  transform-box: view-box;
+}
+
+/*
  * Con el movimiento apagado el diagrama se muestra armado y quieto. La regla
  * general deja las animaciones en 0.01ms, lo que alcanza para los nodos y las
  * líneas; el punto viajero se esconde desde el <style> de cada SVG, porque

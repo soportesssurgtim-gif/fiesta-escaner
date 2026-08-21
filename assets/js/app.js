@@ -39,6 +39,7 @@ import { usarSincronizacion } from './composables/usarSincronizacion.js';
 import { usarBuscadorPersonas } from './composables/usarBuscadorPersonas.js';
 import { usarSorteos } from './composables/usarSorteos.js';
 import { usarManual } from './composables/usarManual.js';
+import { animarDiagrama, cargarAnime } from './composables/usarAnimacionDiagrama.js';
 import { usarLectura } from './composables/usarLectura.js';
 
 import { MENU, DISTRITOS } from './contenido/menu.js';
@@ -386,8 +387,58 @@ async function iniciar() {
        */
       const manualAbierto = ref(false);
 
+      /*
+       * Las animaciones del diagrama de la lámina que se está viendo.
+       *
+       * Se guarda para poder frenarlas. El recorrido del punto va en bucle, así
+       * que sin esto cada lámina visitada dejaría una animación corriendo para
+       * siempre: en un teléfono, batería gastada en dibujos que ya nadie mira.
+       */
+      let animacionDiagrama = null;
+
+      function frenarDiagrama() {
+        if (animacionDiagrama) {
+          animacionDiagrama.detener();
+          animacionDiagrama = null;
+        }
+      }
+
+      /**
+       * Anima el diagrama de la lámina actual, si Anime.js está disponible.
+       *
+       * Se espera a `nextTick` porque el SVG entra por `v-html` y hasta que Vue
+       * no termina de dibujar no hay nada que animar.
+       *
+       * Si la librería no está —sin señal la primera vez, o movimiento reducido
+       * en el sistema— esto no hace nada y quedan las animaciones de CSS, que
+       * alcanzan para entender el diagrama.
+       */
+      async function animarDiagramaActual() {
+        frenarDiagrama();
+        if (!manualAbierto.value || !manual.diagrama) return;
+
+        await nextTick();
+        const marco = document.querySelector('.manual-capa .diagrama-marco');
+        if (!marco) return;
+
+        const animacion = await animarDiagrama(marco);
+
+        // Mientras se cargaba la librería pudo cambiar la lámina o cerrarse el
+        // manual. Si ya no corresponde, se frena en el acto.
+        if (!manualAbierto.value) { if (animacion) animacion.detener(); return; }
+        animacionDiagrama = animacion;
+      }
+
+      watch(
+        () => [manualAbierto.value, manual.capitulo && manual.capitulo.id, manual.paso],
+        () => { animarDiagramaActual(); }
+      );
+
       function abrirManual(capitulo = null) {
         if (capitulo) manual.abrirCapitulo(capitulo);
+        // Se pide la librería apenas se abre, para que esté lista antes de que
+        // alguien llegue a la primera lámina con diagrama.
+        cargarAnime();
         manualAbierto.value = true;
         indiceManualAbierto.value = false;
         // La barra lateral del teléfono queda debajo de la capa; si se deja
@@ -396,6 +447,7 @@ async function iniciar() {
       }
 
       function cerrarManual() {
+        frenarDiagrama();
         lectura.detener();
         lecturaContinua.value = false;
         manualAbierto.value = false;
