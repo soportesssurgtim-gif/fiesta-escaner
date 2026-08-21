@@ -979,3 +979,83 @@ html.dark .manual-pie {
 html.dark .bloque-leyendo {
   background-color: rgb(var(--marca-500-rgb) / 0.12);
 }
+
+/* ---------------------------------------------------------------------
+   El mapa donde se marca el lugar del evento
+
+   Leaflet necesita que su contenedor tenga alto propio: sin esto mide cero y
+   no dibuja nada. El z-index bajo es porque Leaflet pone sus controles en 1000
+   y se le montarían encima a los modales del sistema.
+   --------------------------------------------------------------------- */
+/*
+ * El marco existe para poder poner el pin encima del mapa: el pin se posiciona
+ * respecto de este contenedor, no del mapa, que por dentro se mueve.
+ */
+.mapa-marco {
+  position: relative;
+}
+
+.mapa-evento {
+  height: 15rem;
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--gris-200);
+  z-index: 0;
+  /* La mano es lo que dice «esto se arrastra». */
+  cursor: grab;
+}
+
+.mapa-evento:active { cursor: grabbing; }
+
+/*
+ * El pin, clavado en el centro.
+ *
+ * El desplazamiento vertical completo —y no la mitad— es porque la punta del
+ * pin es lo que señala: si se centrara el dibujo, el lugar marcado quedaría a
+ * media altura del icono y no donde apunta.
+ *
+ * `pointer-events: none` deja pasar el gesto al mapa: sin eso, arrastrar
+ * empezando sobre el pin no movía nada.
+ */
+.mapa-pin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  z-index: 400;
+  font-size: 2rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgb(16 24 40 / 0.35));
+  transition: transform 120ms ease-out;
+}
+
+.mapa-evento:active + .mapa-pin {
+  /* Se levanta un poco mientras se arrastra, como si el mapa pasara debajo. */
+  transform: translate(-50%, -110%);
+}
+
+/* La sombrita en el suelo, donde el pin apunta de verdad. */
+.mapa-pin-sombra {
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 8px;
+  height: 4px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: rgb(16 24 40 / 0.35);
+}
+
+html.dark .mapa-evento { border-color: var(--gris-800); }
+
+/* Los controles de Leaflet, con el aspecto del resto del sistema. */
+.mapa-evento .leaflet-control-zoom a {
+  border-radius: 0.375rem;
+  color: var(--gris-700);
+}
+
+.mapa-evento .leaflet-control-attribution {
+  font-size: 10px;
+  background: rgb(255 255 255 / 0.75);
+}

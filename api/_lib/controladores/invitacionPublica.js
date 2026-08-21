@@ -81,6 +81,10 @@ export const controladorInvitacionPublica = {
       evento: evento.nombre,
       fechaEvento: evento.fecha_evento || '',
       ubicacion: evento.ubicacion || '',
+      // Para el botón de cómo llegar. Van como números o como null; la
+      // pantalla no muestra el botón si falta alguna.
+      latitud: evento.latitud ?? null,
+      longitud: evento.longitud ?? null,
       empleado: {
         nombres: empleado.nombres,
         apellidos: empleado.apellidos,

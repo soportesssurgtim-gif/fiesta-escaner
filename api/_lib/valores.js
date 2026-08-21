@@ -122,3 +122,22 @@ export function ultimosCuatroDigitos(valor) {
 export function nuevoUuid() {
   return crypto.randomUUID();
 }
+
+/**
+ * Una coordenada, o null si no es una.
+ *
+ * Se devuelve null y no cero para lo que no sirve: el cero es una coordenada
+ * valida —esta en el Atlantico, frente a Africa— y guardarlo como si fuera
+ * "sin ubicacion" pondria todos los eventos sin marcar en medio del oceano.
+ *
+ * `limite` es 90 para la latitud y 180 para la longitud.
+ */
+export function aCoordenada(valor, limite) {
+  if (valor === null || valor === undefined || valor === '') return null;
+
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return null;
+  if (numero < -limite || numero > limite) return null;
+
+  return numero;
+}

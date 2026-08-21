@@ -8,7 +8,7 @@
 import { supabase } from '../supabase.js';
 import { Repositorio } from '../repositorio.js';
 import { TABLAS, SI, NO } from '../configuracion.js';
-import { aTexto, aBandera, esVerdadero } from '../valores.js';
+import { aTexto, aBandera, esVerdadero, aCoordenada } from '../valores.js';
 import { leerCuerpo, leerParametro } from '../peticion.js';
 import { esAdministrador, puedeEnModulo } from '../seguridad.js';
 import {
@@ -193,8 +193,17 @@ export const controladorEventos = crearControladorCatalogo({
       nombre: aTexto(cuerpo.nombre),
       fecha_evento: aTexto(cuerpo.fechaEvento || cuerpo.fecha_evento),
       ubicacion: aTexto(cuerpo.ubicacion),
+      // El nombre del lugar sirve para leerlo; las coordenadas, para llegar.
+      // Las dos van juntas o ninguna: media coordenada no ubica nada.
+      latitud: aCoordenada(cuerpo.latitud, 90),
+      longitud: aCoordenada(cuerpo.longitud, 180),
       activo: aBandera(cuerpo.activo ?? 'FALSE')
     };
+
+    if (datos.latitud === null || datos.longitud === null) {
+      datos.latitud = null;
+      datos.longitud = null;
+    }
     // Solo al crear registramos quién lo hizo; en una edición se conserva el
     // autor original.
     if (!cuerpo.id) datos.creado_por = contexto.sesion.usuarioId || null;

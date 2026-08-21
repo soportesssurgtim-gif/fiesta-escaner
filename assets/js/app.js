@@ -31,6 +31,7 @@ import { usarPermisos } from './composables/usarPermisos.js';
 import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarConciliacion } from './composables/usarConciliacion.js';
+import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
@@ -305,12 +306,22 @@ async function iniciar() {
 
       const eventos = usarCatalogo({
         alGuardar: (datos) => api.eventos.guardar(datos),
-        formularioVacio: { id: null, nombre: '', fechaEvento: '', ubicacion: '', activo: 'FALSE' },
+        /*
+         * `ubicacion` es el nombre del lugar y sigue siendo texto libre: es lo
+         * que se lee en la invitación. Las coordenadas van aparte, porque son
+         * para llegar, no para leer.
+         */
+        formularioVacio: {
+          id: null, nombre: '', fechaEvento: '', ubicacion: '',
+          latitud: '', longitud: '', activo: 'FALSE'
+        },
         alAbrir: (registro) => ({
           id: registro.id,
           nombre: registro.nombre || '',
           fechaEvento: registro.fecha_evento || '',
           ubicacion: registro.ubicacion || '',
+          latitud: registro.latitud ?? '',
+          longitud: registro.longitud ?? '',
           activo: String(registro.activo || 'FALSE').toUpperCase()
         }),
         camposBusqueda: ['nombre', 'ubicacion']
@@ -1136,6 +1147,35 @@ async function iniciar() {
        * fiesta y la siguiente no hay ninguna, y con el escáner apagado nadie
        * registra entradas por error en el evento del año pasado.
        */
+      /*
+       * El mapa donde se marca el lugar del evento.
+       *
+       * Se monta cuando se abre el formulario y se desmonta al cerrarlo: Leaflet
+       * mide el contenedor al crearse, y sobre uno que todavía no se dibujó
+       * calcula cero y el mapa queda en blanco.
+       *
+       * Lo que el mapa marca se copia al formulario, que es lo que se guarda.
+       * Así funciona igual si alguien escribe las coordenadas a mano.
+       */
+      const mapa = usarMapa();
+
+      watch(() => eventos.modalAbierto, async (abierto) => {
+        if (!abierto) {
+          mapa.desmontar();
+          return;
+        }
+
+        await nextTick();
+        mapa.montar('mapa-evento', {
+          latitud: eventos.formulario.latitud,
+          longitud: eventos.formulario.longitud,
+          cuandoCambie: (latitud, longitud) => {
+            eventos.formulario.latitud = latitud === null ? '' : latitud;
+            eventos.formulario.longitud = longitud === null ? '' : longitud;
+          }
+        });
+      });
+
       async function desactivarEvento(evento) {
         try {
           const respuesta = await api.eventos.desactivar(evento.id);
@@ -2370,7 +2410,7 @@ async function iniciar() {
         // Eventos
         activarEvento, desactivarEvento,
         bajaEvento, pedirBajaEvento, cancelarBajaEvento, confirmarBajaEvento,
-        compartirInvitacion, enlaceCopiado,
+        compartirInvitacion, enlaceCopiado, mapa, enlaceComoLlegar,
 
         // Sorteos
         sorteos, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,

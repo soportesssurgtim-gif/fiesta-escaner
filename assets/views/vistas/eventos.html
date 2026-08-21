@@ -67,15 +67,19 @@
               <i class="fa-solid fa-power-off"></i> Activar
             </button>
             <!--
-              El que está en curso se apaga desde acá. Queda el sistema sin
-              evento activo, que es un estado válido: entre una fiesta y la
-              siguiente no hay ninguna, y con el escáner apagado nadie registra
-              entradas por error en el evento del año pasado.
+              El que está en curso se apaga desde acá: queda el sistema sin
+              evento activo, que es un estado válido entre una fiesta y la
+              siguiente.
+
+              Dice «Finalizar evento» y no «En curso» porque lo segundo describe
+              el estado, no lo que pasa al pulsarlo, y nadie adivina que ese
+              botón apaga el evento.
             -->
             <button v-else-if="esVerdadero(evento.activo) && permisos.tienePermiso('eventos', 'Editar')"
                     type="button" @click="desactivarEvento(evento)"
-                    class="boton flex-1 border border-success-300 bg-success-100 text-theme-xs text-success-700 hover:bg-success-200 dark:border-success-500/40 dark:bg-success-500/15 dark:text-success-400">
-              <i class="fa-solid fa-check"></i> En curso
+                    class="boton flex-1 border border-success-300 bg-success-50 text-theme-xs text-success-700 hover:border-error-300 hover:bg-error-50 hover:text-error-600 dark:border-success-500/40 dark:bg-success-500/10 dark:text-success-400 dark:hover:bg-error-500/10 dark:hover:text-error-400"
+                    title="Apaga el evento. Queda el sistema sin ninguno en curso.">
+              <i class="fa-solid fa-flag-checkered"></i> Finalizar evento
             </button>
             <span v-else-if="esVerdadero(evento.activo)"
                   class="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success-100 py-2.5 text-theme-xs font-medium text-success-700 dark:bg-success-500/15 dark:text-success-400">
@@ -181,6 +185,84 @@
             <label class="etiqueta">Lugar</label>
             <input v-model="eventos.formulario.ubicacion" type="text" class="campo"
                    placeholder="Salón municipal, Panchimalco" />
+          </div>
+
+          <!--
+            Dónde queda, en el mapa.
+
+            El nombre del lugar sirve para leerlo; las coordenadas, para llegar.
+            Con esto la invitación puede ofrecer un botón que abre el mapa del
+            teléfono con la ruta puesta, en lugar de que cada quien busque el
+            nombre y encuentre otro lugar parecido.
+
+            Se puede tocar el mapa, arrastrar el marcador, o pedir la ubicación
+            actual —lo cómodo si uno está parado en el salón—.
+          -->
+          <div>
+            <label class="etiqueta flex items-center justify-between">
+              <span>Ubicación en el mapa</span>
+              <span v-if="mapa.marcado" class="text-theme-xs font-normal text-success-600 dark:text-success-400">
+                <i class="fa-solid fa-location-dot"></i> Marcada
+              </span>
+            </label>
+
+            <!--
+              El pin va encima del mapa, no dentro: está clavado en el centro y
+              lo que se mueve es el mapa debajo. Por eso no lo dibuja Leaflet.
+
+              `pointer-events: none` en el CSS es lo que permite arrastrar el
+              mapa aunque el dedo caiga sobre el pin.
+            -->
+            <div class="mapa-marco">
+              <div id="mapa-evento" class="mapa-evento"></div>
+
+              <div v-if="mapa.disponible" class="mapa-pin" aria-hidden="true">
+                <i class="fa-solid fa-location-dot"
+                   :class="mapa.marcado ? 'text-error-500' : 'text-gray-400'"></i>
+                <span class="mapa-pin-sombra"></span>
+              </div>
+            </div>
+
+            <p v-if="!mapa.disponible" class="texto-ayuda text-warning-600 dark:text-warning-400">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+              El mapa necesita conexión. Puedes escribir las coordenadas a mano.
+            </p>
+            <p v-else-if="mapa.marcado" class="texto-ayuda">
+              El lugar queda donde está el pin. Mueve el mapa para corregirlo.
+            </p>
+            <p v-else class="texto-ayuda">
+              Mueve el mapa hasta que el lugar quede debajo del pin.
+            </p>
+
+            <div class="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <label for="lat-evento" class="etiqueta text-theme-xs">Latitud</label>
+                <input id="lat-evento" v-model="eventos.formulario.latitud" type="number" step="any"
+                       class="campo font-mono text-theme-xs" placeholder="13.610900"
+                       @change="mapa.escribirCoordenadas(eventos.formulario.latitud, eventos.formulario.longitud)" />
+              </div>
+              <div>
+                <label for="lng-evento" class="etiqueta text-theme-xs">Longitud</label>
+                <input id="lng-evento" v-model="eventos.formulario.longitud" type="number" step="any"
+                       class="campo font-mono text-theme-xs" placeholder="-89.188900"
+                       @change="mapa.escribirCoordenadas(eventos.formulario.latitud, eventos.formulario.longitud)" />
+              </div>
+            </div>
+
+            <div class="mt-2 flex flex-wrap gap-2">
+              <button type="button" @click="mapa.usarMiUbicacion()"
+                      class="boton boton-secundario text-theme-xs"
+                      :disabled="mapa.buscandoUbicacion">
+                <i class="fa-solid" :class="mapa.buscandoUbicacion ? 'fa-circle-notch animar-girar' : 'fa-crosshairs'"></i>
+                {{ mapa.buscandoUbicacion ? 'Buscando…' : 'Usar mi ubicación' }}
+              </button>
+              <button v-if="mapa.marcado" type="button" @click="mapa.limpiar()"
+                      class="boton boton-secundario text-theme-xs">
+                <i class="fa-solid fa-eraser"></i> Quitar marca
+              </button>
+            </div>
+
+            <p v-if="mapa.error" class="texto-ayuda text-error-500">{{ mapa.error }}</p>
           </div>
         </div>
 

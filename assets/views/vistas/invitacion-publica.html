@@ -83,6 +83,21 @@
         <p v-if="invitacion.resultado.ubicacion" class="text-theme-sm text-brand-100">
           <i class="fa-solid fa-location-dot"></i> {{ invitacion.resultado.ubicacion }}
         </p>
+
+        <!--
+          Cómo llegar.
+
+          Abre el mapa del teléfono con la ruta puesta. Solo aparece si el
+          evento tiene coordenadas cargadas: un botón que lleva a ninguna parte
+          es peor que no tener botón.
+        -->
+        <a v-if="enlaceComoLlegar(invitacion.resultado.latitud, invitacion.resultado.longitud)"
+           :href="enlaceComoLlegar(invitacion.resultado.latitud, invitacion.resultado.longitud)"
+           target="_blank" rel="noopener"
+           class="boton boton-secundario mt-3 w-full">
+          <i class="fa-solid fa-diamond-turn-right"></i>
+          Ir al lugar del evento
+        </a>
       </div>
 
       <div class="p-6 text-center">
