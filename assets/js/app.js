@@ -30,6 +30,7 @@ import { usarCatalogo } from './composables/usarCatalogo.js';
 import { usarPermisos } from './composables/usarPermisos.js';
 import { usarEscanerQr } from './composables/usarEscanerQr.js';
 import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
+import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
@@ -856,8 +857,63 @@ async function iniciar() {
         alTerminar: recargarCatalogos
       });
 
-      const importarEmpleados = (evento) =>
-        importacion.importar(evento, 'empleados', (csv) => api.empleados.importar(csv));
+      /*
+       * Importación de empleados con revisión previa.
+       *
+       * Recursos Humanos tiene su planilla con ochocientos empleados y los
+       * departamentos escritos a su manera. Los desplegables con validación de
+       * la plantilla no dejan pegar esos valores, y aunque dejaran, los nombres
+       * no coinciden letra por letra con el catálogo.
+       *
+       * Ahora se pega el texto tal cual está y el sistema propone a qué
+       * departamento y distrito corresponde cada variante. Alguien confirma o
+       * corrige, y recién ahí se sube. Nada se guarda sin que una persona lo
+       * haya mirado.
+       */
+      const conciliacion = usarConciliacion({
+        obtenerDepartamentos: () => departamentos.lista,
+        distritos: DISTRITOS,
+        enviarBloque: (filas) => api.empleados.importarFilas(filas),
+        // Permite resolver un departamento que el archivo trae y el catálogo
+        // no, sin salir del panel y perder lo ya decidido.
+        crearDepartamento: async (nombre) => {
+          const creado = await api.departamentos.guardar({ nombre_dpto: nombre, activo: 'TRUE' });
+          await recargarCatalogos();
+          return creado;
+        },
+        notificar,
+        alTerminar: recargarCatalogos
+      });
+
+      /** Los departamentos que se pueden elegir: los que están activos. */
+      const departamentosActivos = computed(() =>
+        departamentos.lista.filter((d) => formato.esVerdadero(d.activo))
+      );
+
+      const marcadosDepartamento = computed(() =>
+        conciliacion.gruposDepartamento.filter((g) => g.seleccionado).length
+      );
+      const marcadosDistrito = computed(() =>
+        conciliacion.gruposDistrito.filter((g) => g.seleccionado).length
+      );
+
+      /**
+       * Cerrar con filas subidas recarga los catálogos.
+       * Si no, la tabla de atrás sigue mostrando el conteo viejo y parece que
+       * la importación no hizo nada.
+       */
+      async function cerrarConciliacion() {
+        const huboCambios = conciliacion.cuantasSubidas > 0;
+        conciliacion.cerrar();
+        if (huboCambios) await recargarCatalogos();
+      }
+
+      /*
+       * Departamentos importa directo: sus nombres son la clave natural, así
+       * que no hay nada que conciliar. Empleados pasa por la revisión previa
+       * porque su columna de departamento apunta a este catálogo y ahí es donde
+       * cada quien escribe el nombre a su manera.
+       */
       const importarDepartamentos = (evento) =>
         importacion.importar(evento, 'departamentos', (csv) => api.departamentos.importar(csv));
 
@@ -2172,7 +2228,9 @@ async function iniciar() {
         sincronizacion,
 
         // Importar / exportar
-        importacion, importarEmpleados, importarDepartamentos, exportar, descargarPlantilla,
+        importacion,
+        conciliacion, departamentosActivos, marcadosDepartamento, marcadosDistrito,
+        cerrarConciliacion, importarDepartamentos, exportar, descargarPlantilla,
 
         // Eventos
         activarEvento,

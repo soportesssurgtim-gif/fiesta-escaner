@@ -33,6 +33,16 @@ import { responderOk, responderSolicitudInvalida, responderSinPermiso } from '..
  *                   cientos de viajes a la base y la función se pasaría del
  *                   tiempo límite de Vercel.
  */
+/**
+ * Cuántas filas se aceptan por envío.
+ *
+ * La pantalla manda por bloques, así que el archivo entero nunca llega junto.
+ * El límite existe porque cada fila son una o dos consultas y la función tiene
+ * un tiempo máximo: con novecientas de una vez se corta a la mitad y quedan
+ * empleados a medio importar sin que nadie sepa cuáles.
+ */
+const MAXIMO_POR_BLOQUE = 250;
+
 /** Quita los campos de trabajo (los que empiezan con guion bajo). */
 function sinCamposAuxiliares(datos) {
   const limpio = {};
@@ -61,14 +71,32 @@ export function crearImportadorCsv(config) {
     }
 
     const cuerpo = await leerCuerpo(req);
-    const texto = String(cuerpo.csv || '').trim();
-    if (!texto) {
-      return responderSolicitudInvalida(res, 'No se recibió contenido CSV.');
+
+    /*
+     * Las filas llegan de dos formas.
+     *
+     * La nueva es un arreglo de objetos, que es lo que manda la pantalla desde
+     * que lee el Excel en el navegador. Le hacía falta para poder revisar y
+     * corregir los departamentos antes de enviar nada, y de paso evita armar y
+     * volver a partir un CSV en el medio, que son dos lugares más donde se
+     * pueden romper las comillas de un nombre con coma.
+     *
+     * La vieja es el texto CSV. Se conserva para no romper nada que todavía lo
+     * mande.
+     */
+    const filas = Array.isArray(cuerpo.filas)
+      ? cuerpo.filas.filter((fila) => fila && typeof fila === 'object')
+      : parsearCsv(String(cuerpo.csv || '').trim()).filas;
+
+    if (filas.length === 0) {
+      return responderSolicitudInvalida(res, 'No se recibió ninguna fila para importar.');
     }
 
-    const { filas } = parsearCsv(texto);
-    if (filas.length === 0) {
-      return responderSolicitudInvalida(res, 'El archivo no tiene filas de datos.');
+    if (filas.length > MAXIMO_POR_BLOQUE) {
+      return responderSolicitudInvalida(
+        res,
+        `Se reciben hasta ${MAXIMO_POR_BLOQUE} filas por envío. Divide el archivo en bloques más chicos.`
+      );
     }
 
     const contextoExtra = prepararContexto ? await prepararContexto() : null;
@@ -76,7 +104,9 @@ export function crearImportadorCsv(config) {
     const resultado = { insertados: 0, actualizados: 0, errores: [], detalle: [] };
 
     for (const fila of filas) {
-      const numeroLinea = fila._linea;
+      // El número de renglón lo manda la pantalla, que es la que leyó el Excel
+      // y sabe en qué fila estaba cada dato. Si no viene, se numera de corrido.
+      const numeroLinea = fila._linea ?? '?';
       try {
         const datos = mapearFila(fila, contextoExtra);
 

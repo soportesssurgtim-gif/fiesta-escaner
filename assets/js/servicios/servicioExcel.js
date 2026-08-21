@@ -532,6 +532,51 @@ export async function xlsxComoCsv(archivo) {
     .join('\n');
 }
 
+/**
+ * Lee un Excel y devuelve sus filas como objetos, con el encabezado por clave.
+ *
+ * Los nombres de columna se normalizan igual que en el servidor —minúscula y
+ * los espacios como guion bajo— para que un archivo abra igual venga por donde
+ * venga. Cada fila lleva `_linea`, el número de renglón del Excel, que es lo
+ * que se le muestra a quien tiene que ir a corregirlo.
+ *
+ * Devuelve objetos y no texto CSV porque la conciliación de departamentos
+ * necesita leer y reescribir columnas antes de enviar nada, y armar y volver a
+ * partir un CSV en el medio solo agrega dos lugares donde se pueden romper las
+ * comillas.
+ */
+export async function leerXlsxComoObjetos(archivo) {
+  const matriz = await leerXlsx(archivo);
+
+  const conContenido = matriz.filter(
+    (fila) => fila.some((celda) => String(celda ?? '').trim() !== '')
+  );
+
+  if (conContenido.length === 0) return { encabezados: [], filas: [] };
+
+  const encabezados = conContenido[0].map((celda) =>
+    String(celda ?? '').trim().toLowerCase().replace(/\s+/g, '_')
+  );
+
+  const filas = [];
+  for (let i = 1; i < conContenido.length; i++) {
+    // El número de renglón es el de la matriz original, no el de las filas con
+    // contenido: si alguien deja una fila vacía en el medio, el número que se
+    // le informa tiene que ser el que ve en su Excel.
+    const enOriginal = matriz.indexOf(conContenido[i]);
+    const fila = { _linea: (enOriginal >= 0 ? enOriginal : i) + 1 };
+
+    encabezados.forEach((encabezado, columna) => {
+      if (!encabezado) return;
+      fila[encabezado] = String(conContenido[i][columna] ?? '').trim();
+    });
+
+    filas.push(fila);
+  }
+
+  return { encabezados, filas };
+}
+
 /** ¿Este archivo es un Excel? */
 export function esExcel(archivo) {
   const nombre = String(archivo?.name || '').toLowerCase();

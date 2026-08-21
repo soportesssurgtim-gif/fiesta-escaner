@@ -71,6 +71,17 @@ export const api = {
       return http.enviar('empleados', { csv }, { accion: 'importar-csv' });
     },
     /**
+     * Sube un bloque de filas ya revisadas.
+     *
+     * Van como datos y no como texto separado por comas: la pantalla necesita
+     * leer y reescribir el departamento antes de enviarlo, y armar y volver a
+     * partir un CSV en el medio son dos lugares más donde se pueden romper las
+     * comillas de un nombre.
+     */
+    importarFilas(filas) {
+      return http.enviar('empleados', { filas }, { accion: 'importar-csv' });
+    },
+    /**
      * Da de baja a alguien, o lo borra del todo.
      * Con `definitivo` la fila desaparece y solo lo permite un administrador;
      * sin él, se apaga la bandera `activo` y el historial queda intacto.

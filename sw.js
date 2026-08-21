@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.6.1';
+const VERSION_CACHE = 'v3.7.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -68,6 +68,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/nucleo/formato.js',
   '/assets/js/nucleo/tema.js',
   '/assets/js/nucleo/marca.js',
+  '/assets/js/nucleo/similitud.js',
 
   // Servicios
   '/assets/js/servicios/servicioApi.js',
@@ -88,6 +89,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/composables/usarPermisos.js',
   '/assets/js/composables/usarSorteos.js',
   '/assets/js/composables/usarManual.js',
+  '/assets/js/composables/usarConciliacion.js',
   '/assets/js/composables/usarLectura.js',
 
   // Componentes y contenido
@@ -105,6 +107,7 @@ const ARCHIVOS_BASE = [
   '/assets/views/parciales/modal-cambiar-clave.html',
   '/assets/views/parciales/modal-cierre-sesion.html',
   '/assets/views/parciales/modal-importacion.html',
+  '/assets/views/parciales/modal-conciliacion.html',
   '/assets/views/parciales/modal-instalar.html',
   '/assets/views/parciales/modal-pendientes.html',
   '/assets/views/parciales/manual-opciones-voz.html',

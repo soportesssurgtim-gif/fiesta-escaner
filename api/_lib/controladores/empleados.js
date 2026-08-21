@@ -158,7 +158,15 @@ const importarCsv = crearImportadorCsv({
       telefono: aTexto(fila.telefono),
       correo: aTexto(fila.correo),
       dui: normalizarDui(fila.dui),
-      codigo: aTexto(fila.codigo),
+      /*
+       * El código vacío va como nulo, no como cadena vacía.
+       *
+       * La base tiene una restricción de unicidad sobre `codigo`, y en Postgres
+       * dos cadenas vacías son el mismo valor: la segunda fila sin código
+       * rompía la importación entera. Los nulos, en cambio, no chocan entre sí,
+       * que es exactamente lo que hace falta cuando el código es opcional.
+       */
+      codigo: aTexto(fila.codigo) || null,
       activo: aBandera(fila.activo ?? 'TRUE')
     };
   },
@@ -291,7 +299,8 @@ export const controladorEmpleados = crearControladorCatalogo({
     telefono: aTexto(cuerpo.telefono),
     correo: aTexto(cuerpo.correo),
     dui: normalizarDui(cuerpo.dui),
-    codigo: aTexto(cuerpo.codigo),
+    // Vacío va como nulo: ver la nota en la importación, más arriba.
+    codigo: aTexto(cuerpo.codigo) || null,
     activo: aBandera(cuerpo.activo ?? 'TRUE')
   }),
 

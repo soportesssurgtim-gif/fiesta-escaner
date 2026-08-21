@@ -20,7 +20,7 @@
         <label v-if="permisos.tienePermiso('departamentos', 'Agregar')"
                class="boton boton-secundario cursor-pointer">
           <i class="fa-solid fa-file-arrow-up"></i> Importar
-          <input type="file" accept=".xlsx,.xlsm,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" @change="importarDepartamentos($event)" />
+          <input type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" @change="importarDepartamentos($event)" />
         </label>
 
         <button v-if="permisos.tienePermiso('departamentos', 'Agregar')"

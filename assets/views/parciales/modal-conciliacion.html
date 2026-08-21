@@ -1,0 +1,329 @@
+<!--
+  Revisión de departamentos y distritos antes de importar.
+
+  Recursos Humanos pega su planilla tal como la tiene. Acá se ve, agrupado por
+  variante, a qué departamento del catálogo se parece cada texto, y se confirma
+  o se corrige antes de que se guarde nada.
+
+  Se trabaja por variante y no por empleado a propósito: novecientas filas
+  traen unos cuarenta departamentos distintos. Decidir cuarenta veces es
+  posible; novecientas, no.
+
+  El panel NO se cierra al subir. Se sube lo que ya está resuelto y se sigue
+  trabajando sobre lo que falta, sin volver a elegir el archivo ni rehacer las
+  decisiones tomadas.
+-->
+<div v-if="conciliacion.abierto" class="modal-fondo" @click.self="cerrarConciliacion()">
+  <div class="modal-panel flex max-h-[92vh] w-full max-w-4xl flex-col">
+
+    <!-- ==================== ENCABEZADO ==================== -->
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="modal-titulo">Revisar antes de importar</h2>
+        <p class="text-theme-sm text-gray-500 dark:text-gray-400">
+          Confirma a qué departamento y distrito corresponde cada variante del archivo.
+        </p>
+      </div>
+      <button type="button" @click="cerrarConciliacion()" class="boton-icono shrink-0"
+              aria-label="Cerrar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div v-if="conciliacion.leyendo" class="py-16 text-center">
+      <i class="fa-solid fa-circle-notch animar-girar text-2xl text-brand-500"></i>
+      <p class="mt-3 text-theme-sm text-gray-500 dark:text-gray-400">Leyendo el archivo…</p>
+    </div>
+
+    <div v-else-if="conciliacion.error && conciliacion.filas.length === 0"
+         class="flex gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/30 dark:bg-error-500/10">
+      <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0 text-error-500"></i>
+      <p class="text-theme-sm text-error-700 dark:text-error-400">{{ conciliacion.error }}</p>
+    </div>
+
+    <template v-else>
+      <!-- Cómo va la cosa -->
+      <div class="mb-4 grid grid-cols-3 gap-3">
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold text-success-600 dark:text-success-400">
+            {{ conciliacion.filasListas.length }}
+          </p>
+          <p class="text-theme-xs text-gray-500 dark:text-gray-400">listas para subir</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold text-warning-600 dark:text-warning-400">
+            {{ conciliacion.cuantasPendientes }}
+          </p>
+          <p class="text-theme-xs text-gray-500 dark:text-gray-400">por revisar</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 p-3 text-center dark:border-gray-800">
+          <p class="text-theme-xl font-bold text-gray-800 dark:text-white/90">
+            {{ conciliacion.cuantasSubidas }}
+          </p>
+          <p class="text-theme-xs text-gray-500 dark:text-gray-400">ya subidas</p>
+        </div>
+      </div>
+
+      <div class="-mx-1 flex-1 space-y-6 overflow-y-auto px-1">
+
+        <!-- ==================== DEPARTAMENTOS ==================== -->
+        <section>
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              Departamentos
+              <span class="ml-1 text-theme-xs font-normal text-gray-400">
+                {{ conciliacion.gruposDepartamento.length }} variantes,
+                {{ conciliacion.porRevisar.departamentos }} sin confirmar
+              </span>
+            </h3>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button"
+                      @click="conciliacion.confirmarSeguras(conciliacion.gruposDepartamento)"
+                      class="boton boton-secundario">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Confirmar las seguras
+              </button>
+
+              <!-- Asignar el mismo destino a varias variantes de una vez -->
+              <select :value="''"
+                      @change="conciliacion.aplicarASeleccionados(conciliacion.gruposDepartamento, $event.target.value); $event.target.value = ''"
+                      :disabled="marcadosDepartamento === 0"
+                      class="campo campo-select w-auto"
+                      aria-label="Asignar a las variantes marcadas">
+                <option value="">
+                  Asignar a {{ marcadosDepartamento }} marcadas…
+                </option>
+                <option v-for="dep in departamentosActivos" :key="dep.id" :value="dep.id">
+                  {{ dep.nombre_dpto }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div v-for="grupo in conciliacion.gruposDepartamento" :key="grupo.id"
+                 class="rounded-xl border p-3 transition"
+                 :class="grupo.confirmado && grupo.elegido
+                         ? 'border-success-200 bg-success-50/50 dark:border-success-500/30 dark:bg-success-500/5'
+                         : (grupo.banda === 'ninguna'
+                            ? 'border-error-200 dark:border-error-500/30'
+                            : 'border-warning-200 dark:border-warning-500/30')">
+
+              <div class="flex flex-wrap items-center gap-3">
+                <input type="checkbox" :checked="grupo.seleccionado"
+                       @change="conciliacion.alternarSeleccion(grupo)"
+                       class="h-4 w-4 shrink-0 accent-brand-500"
+                       :aria-label="'Marcar ' + (grupo.texto || 'sin departamento')" />
+
+                <!-- Lo que dice el archivo -->
+                <div class="min-w-[10rem] flex-1">
+                  <p class="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                    <span v-if="grupo.vacio" class="italic text-gray-400">Sin departamento</span>
+                    <span v-else>{{ grupo.texto }}</span>
+                  </p>
+                  <p class="text-theme-xs text-gray-400">
+                    {{ grupo.cantidad }} {{ grupo.cantidad === 1 ? 'empleado' : 'empleados' }}
+                  </p>
+                </div>
+
+                <i class="fa-solid fa-arrow-right shrink-0 text-gray-300 dark:text-gray-700"></i>
+
+                <!-- A qué se va a guardar -->
+                <div class="min-w-[12rem] flex-1">
+                  <select :value="grupo.elegido"
+                          @change="conciliacion.elegir(grupo, $event.target.value)"
+                          class="campo campo-select"
+                          :aria-label="'Departamento para ' + (grupo.texto || 'las filas sin departamento')">
+                    <option value="">Elige el departamento…</option>
+                    <option v-for="dep in departamentosActivos" :key="dep.id" :value="dep.id">
+                      {{ dep.nombre_dpto }}
+                    </option>
+                  </select>
+                </div>
+
+                <!-- Qué tan segura es la sugerencia -->
+                <span v-if="!grupo.vacio" class="insignia shrink-0"
+                      :class="grupo.banda === 'segura' ? 'insignia-exito'
+                              : (grupo.banda === 'probable' ? 'insignia-alerta' : 'insignia-peligro')">
+                  {{ grupo.banda === 'segura' ? 'Coincide'
+                     : (grupo.banda === 'probable' ? 'Se parece' : 'Sin parecido') }}
+                </span>
+
+                <i v-if="grupo.confirmado && grupo.elegido"
+                   class="fa-solid fa-circle-check shrink-0 text-success-500"
+                   title="Confirmado"></i>
+              </div>
+
+              <!--
+                Crear el departamento que el archivo trae y el catálogo no.
+                Sin esto, la única salida sería cerrar el panel, ir a crearlo, y
+                empezar de nuevo perdiendo todo lo ya decidido.
+              -->
+              <div v-if="!grupo.vacio && grupo.banda === 'ninguna' && !grupo.confirmado"
+                   class="mt-2 flex items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-800">
+                <p class="min-w-0 flex-1 text-theme-xs text-gray-500 dark:text-gray-400">
+                  No se parece a ninguno del catálogo.
+                </p>
+                <button type="button" @click="conciliacion.crearYAsignar(grupo)"
+                        class="boton boton-secundario">
+                  <i class="fa-solid fa-plus"></i> Crearlo como departamento
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== DISTRITOS ==================== -->
+        <section v-if="conciliacion.gruposDistrito.length > 0">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+              Distritos
+              <span class="ml-1 text-theme-xs font-normal text-gray-400">
+                {{ conciliacion.gruposDistrito.length }} variantes,
+                {{ conciliacion.porRevisar.distritos }} sin confirmar
+              </span>
+            </h3>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button"
+                      @click="conciliacion.confirmarSeguras(conciliacion.gruposDistrito)"
+                      class="boton boton-secundario">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Confirmar los seguros
+              </button>
+
+              <select :value="''"
+                      @change="conciliacion.aplicarASeleccionados(conciliacion.gruposDistrito, $event.target.value); $event.target.value = ''"
+                      :disabled="marcadosDistrito === 0"
+                      class="campo campo-select w-auto"
+                      aria-label="Asignar a los distritos marcados">
+                <option value="">Asignar a {{ marcadosDistrito }} marcados…</option>
+                <option v-for="distrito in DISTRITOS" :key="distrito" :value="distrito">
+                  {{ distrito }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <div v-for="grupo in conciliacion.gruposDistrito" :key="grupo.id"
+                 class="rounded-xl border p-3 transition"
+                 :class="grupo.confirmado && grupo.elegido
+                         ? 'border-success-200 bg-success-50/50 dark:border-success-500/30 dark:bg-success-500/5'
+                         : (grupo.banda === 'ninguna'
+                            ? 'border-error-200 dark:border-error-500/30'
+                            : 'border-warning-200 dark:border-warning-500/30')">
+              <div class="flex flex-wrap items-center gap-3">
+                <input type="checkbox" :checked="grupo.seleccionado"
+                       @change="conciliacion.alternarSeleccion(grupo)"
+                       class="h-4 w-4 shrink-0 accent-brand-500"
+                       :aria-label="'Marcar ' + (grupo.texto || 'sin distrito')" />
+
+                <div class="min-w-[10rem] flex-1">
+                  <p class="truncate text-theme-sm font-medium text-gray-800 dark:text-white/90">
+                    <span v-if="grupo.vacio" class="italic text-gray-400">Sin distrito</span>
+                    <span v-else>{{ grupo.texto }}</span>
+                  </p>
+                  <p class="text-theme-xs text-gray-400">
+                    {{ grupo.cantidad }} {{ grupo.cantidad === 1 ? 'empleado' : 'empleados' }}
+                  </p>
+                </div>
+
+                <i class="fa-solid fa-arrow-right shrink-0 text-gray-300 dark:text-gray-700"></i>
+
+                <div class="min-w-[12rem] flex-1">
+                  <select :value="grupo.elegido"
+                          @change="conciliacion.elegir(grupo, $event.target.value)"
+                          class="campo campo-select"
+                          :aria-label="'Distrito para ' + (grupo.texto || 'las filas sin distrito')">
+                    <option value="">Elige el distrito…</option>
+                    <option v-for="distrito in DISTRITOS" :key="distrito" :value="distrito">
+                      {{ distrito }}
+                    </option>
+                  </select>
+                </div>
+
+                <span v-if="!grupo.vacio" class="insignia shrink-0"
+                      :class="grupo.banda === 'segura' ? 'insignia-exito'
+                              : (grupo.banda === 'probable' ? 'insignia-alerta' : 'insignia-peligro')">
+                  {{ grupo.banda === 'segura' ? 'Coincide'
+                     : (grupo.banda === 'probable' ? 'Se parece' : 'Sin parecido') }}
+                </span>
+
+                <i v-if="grupo.confirmado && grupo.elegido"
+                   class="fa-solid fa-circle-check shrink-0 text-success-500"
+                   title="Confirmado"></i>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Lo que ya se subió -->
+        <section v-if="conciliacion.cuantasSubidas > 0"
+                 class="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+          <h3 class="mb-2 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+            Lo que va subido
+          </h3>
+          <p class="text-theme-sm text-gray-600 dark:text-gray-400">
+            {{ conciliacion.acumulado.insertados }} nuevos,
+            {{ conciliacion.acumulado.actualizados }} actualizados.
+          </p>
+
+          <div v-if="conciliacion.acumulado.errores.length > 0" class="mt-3">
+            <p class="mb-1 text-theme-xs font-medium text-error-600 dark:text-error-400">
+              {{ conciliacion.acumulado.errores.length }} filas con problemas:
+            </p>
+            <ul class="max-h-32 space-y-0.5 overflow-y-auto">
+              <li v-for="(problema, i) in conciliacion.acumulado.errores" :key="i"
+                  class="text-theme-xs text-gray-500 dark:text-gray-400">
+                {{ problema }}
+              </li>
+            </ul>
+          </div>
+        </section>
+      </div>
+
+      <!-- ==================== PIE ==================== -->
+      <div class="mt-5 shrink-0 border-t border-gray-200 pt-4 dark:border-gray-800">
+        <div v-if="conciliacion.subiendo" class="mb-3">
+          <div class="mb-1 flex justify-between text-theme-xs text-gray-500 dark:text-gray-400">
+            <span>Subiendo…</span>
+            <span class="font-mono">{{ conciliacion.progreso.enviadas }} / {{ conciliacion.progreso.total }}</span>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+            <div class="h-full rounded-full bg-brand-500 transition-all"
+                 :style="{ width: (conciliacion.progreso.total
+                            ? conciliacion.progreso.enviadas / conciliacion.progreso.total * 100
+                            : 0) + '%' }"></div>
+          </div>
+        </div>
+
+        <p v-if="conciliacion.error" class="mb-3 text-theme-sm text-error-500">
+          <i class="fa-solid fa-circle-exclamation"></i> {{ conciliacion.error }}
+        </p>
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <button type="button" @click="cerrarConciliacion()"
+                  class="boton boton-secundario sm:flex-1"
+                  :disabled="conciliacion.subiendo">
+            {{ conciliacion.cuantasSubidas > 0 ? 'Terminar' : 'Cancelar' }}
+          </button>
+
+          <button type="button" @click="conciliacion.subirListos()"
+                  class="boton boton-primario sm:flex-[2]"
+                  :disabled="conciliacion.filasListas.length === 0 || conciliacion.subiendo">
+            <i v-if="conciliacion.subiendo" class="fa-solid fa-circle-notch animar-girar"></i>
+            <i v-else class="fa-solid fa-cloud-arrow-up"></i>
+            Subir {{ conciliacion.filasListas.length }}
+            {{ conciliacion.filasListas.length === 1 ? 'empleado' : 'empleados' }}
+          </button>
+        </div>
+
+        <p v-if="conciliacion.cuantasPendientes > 0"
+           class="mt-2 text-center text-theme-xs text-gray-400">
+          Quedan {{ conciliacion.cuantasPendientes }} sin resolver. Puedes subir lo que ya está
+          y seguir con el resto sin cerrar esta ventana.
+        </p>
+      </div>
+    </template>
+  </div>
+</div>

@@ -22,7 +22,7 @@
         <label v-if="permisos.tienePermiso('empleados', 'Agregar')"
                class="boton boton-secundario cursor-pointer">
           <i class="fa-solid fa-file-arrow-up"></i> Importar
-          <input type="file" accept=".xlsx,.xlsm,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" @change="importarEmpleados($event)" />
+          <input type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden" @change="conciliacion.revisarArchivo($event)" />
         </label>
 
         <button v-if="permisos.tienePermiso('empleados', 'Agregar')"
@@ -35,7 +35,7 @@
     <div v-if="empleados.paginados.length === 0">
       <estado-vacio icono="fa-users"
                     titulo="El padrón está vacío"
-                    descripcion="Agrega empleados uno por uno o impórtalos desde un archivo CSV."
+                    descripcion="Agrega empleados uno por uno o impórtalos desde un archivo de Excel."
                     :buscando="empleados.busqueda.length > 0"></estado-vacio>
     </div>
 
