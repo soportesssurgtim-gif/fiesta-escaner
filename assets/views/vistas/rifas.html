@@ -251,7 +251,7 @@
                 <tr v-for="g in sorteos.ganadores" :key="g.id">
                   <td class="font-mono text-theme-xs text-gray-400">{{ g.orden }}</td>
                   <td>
-                    <p class="tabla-celda-principal">{{ g.empleado ? g.empleado.nombre : 'Sin datos' }}</p>
+                    <p class="tabla-celda-principal">{{ g.empleado ? aNombrePropio(g.empleado.nombre) : 'Sin datos' }}</p>
                     <p v-if="g.empleado" class="text-theme-xs text-gray-400">
                       {{ formatearDui(g.empleado.dui) }}
                       <span v-if="g.empleado.cargo"> · {{ aNombrePropio(g.empleado.cargo) }}</span>

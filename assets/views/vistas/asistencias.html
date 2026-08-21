@@ -113,7 +113,7 @@
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                   {{ iniciales(fila.empleadoNombre) }}
                 </span>
-                <span class="tabla-celda-principal">{{ fila.empleadoNombre }}</span>
+                <span class="tabla-celda-principal">{{ aNombrePropio(fila.empleadoNombre) }}</span>
               </div>
             </td>
             <td class="whitespace-nowrap">{{ formatearDui(fila.dui) }}</td>
