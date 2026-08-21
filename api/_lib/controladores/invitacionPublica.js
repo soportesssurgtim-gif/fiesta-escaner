@@ -70,6 +70,18 @@ export function construirUrlQr(texto) {
  */
 const CAMPO_TRAMPA = 'segundo_apellido';
 
+/**
+ * Qué se le dice a quien se pasó del cupo.
+ *
+ * Con el tiempo concreto y no «unos minutos»: quien está en la puerta del
+ * evento necesita saber si son dos minutos o media hora para decidir si espera
+ * o busca a alguien que le ayude.
+ */
+function mensajeDeEspera(cupo) {
+  const minutos = cupo.minutos || Math.ceil((cupo.esperaSegundos || 600) / 60);
+  return `Demasiadas consultas desde esta conexión. Vuelve a intentar en ${minutos} minutos.`;
+}
+
 export const controladorInvitacionPublica = {
   publico: true,
 
@@ -89,19 +101,17 @@ export const controladorInvitacionPublica = {
 /**
  * Entrega un acertijo nuevo.
  *
- * Tiene su propio cupo, más suelto que el de las consultas: pedir un desafío es
- * barato y pasa una vez por consulta, pero dejarlo sin techo permitiría juntar
- * miles de acertijos resueltos de antemano para gastarlos después de golpe.
+ * Su cupo es altísimo a propósito, casi un no-límite. Se pide al abrir la
+ * pantalla, antes de que nadie escriba nada, así que un cupo apretado deja
+ * afuera a quien todavía no consultó. Lo que de verdad pone el techo es el cupo
+ * de las consultas; esto solo evita que alguien nos haga firmar desafíos sin
+ * fin.
  */
 async function entregarDesafio(req, res) {
   const cupo = await registrarIntento(req, 'desafio');
 
   if (!cupo.permitido) {
-    return responderDemasiadasSolicitudes(
-      res,
-      'Demasiadas consultas seguidas. Espera unos minutos y vuelve a intentar.',
-      cupo.esperaSegundos
-    );
+    return responderDemasiadasSolicitudes(res, mensajeDeEspera(cupo), cupo.esperaSegundos);
   }
 
   return responderOk(res, crearDesafio());
@@ -121,11 +131,7 @@ async function consultarInvitacion(req, res) {
 
   const cupo = await registrarIntento(req, 'consulta');
   if (!cupo.permitido) {
-    return responderDemasiadasSolicitudes(
-      res,
-      'Demasiadas consultas seguidas. Espera unos minutos y vuelve a intentar.',
-      cupo.esperaSegundos
-    );
+    return responderDemasiadasSolicitudes(res, mensajeDeEspera(cupo), cupo.esperaSegundos);
   }
 
   const solucion = leerSolucion(leerParametro(req, 'desafio'));

@@ -166,9 +166,16 @@ export function usarDesafio(pedirDesafio) {
       const paquete = guardada.paquete;
       guardada = null;
       estado.listo = false;
-      // El siguiente se empieza a resolver ya, para que la próxima consulta no
-      // tenga que esperar tampoco.
-      preparar();
+
+      /*
+       * No se pide otro de una.
+       *
+       * La primera versión lo hacía, para que una segunda consulta saliera tan
+       * rápido como la primera. Pero casi nadie consulta dos veces —se mira el
+       * QR y se cierra— así que era duplicar los pedidos para un caso raro. Si
+       * llega una segunda consulta, se resuelve en ese momento y lo único que
+       * se nota es el botón esperando un instante.
+       */
       return paquete;
     }
 

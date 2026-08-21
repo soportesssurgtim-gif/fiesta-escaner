@@ -33,13 +33,39 @@ import { supabase } from './supabase.js';
 /**
  * Los cupos.
  *
- * Consultar de más suele ser alguien que se equivocó de DUI y reintenta, así
- * que el cupo aguanta varios intentos seguidos. Pedir desafíos es más barato y
- * pasa una vez por consulta, así que va más suelto.
+ * Por qué son tan holgados
+ * ------------------------
+ * Contar por IP castiga a quien comparte una. Acá eso no es un caso raro: la
+ * telefonía móvil salvadoreña reparte pocas direcciones públicas entre muchos
+ * clientes, así que decenas de empleados mirando su invitación desde el celular
+ * pueden salir todos por la misma. Un cupo apretado los deja afuera a todos por
+ * culpa del primero.
+ *
+ * Sesenta consultas cada diez minutos es invisible para cualquier persona
+ * —incluso para una familia entera revisando sus invitaciones— y sigue siendo
+ * un techo real: con el desafío costando algo más de un décimo de segundo de
+ * cálculo cada uno, juntar los novecientos empleados desde una sola dirección
+ * lleva dos horas y media largas.
+ *
+ * El desafío casi no se limita
+ * ----------------------------
+ * Tenía un cupo de 40 y fue un error: se pide al abrir la pantalla, antes de
+ * que nadie escriba nada, y se vuelve a pedir después de cada consulta. Basta
+ * recargar la página unas cuantas veces para agotarlo, y como sin desafío no se
+ * puede consultar, el resultado era dejar afuera a alguien que todavía no había
+ * consultado ni una vez. Pasó de verdad.
+ *
+ * Limitarlo tampoco aportaba nada: un desafío sin resolver no sirve, resolverlo
+ * cuesta el cálculo, y usarlo cuesta un lugar del cupo de consultas. El techo
+ * real siempre fue el otro.
+ *
+ * Queda un tope alto, solo para que nadie nos haga firmar desafíos sin fin: a
+ * trescientos cada diez minutos, un pedido cada dos segundos sostenido, ninguna
+ * persona se acerca.
  */
 export const LIMITES = {
-  consulta: { intentos: 15, ventanaSegundos: 600 },
-  desafio: { intentos: 40, ventanaSegundos: 600 }
+  consulta: { intentos: 60, ventanaSegundos: 600 },
+  desafio: { intentos: 300, ventanaSegundos: 600 }
 };
 
 /**
@@ -97,7 +123,8 @@ export async function registrarIntento(req, accion) {
       permitido: intentos <= limite.intentos,
       intentos,
       limite: limite.intentos,
-      esperaSegundos: limite.ventanaSegundos
+      esperaSegundos: limite.ventanaSegundos,
+      minutos: Math.ceil(limite.ventanaSegundos / 60)
     };
   } catch (fallo) {
     console.warn(
@@ -108,7 +135,8 @@ export async function registrarIntento(req, accion) {
       permitido: true,
       intentos: 0,
       limite: limite.intentos,
-      esperaSegundos: limite.ventanaSegundos
+      esperaSegundos: limite.ventanaSegundos,
+      minutos: Math.ceil(limite.ventanaSegundos / 60)
     };
   }
 }
