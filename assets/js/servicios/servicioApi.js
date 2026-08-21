@@ -259,6 +259,20 @@ export const api = {
     }
   },
 
+  eventos: {
+    /**
+     * Guarda solo el diseño de la invitación de un evento.
+     *
+     * Va aparte del formulario del evento porque son dos personas distintas:
+     * Recursos Humanos administra el evento y quien mantiene el sistema
+     * configura el diseño. Y porque si viajara junto, guardar el evento desde
+     * una pantalla que no incluye el diseño lo borraría.
+     */
+    guardarDiseno(id, invitacionConfig) {
+      return http.enviar('eventos', { id, invitacionConfig }, { accion: 'diseno' });
+    }
+  },
+
   /** Portal público: son las únicas llamadas que funcionan sin sesión. */
   invitacion: {
     /** El acertijo que hay que resolver antes de poder consultar. */

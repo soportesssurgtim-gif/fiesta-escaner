@@ -139,6 +139,48 @@ function aObjeto(valor) {
 }
 
 /**
+ * Guarda solo el diseño de la invitación de un evento.
+ *
+ * Tiene su propia acción y no viaja con el resto del formulario por dos
+ * razones.
+ *
+ * La primera es de quién hace qué: el evento lo administra Recursos Humanos y
+ * el diseño lo configura quien mantiene el sistema. Son dos personas distintas
+ * en dos pantallas distintas.
+ *
+ * La segunda es que si el diseño viajara en el formulario general, guardar un
+ * evento desde una pantalla que no lo incluye lo borraría: el campo llegaría
+ * vacío y se guardaría como nada. Acá se escribe una sola columna y el resto
+ * del evento no se toca.
+ *
+ * Se guarda tal como llega, sin mirar qué campos trae. Quien lo lee completa lo
+ * que falte y descarta lo que no entienda; validar acá sería repetir esa lógica
+ * en un segundo lugar y arriesgarse a que los dos se separen.
+ */
+async function guardarDiseno({ req, res, sesion }) {
+  if (!esAdministrador(sesion.rol)) {
+    return responderSinPermiso(res, 'Solo un administrador puede cambiar el diseño de la invitación.');
+  }
+
+  const cuerpo = await leerCuerpo(req);
+  const id = aTexto(cuerpo.id);
+
+  if (!id) return responderSolicitudInvalida(res, 'Falta el evento.');
+
+  const { data, error } = await supabase
+    .from(TABLAS.eventos)
+    .update({ invitacion_config: aObjeto(cuerpo.invitacionConfig) })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (!data) return responderNoEncontrado(res, 'Ese evento ya no existe.');
+
+  return responderOk(res, data);
+}
+
+/**
  * Borra un evento.
  *
  * Solo un administrador, y solo si no tiene nada colgando: un evento con
@@ -209,19 +251,6 @@ export const controladorEventos = crearControladorCatalogo({
       // Las dos van juntas o ninguna: media coordenada no ubica nada.
       latitud: aCoordenada(cuerpo.latitud, 90),
       longitud: aCoordenada(cuerpo.longitud, 180),
-      /*
-       * Cómo se ve la invitación de este evento.
-       *
-       * Se guarda tal como llega, sin mirar qué campos trae. Quien lo lee
-       * completa lo que falte y descarta lo que no entienda, así que validar
-       * acá seria repetir esa logica en un segundo lugar y arriesgarse a que
-       * los dos se separen.
-       *
-       * Lo unico que se comprueba es que sea un objeto: cualquier otra cosa
-       * —un texto, un numero, una lista— no es una configuracion y se guarda
-       * como nada, que significa «el diseño de siempre».
-       */
-      invitacion_config: aObjeto(cuerpo.invitacionConfig ?? cuerpo.invitacion_config),
       activo: aBandera(cuerpo.activo ?? 'FALSE')
     };
 
@@ -241,6 +270,7 @@ export const controladorEventos = crearControladorCatalogo({
     'POST set-activo': activarEvento,
     'POST activar': activarEvento,
     'POST desactivar': desactivarEvento,
-    'POST eliminar': eliminarEvento
+    'POST eliminar': eliminarEvento,
+    'POST diseno': guardarDiseno
   }
 });

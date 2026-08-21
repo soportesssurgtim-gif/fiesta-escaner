@@ -319,10 +319,7 @@ async function iniciar() {
          */
         formularioVacio: {
           id: null, nombre: '', fechaEvento: '', ubicacion: '',
-          latitud: '', longitud: '', activo: 'FALSE',
-          // El diseño de la invitación, siempre completo en el formulario
-          // aunque en la base se guarde como nada cuando no cambia nada.
-          invitacionConfig: { ...POR_DEFECTO }
+          latitud: '', longitud: '', activo: 'FALSE'
         },
         alAbrir: (registro) => ({
           id: registro.id,
@@ -331,8 +328,7 @@ async function iniciar() {
           ubicacion: registro.ubicacion || '',
           latitud: registro.latitud ?? '',
           longitud: registro.longitud ?? '',
-          activo: String(registro.activo || 'FALSE').toUpperCase(),
-          invitacionConfig: normalizarDiseno(registro.invitacion_config)
+          activo: String(registro.activo || 'FALSE').toUpperCase()
         }),
         camposBusqueda: ['nombre', 'ubicacion']
       });
@@ -373,31 +369,70 @@ async function iniciar() {
        * se conserva y además se puede seguir leyendo.
        */
       /*
-       * La vista previa del editor del evento.
+       * El diseño de la invitación, en Configuración.
        *
-       * Usa datos de muestra y no los de un empleado real: quien configura el
-       * diseño está en el escritorio, sin nadie a mano, y lo que necesita ver es
-       * cómo quedan los colores y los textos.
+       * Vive acá y no en el formulario del evento a propósito: el evento lo
+       * administra Recursos Humanos —fecha, lugar, activarlo— y el diseño lo
+       * configura quien mantiene el sistema. Meterlo en el mismo formulario le
+       * ponía enfrente a RH una pantalla de colores y disposiciones que no le
+       * toca decidir.
        */
-      const vistaPreviaInvitacion = computed(() => construirModelo(
-        eventos.formulario.invitacionConfig,
-        {
-          evento: eventos.formulario.nombre || 'Nombre del evento',
-          fecha: eventos.formulario.fechaEvento
-            ? formato.formatearFechaLarga(eventos.formulario.fechaEvento)
+      /*
+       * Las pestañas de Configuración.
+       *
+       * La pantalla junta cosas sin relación entre sí, y en una sola columna
+       * había que desplazarse por lo que no se estaba buscando.
+       */
+      const PESTANAS_CONFIG = [
+        { id: 'general', etiqueta: 'General', icono: 'fa-sliders' },
+        { id: 'apariencia', etiqueta: 'Apariencia', icono: 'fa-palette' },
+        { id: 'invitacion', etiqueta: 'Invitación', icono: 'fa-envelope-open-text' },
+        { id: 'mantenimiento', etiqueta: 'Mantenimiento', icono: 'fa-screwdriver-wrench' }
+      ];
+
+      const pestanaConfig = ref('general');
+
+      const disenoInvitacion = reactive({
+        evento: '',
+        config: { ...POR_DEFECTO },
+        guardando: false,
+        aviso: ''
+      });
+
+      /** Al elegir un evento se carga su diseño, o el de siempre si no tiene. */
+      function elegirEventoDelDiseno(id) {
+        disenoInvitacion.evento = id || '';
+        disenoInvitacion.aviso = '';
+
+        const evento = eventos.lista.find((fila) => fila.id === id);
+        disenoInvitacion.config = normalizarDiseno(evento ? evento.invitacion_config : null);
+      }
+
+      /*
+       * La vista previa usa datos de muestra y no los de un empleado real:
+       * quien configura el diseño está en el escritorio, sin nadie a mano, y lo
+       * que necesita ver es cómo quedan los colores y los textos.
+       */
+      const vistaPreviaInvitacion = computed(() => {
+        const evento = eventos.lista.find((fila) => fila.id === disenoInvitacion.evento);
+
+        return construirModelo(disenoInvitacion.config, {
+          evento: evento ? evento.nombre : 'Nombre del evento',
+          fecha: evento && evento.fecha_evento
+            ? formato.formatearFechaLarga(evento.fecha_evento)
             : '',
-          ubicacion: eventos.formulario.ubicacion || '',
+          ubicacion: evento ? evento.ubicacion || '' : '',
           nombre: 'Nombre del Empleado',
           dui: '01234567-8',
           urlQr: ''
-        }
-      ));
+        });
+      });
 
       const bloquesPrevia = computed(() => bloquesDe(vistaPreviaInvitacion.value, 'evento'));
 
       /** Vuelve el diseño al de siempre. */
       function reiniciarDiseno() {
-        eventos.formulario.invitacionConfig = { ...POR_DEFECTO };
+        disenoInvitacion.config = { ...POR_DEFECTO };
       }
 
       /**
@@ -409,7 +444,42 @@ async function iniciar() {
       function copiarDisenoDe(idEvento) {
         const otro = eventos.lista.find((fila) => fila.id === idEvento);
         if (!otro) return;
-        eventos.formulario.invitacionConfig = normalizarDiseno(otro.invitacion_config);
+        disenoInvitacion.config = normalizarDiseno(otro.invitacion_config);
+      }
+
+      /**
+       * Guarda el diseño del evento elegido.
+       *
+       * Si quedó igual al de siempre se guarda como nada, y así se distingue en
+       * la base «este evento no tiene diseño propio» de «tiene uno que resultó
+       * ser el de siempre». Lo segundo no le sirve a nadie y ocupa lugar.
+       */
+      async function guardarDisenoInvitacion() {
+        if (!disenoInvitacion.evento) return;
+
+        disenoInvitacion.guardando = true;
+        disenoInvitacion.aviso = '';
+
+        try {
+          const aGuardar = esLaDeSiempre(disenoInvitacion.config)
+            ? null
+            : normalizarDiseno(disenoInvitacion.config);
+
+          const actualizado = await api.eventos.guardarDiseno(disenoInvitacion.evento, aGuardar);
+
+          // La lista en memoria tiene que reflejarlo, o «copiar de otro evento»
+          // seguiría ofreciendo el diseño viejo hasta recargar la pantalla.
+          const enLista = eventos.lista.find((fila) => fila.id === disenoInvitacion.evento);
+          if (enLista) enLista.invitacion_config = actualizado.invitacion_config ?? null;
+
+          disenoInvitacion.aviso = 'Diseño guardado.';
+          notificarExito('Diseño de la invitación guardado.');
+        } catch (fallo) {
+          disenoInvitacion.aviso = '';
+          notificarError(fallo.message || 'No se pudo guardar el diseño.');
+        } finally {
+          disenoInvitacion.guardando = false;
+        }
       }
 
       const manual = usarManual({
@@ -2581,6 +2651,8 @@ async function iniciar() {
         // Catálogos
         departamentos, empleados, premios, usuarios, roles, eventos,
         vistaPreviaInvitacion, bloquesPrevia, reiniciarDiseno, copiarDisenoDe, DISPOSICIONES,
+        disenoInvitacion, elegirEventoDelDiseno, guardarDisenoInvitacion,
+        PESTANAS_CONFIG, pestanaConfig,
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
         recargarCatalogos, DISTRITOS,

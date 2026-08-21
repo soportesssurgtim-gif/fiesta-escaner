@@ -1219,6 +1219,41 @@ html.dark .mapa-evento { border-color: var(--gris-800); }
 }
 
 /* Cuadrado, para que se lea como accion secundaria al lado del boton ancho. */
+/* ---------------------------------------------------------------------
+   Las pestañas de Configuración
+
+   Subrayado y no botones rellenos: dentro de la pantalla ya hay botones de
+   acción —guardar, restablecer, vaciar— y unas pestañas con el mismo peso
+   visual competirían con ellos. El subrayado dice «estás acá» sin pedir que lo
+   pulsen.
+   --------------------------------------------------------------------- */
+.pestana-config {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 0.625rem 1rem;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gris-500);
+  border-bottom: 2px solid transparent;
+  /* El borde de abajo tiene que caer sobre el de la barra, no debajo. */
+  margin-bottom: -1px;
+  white-space: nowrap;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.pestana-config:hover { color: var(--texto-fuerte); }
+
+.pestana-config-activa {
+  color: var(--marca-500);
+  border-bottom-color: var(--marca-500);
+}
+
+html.dark .pestana-config { color: var(--gris-400); }
+html.dark .pestana-config:hover { color: var(--gris-100); }
+html.dark .pestana-config-activa { color: var(--marca-400); border-bottom-color: var(--marca-400); }
+
 /*
  * Se saca de la pantalla en lugar de usar `display: none`, y no se lo hace
  * invisible en el lugar porque seguiría ocupando su espacio y empujando el
