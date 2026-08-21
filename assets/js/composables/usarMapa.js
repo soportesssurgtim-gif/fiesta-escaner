@@ -6,23 +6,21 @@
  *
  * Las tres vistas
  * ---------------
- * Ninguna fuente gratuita rotula los comercios como Google Maps, así que en
- * lugar de una sola vista hay tres, y cada una sirve para algo distinto:
+ * Son las mismas tres de Google Maps y salen de sus mismos tiles, igual que en
+ * el centro de monitoreo de la alcaldía. Se llegó acá después de probar las
+ * alternativas gratuitas: ninguna rotula los comercios, y sobre una foto sin
+ * nombres «Salón Los Almendros» es un techo más entre los techos.
  *
- *   Híbrido    la foto de satélite con los nombres encima. Es la de entrada:
- *              se reconoce el edificio y además se lee en qué calle está.
+ *   Híbrido    la foto con los nombres encima. Es la de entrada: se reconoce
+ *              el edificio, se lee la calle y se leen los negocios.
  *   Satélite   la foto sola, para confirmar la forma del techo y el patio.
- *   Callejero  el mapa de OpenStreetMap, que es el único de los tres que
- *              rotula negocios por su nombre. Es el que sirve para encontrar
- *              «Salón Los Almendros» sin saber dónde queda.
+ *   Callejero  el callejero, para leer las calles sin la foto debajo.
  *
- * Lo habitual es buscar el nombre en el callejero y pasar a híbrido para
- * confirmar que el pin quedó sobre el edificio y no sobre la calle de enfrente.
- *
- * Una aclaración sobre Google: existen direcciones de sus tiles que funcionan
- * sin clave, pero están fuera de su API y de sus términos. No se usan, y la
- * razón práctica pesa más que la legal: Google las corta sin aviso, y el día
- * que lo haga el mapa quedaría en blanco sin que nadie sepa por qué.
+ * Estas direcciones quedan fuera de la API documentada de Google. Están acá
+ * por decisión de quien mantiene el sistema, y porque el centro de monitoreo
+ * ya las usa en producción con las mismas. Lo que conviene saber de antemano:
+ * si algún día el mapa amanece en blanco, la causa es esta, y se recupera
+ * cambiando las tres direcciones por las de Esri, que no piden clave.
  *
  * Cómo se marca el lugar
  * ----------------------
@@ -249,36 +247,31 @@ export function usarMapa() {
     /*
      * Las capas.
      *
-     * `foto` y `rotulos` se combinan en la vista híbrida con un grupo: Leaflet
-     * solo deja una capa base activa a la vez, así que las dos tienen que
-     * viajar juntas o al elegir híbrido se apagaría una.
+     * Las tres son la misma dirección con una letra distinta en `lyrs`, así que
+     * se arman con una sola función:
+     *
+     *   y   la foto con los nombres encima
+     *   s   la foto sola
+     *   m   el callejero
+     *
+     * `mt{s}` reparte los pedidos entre mt0, mt1, mt2 y mt3. El navegador abre
+     * pocas conexiones simultáneas por dominio, y con un solo servidor las
+     * baldosas entrarían de a una: el mapa se vería armarse por pedazos en
+     * lugar de aparecer.
+     *
+     * Que la de entrada sea la híbrida y no la foto sola es a propósito. La
+     * foto sirve para confirmar un lugar que ya se encontró, no para
+     * encontrarlo: sin los nombres no hay por dónde empezar a buscar.
      */
-    const foto = () => window.L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { maxZoom: 19, attribution: 'Imágenes © Esri, Maxar, Earthstar Geographics' }
-    );
-
-    // Etiquetas sobre fondo transparente, derivadas de OpenStreetMap.
-    const rotulos = () => window.L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/light_only_labels/{z}/{x}/{y}{r}.png',
-      {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '© OpenStreetMap, © CARTO'
-      }
+    const capaGoogle = (lyrs) => window.L.tileLayer(
+      `https://mt{s}.google.com/vt/lyrs=${lyrs}&x={x}&y={y}&z={z}`,
+      { subdomains: '0123', maxZoom: 20, attribution: '© Google' }
     );
 
     const capas = {
-      // La de entrada: se reconoce el edificio y se lee en qué calle está.
-      'Híbrido': window.L.layerGroup([foto(), rotulos()]),
-
-      'Satélite': foto(),
-
-      // El único de los tres que rotula negocios por su nombre.
-      'Callejero': window.L.tileLayer(
-        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { maxZoom: 19, attribution: '© colaboradores de OpenStreetMap' }
-      )
+      'Híbrido': capaGoogle('y'),
+      'Satélite': capaGoogle('s'),
+      'Callejero': capaGoogle('m')
     };
 
     capas['Híbrido'].addTo(mapa);
