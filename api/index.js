@@ -24,7 +24,6 @@ import { controladorDepartamentos } from './_lib/controladores/departamentos.js'
 import { controladorEventos } from './_lib/controladores/eventos.js';
 import { controladorPremios } from './_lib/controladores/premios.js';
 import { controladorRoles } from './_lib/controladores/roles.js';
-import { controladorTarjetas } from './_lib/controladores/tarjetas.js';
 import { controladorUsuarios } from './_lib/controladores/usuarios.js';
 import { controladorConfiguracion } from './_lib/controladores/configuracion.js';
 import { controladorInvitacionPublica } from './_lib/controladores/invitacionPublica.js';
@@ -40,7 +39,6 @@ enrutador.registrar(['departamentos', 'dpto'], controladorDepartamentos);
 enrutador.registrar(['eventos'], controladorEventos);
 enrutador.registrar(['premios', 'sorteos'], controladorPremios);
 enrutador.registrar(['roles', 'permisos'], controladorRoles);
-enrutador.registrar(['tarjetas', 'plantillas'], controladorTarjetas);
 enrutador.registrar(['usuarios'], controladorUsuarios);
 enrutador.registrar(['configuracion'], controladorConfiguracion);
 enrutador.registrar(['invitacion-publica', 'invitacion'], controladorInvitacionPublica);

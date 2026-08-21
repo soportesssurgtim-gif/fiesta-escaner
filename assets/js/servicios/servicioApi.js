@@ -219,25 +219,6 @@ export const api = {
     }
   },
 
-  tarjetas: {
-    plantillas() {
-      return http.obtener('tarjetas');
-    },
-    empleados() {
-      return http.obtener('tarjetas', { accion: 'empleados' });
-    },
-    /**
-     * Guarda una plantilla. La imagen viaja en base64 dentro del cuerpo: es el
-     * backend quien la sube a Storage, porque el navegador no tiene (ni debe
-     * tener) credenciales de Supabase.
-     */
-    guardarPlantilla(datos) {
-      return http.enviar('tarjetas', datos);
-    },
-    eliminarPlantilla(id) {
-      return http.enviar('tarjetas', { id }, { accion: 'eliminar' });
-    }
-  },
 
   configuracion: {
     leer() {

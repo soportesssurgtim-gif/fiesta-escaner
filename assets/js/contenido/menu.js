@@ -16,7 +16,6 @@ export const MENU = [
       { vista: 'scanner',     modulo: 'scanner',     etiqueta: 'Escáner QR',   icono: 'fa-qrcode' },
       { vista: 'asistentes',  modulo: 'asistencias', etiqueta: 'Asistencias',  icono: 'fa-clipboard-check' },
       { vista: 'rifa',        modulo: 'sorteos',     etiqueta: 'Sorteos',      icono: 'fa-gift' },
-      { vista: 'tarjetas',    modulo: 'tarjetas',    etiqueta: 'Invitaciones', icono: 'fa-id-card' }
     ]
   },
   {

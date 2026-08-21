@@ -214,13 +214,6 @@
             <button type="button" @click="copiarEnlaceDetalle()" class="boton boton-secundario">
               <i class="fa-solid fa-link"></i> Copiar enlace
             </button>
-            <button v-if="permisos.tienePermiso('tarjetas', 'Ver')"
-                    type="button" @click="generarTarjetaDetalle()"
-                    class="boton boton-primario" :disabled="detalle.generando">
-              <i v-if="detalle.generando" class="fa-solid fa-circle-notch animar-girar"></i>
-              <i v-else class="fa-solid fa-id-card"></i>
-              {{ detalle.generando ? 'Generando…' : 'Generar tarjeta' }}
-            </button>
           </div>
         </div>
       </div>

@@ -20,10 +20,7 @@ import * as formato from './nucleo/formato.js';
 import { api } from './servicios/servicioApi.js';
 import { servicioInvitacion } from './servicios/servicioInvitacion.js';
 import { descargarXlsx } from './servicios/servicioExcel.js';
-import {
-  disenador, ZONAS_PREDEFINIDAS, MEDIDAS_SUGERIDAS, MAXIMO_POR_LOTE,
-  urlQr, descargarQr, enlaceInvitacion
-} from './servicios/servicioTarjetas.js';
+import { urlQr, descargarQr, enlaceInvitacion } from './nucleo/qr.js';
 
 import { usarNotificaciones } from './composables/usarNotificaciones.js';
 import { usarCatalogo } from './composables/usarCatalogo.js';
@@ -1559,202 +1556,6 @@ async function iniciar() {
       }
 
       // =====================================================================
-      // Tarjetas de invitación
-      // =====================================================================
-
-      const plantillas = ref([]);
-      const plantillaElegida = ref('');
-      const nombrePlantilla = ref('');
-      const campoQr = ref('dui');
-
-      /*
-       * Las medidas de la tarjeta, reflejadas para la pantalla.
-       *
-       * El diseñador es el que manda: acá solo se copia lo suyo después de cada
-       * cambio. Tener dos fuentes de verdad para lo mismo termina siempre en
-       * que una queda vieja, y acá la que dibuja es la del diseñador.
-       */
-      const medidasTarjeta = reactive({ ancho: 1200, alto: 1800 });
-      const hayFranjas = ref(false);
-
-      function refrescarMedidas() {
-        medidasTarjeta.ancho = disenador.medidas.ancho;
-        medidasTarjeta.alto = disenador.medidas.alto;
-        hayFranjas.value = disenador.hayFranjas;
-      }
-
-      /** Fija la medida a mano y redibuja. */
-      function cambiarMedidas(ancho, alto) {
-        disenador.establecerMedidas(ancho, alto);
-        disenador.dibujarPrevia();
-        refrescarMedidas();
-      }
-
-      /** Vuelve a la medida del diseño subido, que es la que no deforma nada. */
-      function medidasDelDiseno() {
-        if (!disenador.plantilla) return;
-        cambiarMedidas(disenador.plantilla.width, disenador.plantilla.height);
-      }
-
-      function aplicarMedidaSugerida(nombre) {
-        const medida = MEDIDAS_SUGERIDAS[nombre];
-        if (medida) cambiarMedidas(medida.ancho, medida.alto);
-      }
-      const guardandoPlantilla = ref(false);
-      const hayPlantillaCargada = ref(false);
-
-      const modalGenerarAbierto = ref(false);
-      const seleccionEmpleados = ref([]);
-      const busquedaTarjetas = ref('');
-      const generando = ref(false);
-      const progresoTarjetas = reactive({ hechas: 0, total: 0, porcentaje: 0 });
-
-      const empleadosParaTarjetas = computed(() => {
-        const termino = busquedaTarjetas.value.trim();
-        const lista = empleados.lista.filter((persona) => formato.esVerdadero(persona.activo));
-        if (!termino) return lista;
-        return lista.filter(
-          (persona) =>
-            formato.coincide(formato.nombreCompleto(persona), termino) ||
-            formato.coincide(persona.dui, termino)
-        );
-      });
-
-      async function cargarPlantillas() {
-        try {
-          plantillas.value = await api.tarjetas.plantillas();
-        } catch (fallo) {
-          console.error('[tarjetas]', fallo);
-        }
-      }
-
-      async function subirPlantilla(evento) {
-        const archivo = evento.target.files && evento.target.files[0];
-        evento.target.value = '';
-        if (!archivo) return;
-
-        try {
-          await disenador.cargarPlantillaDesdeArchivo(archivo);
-          hayPlantillaCargada.value = true;
-          refrescarMedidas();
-          notificarExito('Plantilla lista. Arrastra el QR hasta su lugar.');
-        } catch (fallo) {
-          notificarError(fallo.message);
-        }
-      }
-
-      async function guardarPlantilla() {
-        if (!hayPlantillaCargada.value) {
-          notificarError('Primero sube una plantilla.');
-          return;
-        }
-
-        guardandoPlantilla.value = true;
-        try {
-          await api.tarjetas.guardarPlantilla(disenador.datosParaGuardar(nombrePlantilla.value));
-          await cargarPlantillas();
-          nombrePlantilla.value = '';
-          notificarExito('Plantilla guardada.');
-        } catch (fallo) {
-          notificarError(fallo.message || 'No se pudo guardar la plantilla.');
-        } finally {
-          guardandoPlantilla.value = false;
-        }
-      }
-
-      async function eliminarPlantilla(id) {
-        try {
-          await api.tarjetas.eliminarPlantilla(id);
-          await cargarPlantillas();
-          if (plantillaElegida.value === id) plantillaElegida.value = '';
-          notificarExito('Plantilla eliminada.');
-        } catch (fallo) {
-          notificarError(fallo.message || 'No se pudo eliminar.');
-        }
-      }
-
-      /** Deja lista la plantilla guardada que se eligió, para poder generar. */
-      async function prepararPlantillaElegida() {
-        const plantilla = plantillas.value.find((fila) => fila.id === plantillaElegida.value);
-        if (!plantilla) throw new Error('Elige una plantilla primero.');
-        await disenador.usarPlantillaGuardada(plantilla);
-        refrescarMedidas();
-        return plantilla;
-      }
-
-      async function generarUna(empleado) {
-        try {
-          await prepararPlantillaElegida();
-          await disenador.descargarIndividual(empleado);
-          notificarExito('Tarjeta generada.');
-        } catch (fallo) {
-          notificarError(fallo.message || 'No se pudo generar la tarjeta.');
-        }
-      }
-
-      function abrirGeneracionMasiva() {
-        if (plantillas.value.length === 0) {
-          notificarError('Primero guarda al menos una plantilla.');
-          return;
-        }
-        seleccionEmpleados.value = [];
-        busquedaTarjetas.value = '';
-        progresoTarjetas.hechas = 0;
-        progresoTarjetas.total = 0;
-        progresoTarjetas.porcentaje = 0;
-        modalGenerarAbierto.value = true;
-      }
-
-      function alternarSeleccion(id) {
-        const indice = seleccionEmpleados.value.indexOf(id);
-        if (indice >= 0) seleccionEmpleados.value.splice(indice, 1);
-        else seleccionEmpleados.value.push(id);
-      }
-
-      function seleccionarTodosVisibles() {
-        const visibles = empleadosParaTarjetas.value.slice(0, MAXIMO_POR_LOTE).map((e) => e.id);
-        seleccionEmpleados.value =
-          seleccionEmpleados.value.length === visibles.length ? [] : visibles;
-      }
-
-      async function generarLote() {
-        if (seleccionEmpleados.value.length === 0) {
-          notificarError('Selecciona al menos una persona.');
-          return;
-        }
-
-        generando.value = true;
-        try {
-          await prepararPlantillaElegida();
-
-          const elegidos = empleados.lista.filter((persona) =>
-            seleccionEmpleados.value.includes(persona.id)
-          );
-
-          const resultado = await disenador.generarLoteZip(elegidos, disenador.campoQr, (hechas, total) => {
-            progresoTarjetas.hechas = hechas;
-            progresoTarjetas.total = total;
-            progresoTarjetas.porcentaje = Math.round((hechas / total) * 100);
-          });
-
-          modalGenerarAbierto.value = false;
-
-          if (resultado.fallidos.length > 0) {
-            notificarAlerta(
-              `${resultado.generadas} generadas. No se pudo con: ${resultado.fallidos.join(', ')}`
-            );
-          } else {
-            notificarExito(`${resultado.generadas} tarjetas listas. La descarga comenzó.`);
-          }
-        } catch (fallo) {
-          notificarError(fallo.message || 'No se pudo generar el lote.');
-        } finally {
-          generando.value = false;
-          progresoTarjetas.porcentaje = 0;
-        }
-      }
-
-      // =====================================================================
       // Detalle de un empleado
       //
       // Se abre al hacer clic en la fila del padrón. Junta la ficha completa y
@@ -1834,7 +1635,7 @@ async function iniciar() {
        * Son dos cosas distintas y la interfaz las separa a propósito:
        *
        *   · Dar de baja apaga la bandera `activo`. La persona sale del escáner
-       *     y de las tarjetas, pero su historial de asistencias sigue ahí. Es
+       *     pero su historial de asistencias sigue ahí. Es
        *     lo que se hace el 99% de las veces, y lo puede hacer cualquiera con
        *     permiso de eliminar sobre el módulo.
        *
@@ -1885,27 +1686,6 @@ async function iniciar() {
           // El portapapeles exige HTTPS y permiso. Si no se puede, al menos que
           // el enlace quede a la vista para copiarlo a mano.
           notificarAlerta(enlaceDetalle.value);
-        }
-      }
-
-      /**
-       * Genera la tarjeta completa de esta persona.
-       * Si todavía no se eligió plantilla en la vista de Tarjetas, toma la
-       * primera guardada: desde acá no hay dónde elegirla y no hacer nada
-       * sería peor que decidir por el usuario.
-       */
-      async function generarTarjetaDetalle() {
-        if (plantillas.value.length === 0) {
-          notificarError('No hay ninguna plantilla guardada. Crea una en la vista de Tarjetas.');
-          return;
-        }
-        if (!plantillaElegida.value) plantillaElegida.value = plantillas.value[0].id;
-
-        detalle.generando = true;
-        try {
-          await generarUna(detalle.persona);
-        } finally {
-          detalle.generando = false;
         }
       }
 
@@ -2487,21 +2267,9 @@ async function iniciar() {
         if (vista.value === 'scanner' && nueva !== 'scanner') {
           await escaner.detener();
         }
-        if (vista.value === 'tarjetas' && nueva !== 'tarjetas') {
-          disenador.desmontar();
-        }
-
         vista.value = nueva;
         if (esMovil.value) sidebarMovil.value = false;
       }
-
-      // Al entrar a tarjetas hay que esperar a que el canvas exista en el DOM.
-      watch(vista, async (nueva) => {
-        if (nueva !== 'tarjetas') return;
-        await nextTick();
-        disenador.montar('canvasTarjeta');
-        cargarPlantillas();
-      });
 
       watch(vista, (nueva) => {
         if (nueva !== 'configuracion') return;
@@ -2604,7 +2372,6 @@ async function iniciar() {
         document.removeEventListener('click', alHacerClicFuera);
         document.removeEventListener('keydown', alPresionarTecla);
         escaner.detener();
-        disenador.desmontar();
       });
 
       function ocultarPantallaCarga() {
@@ -2687,21 +2454,10 @@ async function iniciar() {
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
 
-        // Tarjetas
-        plantillas, plantillaElegida, nombrePlantilla, campoQr, hayPlantillaCargada,
-        guardandoPlantilla, subirPlantilla, guardarPlantilla, eliminarPlantilla,
-        modalGenerarAbierto, seleccionEmpleados, busquedaTarjetas, generando,
-        progresoTarjetas, empleadosParaTarjetas, abrirGeneracionMasiva,
-        alternarSeleccion, seleccionarTodosVisibles, generarUna, generarLote,
-        ZONAS_PREDEFINIDAS, MEDIDAS_SUGERIDAS, MAXIMO_POR_LOTE,
-        medidasTarjeta, hayFranjas, cambiarMedidas, medidasDelDiseno, aplicarMedidaSugerida,
-        aplicarZona: (nombre) => disenador.aplicarZona(nombre),
-        cambiarCampoQr: (campo) => { campoQr.value = campo; disenador.establecerCampoQr(campo); },
-
         // Detalle de un empleado
         detalle, qrDetalle, enlaceDetalle, departamentoDetalle, asistenciaDetalle,
         abrirDetalle, cerrarDetalle, editarDesdeDetalle, ejecutarBaja,
-        descargarQrDetalle, copiarEnlaceDetalle, generarTarjetaDetalle,
+        descargarQrDetalle, copiarEnlaceDetalle,
 
         // Configuración
         interruptores, diagnostico, revisandoSistema,

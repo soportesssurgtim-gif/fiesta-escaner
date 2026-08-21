@@ -7,7 +7,7 @@
  */
 
 import { supabase } from '../supabase.js';
-import { TABLAS, BUCKET_PLANTILLAS } from '../configuracion.js';
+import { TABLAS } from '../configuracion.js';
 import { aTexto, aEntero, aBandera, esVerdadero } from '../valores.js';
 import { leerCuerpo } from '../peticion.js';
 import { esAdministrador } from '../seguridad.js';
@@ -219,13 +219,6 @@ export const PURGABLES = [
     descripcion: 'Los eventos y todo lo que cuelga de ellos: asistencias, sorteos y ganadores.',
     tabla: TABLAS.eventos,
     dependientes: [TABLAS.ganadores, TABLAS.sorteos, TABLAS.asistencias]
-  },
-  {
-    clave: 'invitaciones',
-    etiqueta: 'Invitaciones',
-    descripcion: 'Las plantillas de tarjeta, junto con sus imágenes de fondo.',
-    tabla: TABLAS.plantillasTarjetas,
-    dependientes: []
   }
 ];
 
@@ -251,26 +244,6 @@ async function vaciarTabla(tabla) {
   if (error) throw error;
 
   return total;
-}
-
-/**
- * Borra también las imágenes del bucket.
- * Sin esto, vaciar las plantillas deja los PNG huérfanos ocupando la cuota
- * gratuita de Storage sin que nada los referencie.
- */
-async function vaciarImagenesDePlantillas() {
-  const { data } = await supabase.from(TABLAS.plantillasTarjetas).select('imagen_url');
-  const rutas = (data || []).map((fila) => fila.imagen_url).filter(Boolean);
-  if (rutas.length === 0) return 0;
-
-  const { error } = await supabase.storage.from(BUCKET_PLANTILLAS).remove(rutas);
-  if (error) {
-    // Que falle el borrado de las imágenes no debe abortar el purgado: los
-    // registros son lo que importa y un PNG huérfano no rompe nada.
-    console.warn('[configuracion] No se pudieron borrar las imágenes:', error.message);
-    return 0;
-  }
-  return rutas.length;
 }
 
 async function listarPurgables({ res, sesion }) {
@@ -327,11 +300,6 @@ async function purgarConjunto({ req, res, sesion }) {
     borrados.push({ tabla, filas: await vaciarTabla(tabla) });
   }
 
-  let imagenes = 0;
-  if (conjunto.tabla === TABLAS.plantillasTarjetas) {
-    imagenes = await vaciarImagenesDePlantillas();
-  }
-
   borrados.push({ tabla: conjunto.tabla, filas: await vaciarTabla(conjunto.tabla) });
 
   const total = borrados.reduce((suma, fila) => suma + fila.filas, 0);
@@ -345,7 +313,6 @@ async function purgarConjunto({ req, res, sesion }) {
     ok: true,
     conjunto: conjunto.etiqueta,
     total,
-    imagenes,
     detalle: borrados
   });
 }

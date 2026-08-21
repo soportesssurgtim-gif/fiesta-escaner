@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.14.1';
+const VERSION_CACHE = 'v3.15.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**
@@ -66,6 +66,7 @@ const ARCHIVOS_BASE = [
   '/assets/js/nucleo/cargadorVistas.js',
   '/assets/js/nucleo/clienteHttp.js',
   '/assets/js/nucleo/formato.js',
+  '/assets/js/nucleo/qr.js',
   '/assets/js/nucleo/tema.js',
   '/assets/js/nucleo/marca.js',
   '/assets/js/nucleo/similitud.js',
@@ -75,7 +76,6 @@ const ARCHIVOS_BASE = [
   '/assets/js/servicios/servicioExcel.js',
   '/assets/js/servicios/servicioInvitacion.js',
   '/assets/js/servicios/servicioOffline.js',
-  '/assets/js/servicios/servicioTarjetas.js',
 
   // Composables
   '/assets/js/composables/usarBuscadorPersonas.js',
@@ -129,7 +129,6 @@ const ARCHIVOS_BASE = [
   '/assets/views/vistas/premios.html',
   '/assets/views/vistas/rifas.html',
   '/assets/views/vistas/sorteos.html',
-  '/assets/views/vistas/tarjetas.html',
   '/assets/views/vistas/usuarios.html',
 
   // Librerías externas que sí permiten CORS

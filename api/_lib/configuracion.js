@@ -25,8 +25,7 @@ export const TABLAS = {
   sorteoPremios: 'sorteo_premios',
   permisos: 'permisos',
   configuracion: 'configuracion',
-  sesiones: 'sesiones',
-  plantillasTarjetas: 'plantillas_tarjetas'
+  sesiones: 'sesiones'
 };
 
 // La base guarda los booleanos como texto 'TRUE' / 'FALSE'. Es una herencia del
@@ -40,7 +39,6 @@ export const NO = 'FALSE';
 export const MODULOS = [
   'scanner',
   'asistencias',
-  'tarjetas',
   'departamentos',
   'empleados',
   'eventos',
@@ -54,9 +52,6 @@ export const MODULOS = [
 // Nombres de rol que se consideran administrador total. Se comparan en
 // mayúsculas, por eso están escritos así.
 export const ROLES_ADMINISTRADORES = ['ADMIN', 'ADMINISTRADOR'];
-
-// Bucket de Supabase Storage donde viven las plantillas de tarjetas.
-export const BUCKET_PLANTILLAS = 'plantillas';
 
 // Servicio externo que genera los códigos QR. Es público y gratuito.
 export const BASE_QR = 'https://quickchart.io/qr';
