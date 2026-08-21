@@ -68,25 +68,6 @@
       </div>
     </div>
 
-    <!--
-      El QR a pantalla completa.
-
-      Fondo blanco y el código lo más grande que entre. No es un modal del
-      sistema a propósito: acá no hay nada que decidir ni que leer, se muestra y
-      se cierra tocando en cualquier lado.
-    -->
-    <div v-if="qrAmpliado && invitacion.resultado"
-         class="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-white p-6"
-         @click="qrAmpliado = false">
-      <img :src="invitacion.resultado.empleado.qr_url"
-           alt="Código QR de tu invitación"
-           class="w-full max-w-sm object-contain" />
-      <p class="mt-6 text-theme-sm font-medium text-gray-800">
-        {{ nombreCompleto(invitacion.resultado.empleado) }}
-      </p>
-      <p class="mt-6 text-theme-xs text-gray-400">Toca en cualquier lado para volver</p>
-    </div>
-
     <!-- Resultado con el QR -->
     <div v-else class="animar-aparecer tarjeta overflow-hidden">
       <!--
@@ -191,6 +172,31 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!--
+      El QR a pantalla completa.
+
+      Fondo blanco y el código lo más grande que entre. No es un modal del
+      sistema a propósito: acá no hay nada que decidir ni que leer, se muestra y
+      se cierra tocando en cualquier lado.
+
+      Va al final y no junto al QR chico por una razón que costó un error: entre
+      un `v-if` y su `v-else` no puede haber nada. Puesto en el medio, Vue
+      apareaba el `v-else` de la tarjeta de resultado con el `v-if` de esta capa,
+      y la tarjeta se dibujaba sin resultado —leyendo `latitud` de null— cada vez
+      que alguien abría el portal.
+    -->
+    <div v-if="qrAmpliado && invitacion.resultado"
+         class="fixed inset-0 z-[80] flex flex-col items-center justify-center bg-white p-6"
+         @click="qrAmpliado = false">
+      <img :src="invitacion.resultado.empleado.qr_url"
+           alt="Código QR de tu invitación"
+           class="w-full max-w-sm object-contain" />
+      <p class="mt-6 text-theme-sm font-medium text-gray-800">
+        {{ nombreCompleto(invitacion.resultado.empleado) }}
+      </p>
+      <p class="mt-6 text-theme-xs text-gray-400">Toca en cualquier lado para volver</p>
     </div>
 
     <p class="mt-8 text-center text-theme-xs text-gray-400">
