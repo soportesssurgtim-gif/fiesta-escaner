@@ -122,6 +122,17 @@ export const api = {
     },
     eliminar(id) {
       return http.enviar('eventos', { id }, { accion: 'eliminar' });
+    },
+    /**
+     * Guarda solo el diseño de la invitación de un evento.
+     *
+     * Va en su propia acción y no dentro de `guardar` porque son dos personas
+     * distintas: Recursos Humanos administra el evento y quien mantiene el
+     * sistema configura el diseño. Y porque si viajara junto, guardar el evento
+     * desde una pantalla que no incluye el diseño lo borraría.
+     */
+    guardarDiseno(id, invitacionConfig) {
+      return http.enviar('eventos', { id, invitacionConfig }, { accion: 'diseno' });
     }
   },
 
@@ -237,20 +248,6 @@ export const api = {
      */
     purgar(conjunto, confirmacion) {
       return http.enviar('configuracion', { conjunto, confirmacion }, { accion: 'purgar' });
-    }
-  },
-
-  eventos: {
-    /**
-     * Guarda solo el diseño de la invitación de un evento.
-     *
-     * Va aparte del formulario del evento porque son dos personas distintas:
-     * Recursos Humanos administra el evento y quien mantiene el sistema
-     * configura el diseño. Y porque si viajara junto, guardar el evento desde
-     * una pantalla que no incluye el diseño lo borraría.
-     */
-    guardarDiseno(id, invitacionConfig) {
-      return http.enviar('eventos', { id, invitacionConfig }, { accion: 'diseno' });
     }
   },
 
