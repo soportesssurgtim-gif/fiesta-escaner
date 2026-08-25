@@ -169,48 +169,18 @@
     <div class="lg:col-span-2">
 
       <!--
-        El cartel del ganador.
+        Cuando no hay nadie en el cartel, el escenario queda esperando.
 
-        Ocupa todo y se lee de lejos, porque se proyecta. No se cierra solo:
-        quien locuta necesita el nombre en pantalla mientras lo dice, y el
-        aplauso dura lo que dura.
+        El cartel en si es un modal y esta al final del archivo: tapa la
+        pantalla entera, que es lo que corresponde cuando la sala mira un
+        nombre proyectado.
       -->
-      <div v-if="sorteos.ultimaExtraccion" class="animar-aparecer tarjeta overflow-hidden">
-        <div class="bg-brand-500 px-6 py-4 text-center">
-          <p class="text-theme-xs uppercase tracking-widest text-brand-100">Ganador de</p>
-          <p class="mt-1 text-theme-xl font-bold text-white">
-            {{ sorteos.ultimaExtraccion.premioNombre }}
+      <div v-if="!sorteos.ultimaExtraccion" class="tarjeta">
+        <div class="tarjeta-cuerpo py-16 text-center">
+          <i class="fa-solid fa-gift mb-4 text-5xl text-gray-200 dark:text-gray-800"></i>
+          <p class="text-theme-sm text-gray-400">
+            Elige el premio y saca al ganador. Va a aparecer acá, a pantalla completa.
           </p>
-        </div>
-
-        <div class="tarjeta-cuerpo">
-          <div class="space-y-4 py-4">
-            <div v-for="(g, indice) in sorteos.ultimaExtraccion.ganadores" :key="g.id"
-                 class="animar-aparecer text-center"
-                 :style="{ animationDelay: (indice * 120) + 'ms' }">
-              <p class="font-bold leading-tight text-gray-800 dark:text-white/90"
-                 :class="sorteos.ultimaExtraccion.ganadores.length > 3 ? 'text-title-sm' : 'text-title-md'">
-                {{ aNombrePropio(g.empleado.nombre) }}
-              </p>
-              <p class="mt-1 text-theme-sm text-gray-500 dark:text-gray-400">
-                {{ formatearDui(g.empleado.dui) }}
-                <span v-if="g.empleado.cargo"> · {{ aNombrePropio(g.empleado.cargo) }}</span>
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-4 flex flex-col gap-2 sm:flex-row">
-            <button type="button" @click="sorteos.limpiarCartel()" class="boton boton-secundario flex-1">
-              Listo
-            </button>
-            <button v-if="sorteos.premiosPendientes.length > 0"
-                    type="button" @click="sorteos.extraer()"
-                    class="boton boton-primario flex-1"
-                    :disabled="sorteos.sorteando">
-              <i class="fa-solid" :class="sorteos.sorteando ? 'fa-circle-notch animar-girar' : 'fa-dice'"></i>
-              Siguiente
-            </button>
-          </div>
         </div>
       </div>
 
@@ -277,4 +247,63 @@
       </div>
     </div>
   </div>
+  <!--
+    El cartel del ganador, a pantalla completa.
+
+    Se proyecta ante la sala entera, asi que tapa todo: mientras se lee un
+    nombre no hay nada mas que mirar. Antes era una tarjeta en la columna del
+    escenario y competia con la lista de premios y la tabla de ganadores.
+
+    NO se cierra solo, y no se cierra tocando el fondo. Quien locuta necesita el
+    nombre en pantalla mientras lo dice y el aplauso dura lo que dura; un modal
+    que se va con un clic al costado se cierra sin querer justo en ese momento.
+    Se sale por «Listo» o por «Siguiente», que son decisiones.
+  -->
+  <div v-if="sorteos.ultimaExtraccion" class="cartel-ganador">
+    <!--
+      El confeti va detras del panel y no lo tapa: `pointer-events: none` para
+      que no coma los clics de los botones.
+    -->
+    <canvas id="confeti-ganador" class="cartel-confeti" aria-hidden="true"></canvas>
+
+    <div class="cartel-panel animar-aparecer">
+      <div class="bg-brand-500 px-6 py-5 text-center">
+        <p class="text-theme-xs uppercase tracking-widest text-brand-100">Ganador de</p>
+        <p class="mt-1 text-title-sm font-bold text-white">
+          {{ sorteos.ultimaExtraccion.premioNombre }}
+        </p>
+      </div>
+
+      <div class="px-6 py-8">
+        <div class="space-y-6">
+          <div v-for="(g, indice) in sorteos.ultimaExtraccion.ganadores" :key="g.id"
+               class="animar-aparecer text-center"
+               :style="{ animationDelay: (indice * 140) + 'ms' }">
+            <p class="font-bold leading-tight text-gray-800 dark:text-white/90"
+               :class="sorteos.ultimaExtraccion.ganadores.length > 3 ? 'text-title-md' : 'text-title-lg'">
+              {{ aNombrePropio(g.empleado.nombre) }}
+            </p>
+            <p class="mt-2 text-theme-sm text-gray-500 dark:text-gray-400">
+              {{ formatearDui(g.empleado.dui) }}
+              <span v-if="g.empleado.cargo"> · {{ aNombrePropio(g.empleado.cargo) }}</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-8 flex flex-col gap-2 sm:flex-row">
+          <button type="button" @click="cerrarCartel()" class="boton boton-secundario flex-1 py-3">
+            Listo
+          </button>
+          <button v-if="sorteos.premiosPendientes.length > 0"
+                  type="button" @click="sorteos.extraer()"
+                  class="boton boton-primario flex-1 py-3"
+                  :disabled="sorteos.sorteando">
+            <i class="fa-solid" :class="sorteos.sorteando ? 'fa-circle-notch animar-girar' : 'fa-dice'"></i>
+            Siguiente premio
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </section>

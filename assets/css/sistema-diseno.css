@@ -505,6 +505,63 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
 
 
 /* --- Modales --- */
+/* ---------------------------------------------------------------------
+   El cartel del ganador
+
+   No usa `.modal-fondo` aunque se le parezca, por dos diferencias que importan
+   en una sala con proyector:
+
+   El fondo es mucho mas opaco. Un modal comun deja ver la pantalla de atras
+   para no perder el contexto; acá el contexto sobra, y lo que se busca es que a
+   diez metros no compita nada con el nombre.
+
+   Y no se cierra tocando el fondo. Quien locuta tiene el nombre en pantalla
+   mientras lo dice; un clic al costado lo haria desaparecer justo ahi. Se sale
+   por «Listo» o por «Siguiente premio», que son decisiones.
+   --------------------------------------------------------------------- */
+.cartel-ganador {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: rgb(16 24 40 / 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.cartel-panel {
+  position: relative;
+  /* Por encima del confeti, que cae por detras. */
+  z-index: 1;
+  width: 100%;
+  max-width: 44rem;
+  overflow: hidden;
+  border-radius: var(--radio-lg);
+  background-color: var(--fondo-panel);
+  box-shadow: var(--sombra-xl);
+}
+
+/*
+ * El lienzo del confeti.
+ *
+ * Ocupa la pantalla entera y no solo el panel: los papelitos tienen que caer
+ * por detras y por los costados, que es lo que da la sensacion de que llueven
+ * sobre la sala y no dentro de una caja.
+ *
+ * `pointer-events: none` es lo que deja pulsar los botones a traves de el. Sin
+ * eso el lienzo se come todos los clics y el cartel no se puede cerrar.
+ */
+.cartel-confeti {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .modal-fondo {
   position: fixed;
   inset: 0;

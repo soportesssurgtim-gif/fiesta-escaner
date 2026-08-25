@@ -30,6 +30,7 @@ import { usarImportacionCsv } from './composables/usarImportacionCsv.js';
 import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
 import { usarDesafio } from './composables/usarDesafio.js';
+import { usarConfeti } from './composables/usarConfeti.js';
 import {
   construirModelo, bloquesDe, normalizar as normalizarDiseno,
   esLaDeSiempre, POR_DEFECTO, DISPOSICIONES
@@ -485,6 +486,35 @@ async function iniciar() {
         // Va como función y no como valor para que se recalcule al girar el
         // teléfono, que cambia `esMovil` sin recargar nada.
         esAngosto: () => esMovil.value
+      });
+
+      /*
+       * El confeti del cartel de ganadores.
+       *
+       * Se lanza al aparecer un ganador y se corta al cerrar el cartel. Si no
+       * se cortara, seguiria corriendo detras de la pantalla siguiente: son
+       * cuadros de animacion gastados en algo que ya nadie ve, y en la maquina
+       * del proyector eso se nota.
+       */
+      const confeti = usarConfeti();
+
+      /** Cierra el cartel y corta el confeti. */
+      function cerrarCartel() {
+        confeti.detener();
+        sorteos.limpiarCartel();
+      }
+
+      /*
+       * Al aparecer un ganador cae el confeti.
+       *
+       * Se espera a `nextTick` porque el lienzo entra con el modal: antes de
+       * que Vue lo dibuje, `getElementById` no encuentra nada y el confeti no
+       * saldria nunca.
+       */
+      watch(() => sorteos.ultimaExtraccion, async (extraccion) => {
+        if (!extraccion) { confeti.detener(); return; }
+        await nextTick();
+        confeti.lanzar('confeti-ganador');
       });
 
       const lectura = usarLectura();
@@ -2450,7 +2480,8 @@ async function iniciar() {
         compartirInvitacion, enlaceCopiado, mapa, enlaceComoLlegar,
 
         // Sorteos
-        sorteos, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
+        sorteos,
+        confeti, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
 
