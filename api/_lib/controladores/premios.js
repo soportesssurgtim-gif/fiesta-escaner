@@ -406,11 +406,22 @@ async function sortearGanador({ req, res, sesion }) {
   const quedanDeEstePremio = disponibles - nuevos.length;
   await sincronizarEstado(sorteoId);
 
-  // Muestra para animación
-  const muestra = elegidosConDatos
-    .slice(0, 40)
-    .map((fila) => `${fila.empleados.nombres} ${fila.empleados.apellidos || ''}`.trim())
-    .filter(Boolean);
+  // --- Muestra para animación (ruleta) ------------------------------------
+  // Se construye con TODOS los asistentes elegibles, no solo los ganadores.
+  // Así la animación muestra nombres aleatorios reales antes de revelar al ganador.
+  let muestra = [];
+  if (participantes.length > 0) {
+    // Barajar para que la muestra sea aleatoria
+    const barajados = [...participantes];
+    for (let i = barajados.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [barajados[i], barajados[j]] = [barajados[j], barajados[i]];
+    }
+    muestra = barajados
+      .slice(0, 40)
+      .map((fila) => `${fila.empleados.nombres} ${fila.empleados.apellidos || ''}`.trim())
+      .filter(Boolean);
+  }
 
   // Calcular elegibles restantes
   let elegiblesRestantes = 0;
