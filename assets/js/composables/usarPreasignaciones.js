@@ -14,7 +14,7 @@ import { formatearFechaHora } from '../nucleo/formato.js';
 
 const { ref, reactive, computed, onMounted, onUnmounted } = Vue;
 
-export function usarPreasignaciones({ notificar, notificarError, eventoActivo }) {
+export function usarPreasignaciones({ notificar, notificarError, eventoActivo, haySesion }) {
   const lista = ref([]);
   const cargando = ref(false);
   const guardando = ref(false);
@@ -22,6 +22,7 @@ export function usarPreasignaciones({ notificar, notificarError, eventoActivo })
   const busquedaEmpleado = ref('');
   const mostrarListaEmpleados = ref(false);
   const contenedorEmpleados = ref(null);
+  const datosCargados = ref(false);
 
   // Cerrar lista al hacer clic fuera
   function manejarClickFuera(evento) {
@@ -32,7 +33,6 @@ export function usarPreasignaciones({ notificar, notificarError, eventoActivo })
 
   onMounted(() => {
     document.addEventListener('click', manejarClickFuera);
-    cargarDatosIniciales();
   });
 
   onUnmounted(() => {
@@ -71,9 +71,16 @@ export function usarPreasignaciones({ notificar, notificarError, eventoActivo })
 
       // Cargar preasignaciones
       await cargarLista(formulario.sorteoId, formulario.lineaId);
+      datosCargados.value = true;
     } catch (fallo) {
       console.error('[preasignaciones] Error cargando datos iniciales:', fallo);
     }
+  }
+
+  /** Cargar datos solo cuando haya sesión (llamado desde la vista) */
+  async function cargarSiHaySesion() {
+    if (!haySesion?.value || datosCargados.value) return;
+    await cargarDatosIniciales();
   }
 
   // Formulario para nueva preasignación
@@ -188,6 +195,7 @@ export function usarPreasignaciones({ notificar, notificarError, eventoActivo })
     cargarSorteos,
     cargarEmpleados,
     cargarLista,
+    cargarSiHaySesion,
     crear,
     eliminar,
     premiosDeSorteo,

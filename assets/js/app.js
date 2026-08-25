@@ -397,6 +397,13 @@ async function iniciar() {
 
       const pestanaConfig = ref('general');
 
+      // Cargar datos de preasignaciones cuando se selecciona la pestaña
+      watch(pestanaConfig, (nuevaPestana) => {
+        if (nuevaPestana === 'preasignaciones') {
+          preasignaciones.cargarSiHaySesion();
+        }
+      });
+
       const disenoInvitacion = reactive({
         evento: '',
         config: { ...POR_DEFECTO },
@@ -1540,7 +1547,8 @@ async function iniciar() {
       const preasignaciones = usarPreasignaciones({
         notificar,
         notificarError,
-        eventoActivo: () => eventoActivo.value
+        eventoActivo: () => eventoActivo.value,
+        haySesion
       });
 
       /*
