@@ -259,7 +259,7 @@
     que se va con un clic al costado se cierra sin querer justo en ese momento.
     Se sale por «Listo» o por «Siguiente», que son decisiones.
   -->
-  <div v-if="sorteos.ultimaExtraccion" class="cartel-ganador">
+  <div v-if="sorteos.ultimaExtraccion || ruleta.girando" class="cartel-ganador">
     <!--
       El confeti va detras del panel y no lo tapa: `pointer-events: none` para
       que no coma los clics de los botones.
@@ -268,9 +268,13 @@
 
     <div class="cartel-panel animar-aparecer">
       <div class="bg-brand-500 px-6 py-5 text-center">
-        <p class="text-theme-xs uppercase tracking-widest text-brand-100">Ganador de</p>
+        <p class="text-theme-xs uppercase tracking-widest text-brand-100">
+          {{ ruleta.girando ? 'Sorteando' : 'Ganador de' }}
+        </p>
         <p class="mt-1 text-title-sm font-bold text-white">
-          {{ sorteos.ultimaExtraccion.premioNombre }}
+          {{ sorteos.ultimaExtraccion
+             ? sorteos.ultimaExtraccion.premioNombre
+             : (sorteos.linea ? sorteos.linea.premioNombre : '') }}
         </p>
       </div>
 
@@ -299,7 +303,7 @@
           <div class="carrete-marca" aria-hidden="true"></div>
         </div>
 
-        <div v-else class="space-y-6">
+        <div v-else-if="sorteos.ultimaExtraccion" class="space-y-6">
           <div v-for="(g, indice) in sorteos.ultimaExtraccion.ganadores" :key="g.id"
                class="animar-aparecer text-center"
                :style="{ animationDelay: (indice * 140) + 'ms' }">
@@ -314,7 +318,7 @@
           </div>
         </div>
 
-        <div v-if="!ruleta.girando" class="mt-8 flex flex-col gap-2 sm:flex-row">
+        <div v-if="!ruleta.girando && sorteos.ultimaExtraccion" class="mt-8 flex flex-col gap-2 sm:flex-row">
           <button type="button" @click="cerrarCartel()" class="boton boton-secundario flex-1 py-3">
             Listo
           </button>

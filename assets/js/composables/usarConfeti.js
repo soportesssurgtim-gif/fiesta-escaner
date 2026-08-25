@@ -27,7 +27,7 @@
  * le da el aire de festejo: solo azules se ve monocromo, con dorado se ve fiesta.
  */
 
-const { ref } = Vue;
+const { reactive, ref } = Vue;
 
 /** Cuántos papelitos por tanda. Más que esto no se distingue y cuesta más. */
 const POR_TANDA = 90;
@@ -209,5 +209,13 @@ export function usarConfeti() {
     cayendo.value = false;
   }
 
-  return { cayendo, lanzar, detener };
+  /*
+   * Va en `reactive` y no como objeto suelto.
+   *
+   * `setup()` desenvuelve solo las refs de primer nivel. Devolviendo un objeto
+   * comun, `confeti.cayendo` en la plantilla seria la ref y no su valor. Hoy
+   * nadie lo lee desde el HTML y por eso no se noto, pero es la misma trampa
+   * que dejo al carrete mostrando «[object Object]» en pantalla.
+   */
+  return reactive({ cayendo, lanzar, detener });
 }

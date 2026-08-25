@@ -1479,11 +1479,31 @@ async function iniciar() {
       }
 
       /*
-       * El orden del festejo: primero gira el carrete, después cae el confeti.
+       * Los nombres del último sorteo, para poder arrancar el carrete al
+       * instante en el siguiente.
        *
-       * El confeti tiene que salir cuando aparece el nombre, no antes: largarlo
-       * mientras todavía giran los nombres arruina el momento, porque anuncia el
-       * final antes de que llegue.
+       * El carrete tiene que empezar a girar cuando se pulsa el botón, no cuando
+       * contesta el servidor: el giro existe para tapar esa espera. Pero los
+       * nombres vienen en la respuesta, así que en el primer sorteo de la noche
+       * todavía no hay ninguno y el carrete arranca al llegar.
+       *
+       * Guardar los del sorteo anterior resuelve el resto de la noche, que son
+       * casi todos, sin pedirle nada más al servidor.
+       */
+      const nombresParaGirar = ref([]);
+
+      /** Al pulsar «Sacar ganador» arranca el giro, antes de saber quién ganó. */
+      watch(() => sorteos.sorteando, (sorteando) => {
+        if (sorteando && nombresParaGirar.value.length > 0) {
+          ruleta.arrancar(nombresParaGirar.value);
+        }
+      });
+
+      /*
+       * Y al llegar el resultado, el carrete frena en el ganador.
+       *
+       * El confeti sale después de que frena, no antes: largarlo mientras
+       * todavía giran los nombres anuncia el final antes de que llegue.
        *
        * Se espera a `nextTick` porque el lienzo del confeti entra con el modal:
        * antes de que Vue lo dibuje, `getElementById` no encuentra nada.
@@ -1495,6 +1515,9 @@ async function iniciar() {
           return;
         }
 
+        const muestra = extraccion.muestra || [];
+        if (muestra.length > 0) nombresParaGirar.value = muestra;
+
         const ganadores = extraccion.ganadores || [];
 
         /*
@@ -1504,7 +1527,13 @@ async function iniciar() {
          */
         const final = ganadores.length === 1 ? ganadores[0].empleado.nombre : '';
 
-        await ruleta.girar(extraccion.muestra || [], final);
+        // Si no alcanzó a arrancar —primer sorteo de la noche— se arranca ahora
+        // y se frena enseguida, que es lo que hacía antes.
+        if (!ruleta.girando) {
+          await ruleta.girar(muestra, final);
+        } else {
+          await ruleta.frenarEn(final);
+        }
 
         await nextTick();
         confeti.lanzar('confeti-ganador');
