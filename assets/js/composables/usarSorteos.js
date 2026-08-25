@@ -19,7 +19,7 @@ import { api } from '../servicios/servicioApi.js';
 
 const { ref, reactive, computed } = Vue;
 
-export function usarSorteos({ notificar, notificarError, alCambiar }) {
+export function usarSorteos({ notificar, notificarError, alCambiar, eventoActivo }) {
   const lista = ref([]);
   const elegido = ref('');
   const ganadores = ref([]);
@@ -66,11 +66,39 @@ export function usarSorteos({ notificar, notificarError, alCambiar }) {
         elegido.value = '';
         ganadores.value = [];
       }
+
+      // Y si no hay ninguno elegido, se elige el que corresponde.
+      if (!elegido.value) await elegirElDelEvento();
     } catch (fallo) {
       if (!fallo.esSesionVencida) console.error('[sorteos]', fallo);
     } finally {
       cargando.value = false;
     }
+  }
+
+  /**
+   * Elige solo el sorteo del evento en curso.
+   *
+   * Quien locuta abre esta pantalla en medio de la fiesta y ya tenía que elegir
+   * el sorteo de una lista donde estaban también los de años anteriores. Casi
+   * siempre hay uno solo que tiene sentido: el del evento activo, con premios
+   * todavía por repartir.
+   *
+   * Si hay varios que califican se toma el más reciente, que es el orden en que
+   * los devuelve el servidor. Si no hay ninguno no se elige nada y la lista
+   * queda como estaba: adivinar de más sería peor que no adivinar.
+   */
+  async function elegirElDelEvento() {
+    const evento = typeof eventoActivo === 'function' ? eventoActivo() : null;
+    if (!evento || !evento.id) return;
+
+    const candidato = lista.value.find((s) =>
+      s.evento === evento.id &&
+      !s.completo &&
+      String(s.estado || 'ABIERTO').toUpperCase() !== 'CERRADO'
+    );
+
+    if (candidato) await elegirSorteo(candidato.id);
   }
 
   async function elegirSorteo(id) {
@@ -191,6 +219,7 @@ export function usarSorteos({ notificar, notificarError, alCambiar }) {
     maximoPorExtraer,
     premiosPendientes,
     ultimaExtraccion,
+    elegirElDelEvento,
     progreso,
     cargar,
     elegirSorteo,

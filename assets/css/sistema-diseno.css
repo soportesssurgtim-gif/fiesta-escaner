@@ -506,6 +506,75 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
 
 /* --- Modales --- */
 /* ---------------------------------------------------------------------
+   El carrete de nombres
+
+   El alto de la fila esta tambien en usarRuleta.js, como ALTO_FILA: el
+   composable calcula el recorrido en pixeles y necesita saber cuanto mide cada
+   fila. Si se cambia uno hay que cambiar el otro, y hay una prueba que lo
+   comprueba para que no se separen.
+   --------------------------------------------------------------------- */
+.carrete {
+  position: relative;
+  /* Tres filas: la del medio es la que se lee. */
+  height: 216px;
+}
+
+.carrete-ventana {
+  height: 100%;
+  overflow: hidden;
+  /*
+   * Las filas de los bordes se desvanecen.
+   *
+   * Sin esto el carrete parece una lista que se corta, y con el degradado
+   * parece un cilindro girando: el ojo entiende que hay mas nombres arriba y
+   * abajo de los que se ven.
+   */
+  mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
+}
+
+.carrete-columna {
+  /*
+   * Sin transicion: el composable mueve esto en cada cuadro y una transicion
+   * de CSS encima peleria con la animacion, dejandola blanda y fuera de tiempo.
+   */
+  will-change: transform;
+}
+
+.carrete-fila {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  padding: 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--texto-fuerte);
+  /* Un nombre largo no puede empujar la fila: el recorrido esta en pixeles. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+html.dark .carrete-fila { color: var(--gris-100); }
+
+/* La linea del medio, donde frena. Da un punto donde apoyar la mirada. */
+.carrete-marca {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 72px;
+  transform: translateY(-50%);
+  border-top: 2px solid var(--marca-500);
+  border-bottom: 2px solid var(--marca-500);
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* ---------------------------------------------------------------------
    El cartel del ganador
 
    No usa `.modal-fondo` aunque se le parezca, por dos diferencias que importan

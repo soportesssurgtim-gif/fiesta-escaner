@@ -275,7 +275,31 @@
       </div>
 
       <div class="px-6 py-8">
-        <div class="space-y-6">
+        <!--
+          El carrete.
+
+          Mientras gira se ve esto y no los ganadores. La ventana deja ver tres
+          filas: la de arriba y la de abajo se desvanecen con una mascara, asi
+          que la del medio es la unica que se lee entera y es donde va a frenar.
+
+          El desplazamiento lo maneja el composable con `transform`, que lo mueve
+          el compositor del navegador sin rehacer la disposicion de la pagina en
+          cada cuadro.
+        -->
+        <div v-if="ruleta.girando" class="carrete">
+          <div class="carrete-ventana">
+            <div class="carrete-columna"
+                 :style="{ transform: 'translateY(-' + ruleta.desplazamiento + 'px)' }">
+              <div v-for="(nombre, i) in ruleta.filas" :key="i" class="carrete-fila">
+                {{ aNombrePropio(nombre) }}
+              </div>
+            </div>
+          </div>
+          <!-- La linea que marca donde frena, para que el ojo tenga un punto. -->
+          <div class="carrete-marca" aria-hidden="true"></div>
+        </div>
+
+        <div v-else class="space-y-6">
           <div v-for="(g, indice) in sorteos.ultimaExtraccion.ganadores" :key="g.id"
                class="animar-aparecer text-center"
                :style="{ animationDelay: (indice * 140) + 'ms' }">
@@ -290,7 +314,7 @@
           </div>
         </div>
 
-        <div class="mt-8 flex flex-col gap-2 sm:flex-row">
+        <div v-if="!ruleta.girando" class="mt-8 flex flex-col gap-2 sm:flex-row">
           <button type="button" @click="cerrarCartel()" class="boton boton-secundario flex-1 py-3">
             Listo
           </button>

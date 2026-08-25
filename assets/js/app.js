@@ -31,6 +31,7 @@ import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
 import { usarDesafio } from './composables/usarDesafio.js';
 import { usarConfeti } from './composables/usarConfeti.js';
+import { usarRuleta } from './composables/usarRuleta.js';
 import {
   construirModelo, bloquesDe, normalizar as normalizarDiseno,
   esLaDeSiempre, POR_DEFECTO, DISPOSICIONES
@@ -1448,7 +1449,9 @@ async function iniciar() {
         notificarError,
         // Al extraer cambia el stock de los premios, así que el catálogo que
         // está en pantalla queda desactualizado.
-        alCambiar: recargarCatalogos
+        alCambiar: recargarCatalogos,
+        // Para preseleccionar el sorteo de la fiesta que se está haciendo.
+        eventoActivo: () => eventoActivo.value
       });
 
       /*
@@ -1466,20 +1469,43 @@ async function iniciar() {
        * proyector eso se nota.
        */
       const confeti = usarConfeti();
+      const ruleta = usarRuleta();
 
-      /** Cierra el cartel y corta el confeti. */
+      /** Cierra el cartel y corta lo que esté corriendo. */
       function cerrarCartel() {
+        ruleta.detener();
         confeti.detener();
         sorteos.limpiarCartel();
       }
 
       /*
-       * Se espera a `nextTick` porque el lienzo entra con el modal: antes de que
-       * Vue lo dibuje, `getElementById` no encuentra nada y el confeti no
-       * saldría nunca.
+       * El orden del festejo: primero gira el carrete, después cae el confeti.
+       *
+       * El confeti tiene que salir cuando aparece el nombre, no antes: largarlo
+       * mientras todavía giran los nombres arruina el momento, porque anuncia el
+       * final antes de que llegue.
+       *
+       * Se espera a `nextTick` porque el lienzo del confeti entra con el modal:
+       * antes de que Vue lo dibuje, `getElementById` no encuentra nada.
        */
       watch(() => sorteos.ultimaExtraccion, async (extraccion) => {
-        if (!extraccion) { confeti.detener(); return; }
+        if (!extraccion) {
+          ruleta.detener();
+          confeti.detener();
+          return;
+        }
+
+        const ganadores = extraccion.ganadores || [];
+
+        /*
+         * Con un solo ganador el carrete frena en su nombre, que es el momento.
+         * Con varios no se frena en ninguno —quedarse en uno de tres sugeriría
+         * que ese es «el» ganador— y la pantalla revela la lista completa.
+         */
+        const final = ganadores.length === 1 ? ganadores[0].empleado.nombre : '';
+
+        await ruleta.girar(extraccion.muestra || [], final);
+
         await nextTick();
         confeti.lanzar('confeti-ganador');
       });
@@ -2485,7 +2511,7 @@ async function iniciar() {
 
         // Sorteos
         sorteos,
-        confeti, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
+        confeti, ruleta, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
 

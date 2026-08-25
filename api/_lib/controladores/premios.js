@@ -319,8 +319,28 @@ async function sortearGanador({ req, res, sesion }) {
   const quedanDeEstePremio = disponibles - nuevos.length;
   await sincronizarEstado(sorteoId);
 
+  /*
+   * Unos nombres para la animacion del sorteo.
+   *
+   * La pantalla hace girar nombres antes de mostrar al ganador, y necesita con
+   * cuales. Salen de aca porque la lista de elegibles ya esta en memoria: pedirla
+   * de nuevo desde el navegador seria una consulta mas para algo decorativo.
+   *
+   * Son nombres de asistentes que de verdad podian ganar, no relleno inventado:
+   * lo que gira es la gente que estaba en el sorteo.
+   *
+   * Se limita a cuarenta porque es mucho mas de lo que alcanza a leerse mientras
+   * gira, y mandar novecientos nombres para una animacion seria desperdiciar la
+   * respuesta.
+   */
+  const muestra = barajados
+    .slice(0, 40)
+    .map((fila) => `${fila.empleados.nombres} ${fila.empleados.apellidos || ''}`.trim())
+    .filter(Boolean);
+
   return responderOk(res, {
     ganadores: nuevos,
+    muestra,
     premioNombre: nombrePremio,
     lineaId,
     pendientesDeEstePremio: quedanDeEstePremio,
