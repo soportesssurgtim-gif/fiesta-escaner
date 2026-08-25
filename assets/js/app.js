@@ -31,7 +31,7 @@ import { usarConciliacion } from './composables/usarConciliacion.js';
 import { usarMapa, enlaceComoLlegar } from './composables/usarMapa.js';
 import { usarDesafio } from './composables/usarDesafio.js';
 import { usarConfeti } from './composables/usarConfeti.js';
-import { usarRuleta } from './composables/usarRuleta.js';
+import { usarRuleta, CIRCUNFERENCIA } from './composables/usarRuleta.js';
 import {
   construirModelo, bloquesDe, normalizar as normalizarDiseno,
   esLaDeSiempre, POR_DEFECTO, DISPOSICIONES
@@ -1478,29 +1478,47 @@ async function iniciar() {
         sorteos.limpiarCartel();
       }
 
+      /**
+       * El tamaño del nombre en el foco, según lo largo que sea.
+       *
+       * Adentro del anillo hay un ancho fijo. «Ana López» y «María José
+       * Hernández de González» no pueden ir del mismo cuerpo: el segundo se
+       * saldría del círculo.
+       */
+      function claseFoco(nombre) {
+        const largo = (nombre || '').length;
+        if (largo > 26) return 'foco-nombre--chico';
+        if (largo > 15) return 'foco-nombre--medio';
+        return '';
+      }
+
       /*
-       * Los nombres del último sorteo, para poder arrancar el carrete al
-       * instante en el siguiente.
+       * Los nombres que pasan por el foco mientras se espera al servidor.
        *
-       * El carrete tiene que empezar a girar cuando se pulsa el botón, no cuando
-       * contesta el servidor: el giro existe para tapar esa espera. Pero los
-       * nombres vienen en la respuesta, así que en el primer sorteo de la noche
-       * todavía no hay ninguno y el carrete arranca al llegar.
+       * El foco tiene que estar girando desde que se pulsa el botón, no desde
+       * que contesta el servidor: el giro existe para tapar esa espera.
        *
-       * Guardar los del sorteo anterior resuelve el resto de la noche, que son
-       * casi todos, sin pedirle nada más al servidor.
+       * La respuesta trae la muestra de elegibles con la que el servidor sorteó,
+       * que es la lista exacta, pero llega tarde. Para el arranque sirven los
+       * asistentes que la vista ya tiene cargados —los mismos del «Participan
+       * N» de arriba—, que no cuestan una consulta más.
        */
       const nombresParaGirar = ref([]);
 
+      function nombresParaArrancar() {
+        if (nombresParaGirar.value.length > 0) return nombresParaGirar.value;
+        return asistencias.value.map((a) => a.empleadoNombre).filter(Boolean);
+      }
+
       /** Al pulsar «Sacar ganador» arranca el giro, antes de saber quién ganó. */
       watch(() => sorteos.sorteando, (sorteando) => {
-        if (sorteando && nombresParaGirar.value.length > 0) {
-          ruleta.arrancar(nombresParaGirar.value);
-        }
+        if (!sorteando) return;
+        const nombres = nombresParaArrancar();
+        if (nombres.length > 0) ruleta.arrancar(nombres);
       });
 
       /*
-       * Y al llegar el resultado, el carrete frena en el ganador.
+       * Y al llegar el resultado, el foco frena en el ganador.
        *
        * El confeti sale después de que frena, no antes: largarlo mientras
        * todavía giran los nombres anuncia el final antes de que llegue.
@@ -1521,7 +1539,7 @@ async function iniciar() {
         const ganadores = extraccion.ganadores || [];
 
         /*
-         * Con un solo ganador el carrete frena en su nombre, que es el momento.
+         * Con un solo ganador el foco frena en su nombre, que es el momento.
          * Con varios no se frena en ninguno —quedarse en uno de tres sugeriría
          * que ese es «el» ganador— y la pantalla revela la lista completa.
          */
@@ -2540,7 +2558,7 @@ async function iniciar() {
 
         // Sorteos
         sorteos,
-        confeti, ruleta, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
+        confeti, ruleta, claseFoco, CIRCUNFERENCIA, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
 

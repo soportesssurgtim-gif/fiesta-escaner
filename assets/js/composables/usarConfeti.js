@@ -215,7 +215,7 @@ export function usarConfeti() {
    * `setup()` desenvuelve solo las refs de primer nivel. Devolviendo un objeto
    * comun, `confeti.cayendo` en la plantilla seria la ref y no su valor. Hoy
    * nadie lo lee desde el HTML y por eso no se noto, pero es la misma trampa
-   * que dejo al carrete mostrando «[object Object]» en pantalla.
+   * que dejo al sorteo mostrando «[object Object]» proyectado en pantalla.
    */
   return reactive({ cayendo, lanzar, detener });
 }

@@ -506,72 +506,93 @@ html.dark .enlace-menu-activo:hover { background-color: rgba(70, 95, 255, 0.12);
 
 /* --- Modales --- */
 /* ---------------------------------------------------------------------
-   El carrete de nombres
+   El foco del ganador
 
-   El alto de la fila esta tambien en usarRuleta.js, como ALTO_FILA: el
-   composable calcula el recorrido en pixeles y necesita saber cuanto mide cada
-   fila. Si se cambia uno hay que cambiar el otro, y hay una prueba que lo
-   comprueba para que no se separen.
+   Un nombre grande en el centro y un anillo girando alrededor. El giro y el
+   arco los escribe usarRuleta.js en cada cuadro; aca esta solo la forma.
    --------------------------------------------------------------------- */
-.carrete {
+.foco {
   position: relative;
-  /* Tres filas: la del medio es la que se lee. */
-  height: 216px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Cuadrado, y nunca mas ancho que el celular donde tambien se usa. */
+  width: min(20rem, 72vw);
+  aspect-ratio: 1;
+  margin: 0 auto;
 }
 
-.carrete-ventana {
+.foco-anillo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  overflow: hidden;
   /*
-   * Las filas de los bordes se desvanecen.
-   *
-   * Sin esto el carrete parece una lista que se corta, y con el degradado
-   * parece un cilindro girando: el ojo entiende que hay mas nombres arriba y
-   * abajo de los que se ven.
-   */
-  mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 32%, #000 68%, transparent);
-}
-
-.carrete-columna {
-  /*
-   * Sin transicion: el composable mueve esto en cada cuadro y una transicion
-   * de CSS encima peleria con la animacion, dejandola blanda y fuera de tiempo.
+   * Sin transicion: el composable escribe la rotacion en cada cuadro y una
+   * transicion de CSS encima peleria con la animacion, dejandola blanda y
+   * fuera de tiempo.
    */
   will-change: transform;
 }
 
-.carrete-fila {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 72px;
-  padding: 0 1rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: center;
-  color: var(--texto-fuerte);
-  /* Un nombre largo no puede empujar la fila: el recorrido esta en pixeles. */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+/* La pista: el circulo completo, tenue, para que el arco tenga sobre que ir. */
+.foco-pista {
+  fill: none;
+  stroke: var(--marca-500);
+  stroke-width: 4;
+  opacity: 0.16;
 }
 
-html.dark .carrete-fila { color: var(--gris-100); }
+.foco-arco {
+  fill: none;
+  stroke: var(--marca-500);
+  stroke-width: 6;
+  stroke-linecap: round;
+}
 
-/* La linea del medio, donde frena. Da un punto donde apoyar la mirada. */
-.carrete-marca {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 72px;
-  transform: translateY(-50%);
-  border-top: 2px solid var(--marca-500);
-  border-bottom: 2px solid var(--marca-500);
-  pointer-events: none;
-  opacity: 0.35;
+/*
+ * El nombre.
+ *
+ * Va dentro del anillo y no puede desbordarlo, asi que el tamano baja segun lo
+ * largo que sea: la clase la elige claseFoco() en app.js.
+ */
+.foco-nombre {
+  position: relative;
+  z-index: 1;
+  width: 74%;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--texto-fuerte);
+  overflow-wrap: break-word;
+}
+
+.foco-nombre--medio { font-size: 1.5rem; }
+.foco-nombre--chico { font-size: 1.15rem; }
+
+html.dark .foco-nombre { color: var(--gris-100); }
+
+/*
+ * El momento en que queda el ganador: el nombre aterriza con un rebote corto.
+ *
+ * Sin halo alrededor del anillo. Se probo con `drop-shadow` y el filtro pinta
+ * su sombra sobre la caja del SVG, que esta rotandose: en vez de un resplandor
+ * redondo sale un rombo gris girado detras del circulo. El rebote del nombre
+ * alcanza para marcar el momento, y llega justo cuando quien locuta lo esta
+ * leyendo en voz alta.
+ */
+.foco--listo .foco-nombre {
+  animation: foco-aterrizar 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes foco-aterrizar {
+  from { transform: scale(0.82); }
+  to   { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foco--listo .foco-nombre { animation: none; }
 }
 
 /* ---------------------------------------------------------------------
@@ -603,7 +624,6 @@ html.dark .carrete-fila { color: var(--gris-100); }
 
 .cartel-panel {
   position: relative;
-  /* Por encima del confeti, que cae por detras. */
   z-index: 1;
   width: 100%;
   max-width: 44rem;
@@ -617,15 +637,21 @@ html.dark .carrete-fila { color: var(--gris-100); }
  * El lienzo del confeti.
  *
  * Ocupa la pantalla entera y no solo el panel: los papelitos tienen que caer
- * por detras y por los costados, que es lo que da la sensacion de que llueven
- * sobre la sala y no dentro de una caja.
+ * por los costados tambien, que es lo que da la sensacion de que llueven sobre
+ * la sala y no dentro de una caja.
  *
- * `pointer-events: none` es lo que deja pulsar los botones a traves de el. Sin
- * eso el lienzo se come todos los clics y el cartel no se puede cerrar.
+ * Y caen POR DELANTE del panel, no por detras. Detras se veian solo por los
+ * bordes y el efecto se perdia justo donde esta mirando todo el mundo; por
+ * delante pasan sobre el nombre del ganador, como en la sala de verdad.
+ *
+ * `pointer-events: none` es lo que deja pulsar los botones a traves de el, y
+ * pasa a ser imprescindible al ponerlo encima: sin eso el lienzo tapa «Listo»
+ * y «Siguiente premio» y el cartel no se puede cerrar.
  */
 .cartel-confeti {
   position: absolute;
   inset: 0;
+  z-index: 2;
   width: 100%;
   height: 100%;
   pointer-events: none;

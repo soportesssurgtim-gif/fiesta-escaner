@@ -175,14 +175,14 @@
         pantalla entera, que es lo que corresponde cuando la sala mira un
         nombre proyectado.
       -->
-      <div v-if="!sorteos.ultimaExtraccion" class="tarjeta">
+      <!-- <div v-if="!sorteos.ultimaExtraccion" class="tarjeta">
         <div class="tarjeta-cuerpo py-16 text-center">
           <i class="fa-solid fa-gift mb-4 text-5xl text-gray-200 dark:text-gray-800"></i>
           <p class="text-theme-sm text-gray-400">
             Elige el premio y saca al ganador. Va a aparecer acá, a pantalla completa.
           </p>
         </div>
-      </div>
+      </div> -->
 
       <!-- Los que ya salieron -->
       <div class="tarjeta" :class="{ 'mt-4 lg:mt-6': sorteos.ultimaExtraccion }">
@@ -261,15 +261,19 @@
   -->
   <div v-if="sorteos.ultimaExtraccion || ruleta.girando" class="cartel-ganador">
     <!--
-      El confeti va detras del panel y no lo tapa: `pointer-events: none` para
-      que no coma los clics de los botones.
+      El confeti cae por delante del panel, sobre el nombre del ganador.
+      `pointer-events: none` es lo que deja pulsar los botones a traves de el:
+      sin eso el lienzo tapa «Listo» y el cartel no se puede cerrar.
     -->
     <canvas id="confeti-ganador" class="cartel-confeti" aria-hidden="true"></canvas>
 
     <div class="cartel-panel animar-aparecer">
       <div class="bg-brand-500 px-6 py-5 text-center">
         <p class="text-theme-xs uppercase tracking-widest text-brand-100">
-          {{ ruleta.girando ? 'Sorteando' : 'Ganador de' }}
+          {{ ruleta.girando
+             ? 'Sorteando'
+             : (sorteos.ultimaExtraccion && sorteos.ultimaExtraccion.ganadores.length > 1
+                ? 'Ganadores de' : 'Ganador de') }}
         </p>
         <p class="mt-1 text-title-sm font-bold text-white">
           {{ sorteos.ultimaExtraccion
@@ -280,30 +284,52 @@
 
       <div class="px-6 py-8">
         <!--
-          El carrete.
+          El foco.
 
-          Mientras gira se ve esto y no los ganadores. La ventana deja ver tres
-          filas: la de arriba y la de abajo se desvanecen con una mascara, asi
-          que la del medio es la unica que se lee entera y es donde va a frenar.
-
-          El desplazamiento lo maneja el composable con `transform`, que lo mueve
-          el compositor del navegador sin rehacer la disposicion de la pagina en
-          cada cuadro.
+          Un nombre grande en el centro y un anillo girando alrededor. Se ve
+          mientras el servidor decide y sigue ahi cuando frena: el ganador
+          aterriza donde el ojo ya estaba mirando, sin cambiar de pantalla.
         -->
-        <div v-if="ruleta.girando" class="carrete">
-          <div class="carrete-ventana">
-            <div class="carrete-columna"
-                 :style="{ transform: 'translateY(-' + ruleta.desplazamiento + 'px)' }">
-              <div v-for="(nombre, i) in ruleta.filas" :key="i" class="carrete-fila">
-                {{ aNombrePropio(nombre) }}
-              </div>
-            </div>
-          </div>
-          <!-- La linea que marca donde frena, para que el ojo tenga un punto. -->
-          <div class="carrete-marca" aria-hidden="true"></div>
+        <div v-if="ruleta.girando || ruleta.listo"
+             class="foco" :class="{ 'foco--listo': ruleta.listo }">
+          <svg class="foco-anillo" viewBox="0 0 120 120" aria-hidden="true"
+               :style="{ transform: 'rotate(' + ruleta.giro + 'deg)' }">
+            <circle class="foco-pista" cx="60" cy="60" r="54"></circle>
+            <circle class="foco-arco" cx="60" cy="60" r="54"
+                    transform="rotate(-90 60 60)"
+                    :stroke-dasharray="(ruleta.avance * CIRCUNFERENCIA) + ' ' + CIRCUNFERENCIA"></circle>
+          </svg>
+          <p class="foco-nombre" :class="claseFoco(ruleta.nombre)">
+            {{ aNombrePropio(ruleta.nombre) }}
+          </p>
         </div>
 
-        <div v-else-if="sorteos.ultimaExtraccion" class="space-y-6">
+        <!--
+          De donde salio, y despues quien es.
+
+          Mientras gira dice entre cuantos se esta sorteando: es lo que deja
+          claro que el sorteo fue entre todos los asistentes y no entre los
+          nombres que alcanzan a verse pasar. Al frenar, ese mismo renglon pasa
+          a ser el DUI y el cargo del ganador.
+        -->
+        <p v-if="ruleta.girando"
+           class="mt-4 text-center text-theme-sm text-gray-500 dark:text-gray-400">
+          Entre {{ resumen.total }} asistentes
+        </p>
+        <p v-else-if="ruleta.listo && sorteos.ultimaExtraccion"
+           class="animar-aparecer mt-4 text-center text-theme-sm text-gray-500 dark:text-gray-400">
+          {{ formatearDui(sorteos.ultimaExtraccion.ganadores[0].empleado.dui) }}
+          <span v-if="sorteos.ultimaExtraccion.ganadores[0].empleado.cargo">
+            · {{ aNombrePropio(sorteos.ultimaExtraccion.ganadores[0].empleado.cargo) }}
+          </span>
+        </p>
+
+        <!--
+          Varios ganadores: el foco no se queda en ninguno y se muestra la lista
+          entera. Quedarse en uno de tres sugeriria que ese es «el» ganador.
+        -->
+        <div v-if="!ruleta.girando && !ruleta.listo && sorteos.ultimaExtraccion"
+             class="space-y-6">
           <div v-for="(g, indice) in sorteos.ultimaExtraccion.ganadores" :key="g.id"
                class="animar-aparecer text-center"
                :style="{ animationDelay: (indice * 140) + 'ms' }">
