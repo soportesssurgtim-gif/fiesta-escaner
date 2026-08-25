@@ -46,6 +46,7 @@ import { usarSincronizacion } from './composables/usarSincronizacion.js';
 import { usarBuscadorPersonas } from './composables/usarBuscadorPersonas.js';
 import { usarSorteos } from './composables/usarSorteos.js';
 import { usarManual } from './composables/usarManual.js';
+import { usarPreasignaciones } from './composables/usarPreasignaciones.js';
 import { animarDiagrama, cargarAnime } from './composables/usarAnimacionDiagrama.js';
 import { usarLectura } from './composables/usarLectura.js';
 
@@ -388,6 +389,7 @@ async function iniciar() {
        */
       const PESTANAS_CONFIG = [
         { id: 'general', etiqueta: 'General', icono: 'fa-sliders' },
+        { id: 'preasignaciones', etiqueta: 'Preasignaciones', icono: 'fa-ticket' },
         { id: 'apariencia', etiqueta: 'Apariencia', icono: 'fa-palette' },
         { id: 'invitacion', etiqueta: 'Invitación', icono: 'fa-envelope-open-text' },
         { id: 'mantenimiento', etiqueta: 'Mantenimiento', icono: 'fa-screwdriver-wrench' }
@@ -1526,6 +1528,18 @@ async function iniciar() {
         // está en pantalla queda desactualizado.
         alCambiar: recargarCatalogos,
         // Para preseleccionar el sorteo de la fiesta que se está haciendo.
+        eventoActivo: () => eventoActivo.value
+      });
+
+      /*
+       * Preasignaciones de sorteo.
+       *
+       * Permite registrar favorecidos que deben despacharse primero cuando se
+       * ejecuta un sorteo específico (ej. boletos físicos prefijados).
+       */
+      const preasignaciones = usarPreasignaciones({
+        notificar,
+        notificarError,
         eventoActivo: () => eventoActivo.value
       });
 
@@ -2685,6 +2699,9 @@ async function iniciar() {
         confeti, ruleta, claseFoco, CIRCUNFERENCIA, cerrarCartel, enlacePortal, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
+
+        // Preasignaciones
+        preasignaciones,
 
         // Detalle de un empleado
         detalle, qrDetalle, enlaceDetalle, departamentoDetalle, asistenciaDetalle,

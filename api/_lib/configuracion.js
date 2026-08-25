@@ -23,6 +23,7 @@ export const TABLAS = {
   asistencias: 'asistencias',
   ganadores: 'ganadores',
   sorteoPremios: 'sorteo_premios',
+  preasignacionesSorteo: 'preasignaciones_sorteo',
   permisos: 'permisos',
   configuracion: 'configuracion',
   sesiones: 'sesiones'

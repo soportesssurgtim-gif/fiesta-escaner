@@ -162,6 +162,11 @@ async function listarGanadores({ req, res }) {
  * línea existan y tengan unidades por repartir, después que quede gente
  * elegible, y recién ahí se escribe. Así nunca queda un ganador a medias ni se
  * descuenta un premio que no se entregó.
+ *
+ * Soporte de preasignaciones: antes de elegir aleatoriamente, consume los
+ * registros de preasignaciones_sorteo para ese sorteo/premio. Si hay menos
+ * preasignaciones que los pedidos, completa con aleatorios. Las preasignaciones
+ * consumidas se eliminan silenciosamente.
  */
 async function sortearGanador({ req, res, sesion }) {
   const cuerpo = await leerCuerpo(req);
@@ -217,7 +222,20 @@ async function sortearGanador({ req, res, sesion }) {
 
   const aSortear = Math.min(pedidos, disponibles);
 
-  // --- Quiénes pueden ganar -----------------------------------------------
+  // --- Prioridad 1: Consumir preasignaciones -------------------------------
+  const { data: preasignaciones } = await supabase
+    .from(TABLAS.preasignacionesSorteo)
+    .select('empleado')
+    .eq('sorteo', sorteoId)
+    .eq('sorteo_premio', lineaId)
+    .order('created_at', { ascending: true })
+    .limit(aSortear);
+
+  const idsPreasignados = (preasignaciones || []).map(p => p.empleado);
+  const idsElegidos = [...idsPreasignados];
+  const faltan = aSortear - idsElegidos.length;
+
+  // --- Cargar asistencias una sola vez (necesarias para aleatorios o para datos) ---
   const { data: asistencias, error: errorAsistencias } = await supabase
     .from(TABLAS.asistencias)
     .select('id, empleado, empleados!inner(id, nombres, apellidos, dui, cargo)')
@@ -226,46 +244,106 @@ async function sortearGanador({ req, res, sesion }) {
   if (errorAsistencias) throw errorAsistencias;
 
   const participantes = (asistencias || []).filter((fila) => fila.empleado);
-  if (participantes.length === 0) {
-    return responderSolicitudInvalida(
-      res,
-      'Todavía no hay asistencias registradas en este evento. Nadie puede ganar.'
-    );
+  const mapaEmpleados = new Map();
+  for (const p of participantes) {
+    mapaEmpleados.set(p.empleado, p);
   }
 
-  let elegibles = participantes;
+  // --- Prioridad 2: Completar con aleatorios si faltan cupos ---------------
+  if (faltan > 0) {
+    if (participantes.length === 0) {
+      return responderSolicitudInvalida(
+        res,
+        'Todavía no hay asistencias registradas en este evento. Nadie puede ganar.'
+      );
+    }
 
-  // Salvo que el sorteo lo permita, nadie se lleva dos premios.
-  if (!esVerdadero(sorteo.permite_repetir_ganador)) {
-    const { data: previos } = await supabase
-      .from(TABLAS.ganadores)
-      .select('empleado')
-      .eq('sorteo', sorteoId);
+    // Excluir quienes ya están preasignados y quienes ya ganaron (si no se permite repetir)
+    let elegibles = participantes.filter(p => !idsElegidos.includes(p.empleado));
 
-    const yaGanaron = new Set((previos || []).map((g) => g.empleado).filter(Boolean));
-    elegibles = participantes.filter((fila) => !yaGanaron.has(fila.empleado));
+    if (!esVerdadero(sorteo.permite_repetir_ganador)) {
+      const { data: previos } = await supabase
+        .from(TABLAS.ganadores)
+        .select('empleado')
+        .eq('sorteo', sorteoId);
+
+      const yaGanaron = new Set((previos || []).map((g) => g.empleado).filter(Boolean));
+      elegibles = elegibles.filter((fila) => !yaGanaron.has(fila.empleado));
+    }
+
+    if (elegibles.length === 0 && idsElegidos.length === 0) {
+      return responderSolicitudInvalida(
+        res,
+        'Todos los asistentes ya ganaron algo en este sorteo. ' +
+        'Si quieres que alguien pueda repetir, activa esa opción al editar el sorteo.'
+      );
+    }
+
+    // Barajar y tomar los que faltan
+    const cuantosAleatorios = Math.min(faltan, elegibles.length);
+    const barajados = [...elegibles];
+    for (let i = barajados.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [barajados[i], barajados[j]] = [barajados[j], barajados[i]];
+    }
+    const aleatorios = barajados.slice(0, cuantosAleatorios);
+
+    for (const a of aleatorios) {
+      idsElegidos.push(a.empleado);
+      // Agregar al mapa si no está
+      if (!mapaEmpleados.has(a.empleado)) {
+        mapaEmpleados.set(a.empleado, a);
+      }
+    }
   }
 
-  if (elegibles.length === 0) {
-    return responderSolicitudInvalida(
-      res,
-      'Todos los asistentes ya ganaron algo en este sorteo. ' +
-      'Si quieres que alguien pueda repetir, activa esa opción al editar el sorteo.'
-    );
+  if (idsElegidos.length === 0) {
+    return responderSolicitudInvalida(res, 'No hay ganadores posibles en este momento.');
   }
 
-  const cuantos = Math.min(aSortear, elegibles.length);
+  // --- Construir lista final de elegidos con datos del empleado ------------
+  const elegidosFinales = idsElegidos.map(id => {
+    const encontrado = mapaEmpleados.get(id);
+    if (encontrado) return encontrado;
 
-  // --- La extracción --------------------------------------------------------
-  // Se baraja y se toman los primeros, en vez de sortear de a uno: así no puede
-  // salir la misma persona dos veces en la misma tanda.
-  const barajados = [...elegibles];
-  for (let i = barajados.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [barajados[i], barajados[j]] = [barajados[j], barajados[i]];
+    // Si es preasignado pero no está en asistencias, buscar sus datos
+    return {
+      empleado: id,
+      empleados: null,
+      id: null
+    };
+  });
+
+  // Para preasignados sin asistencia, obtener datos del empleado
+  const idsSinDatos = elegidosFinales
+    .filter(e => !e.empleados)
+    .map(e => e.empleado);
+
+  if (idsSinDatos.length > 0) {
+    const { data: empleadosDatos } = await supabase
+      .from(TABLAS.empleados)
+      .select('id, nombres, apellidos, dui, cargo')
+      .in('id', idsSinDatos);
+
+    const mapaEmpleadosDb = new Map((empleadosDatos || []).map(e => [e.id, e]));
+    for (const e of elegidosFinales) {
+      if (!e.empleados) {
+        const datos = mapaEmpleadosDb.get(e.empleado);
+        if (datos) {
+          e.empleados = datos;
+        }
+      }
+    }
   }
-  const elegidos = barajados.slice(0, cuantos);
 
+  // Filtrar los que sí tienen datos de empleado
+  const elegidosConDatos = elegidosFinales.filter(e => e.empleados);
+
+  if (elegidosConDatos.length === 0) {
+    return responderSolicitudInvalida(res, 'No se pudieron obtener datos de los ganadores.');
+  }
+
+  // --- Registrar ganadores ----------------------------------------------
   const { count: totalPrevio } = await supabase
     .from(TABLAS.ganadores)
     .select('id', { count: 'exact', head: true })
@@ -274,14 +352,14 @@ async function sortearGanador({ req, res, sesion }) {
   const repositorioGanadores = new Repositorio(TABLAS.ganadores);
   const nuevos = [];
 
-  for (let i = 0; i < elegidos.length; i++) {
-    const elegido = elegidos[i];
+  for (let i = 0; i < elegidosConDatos.length; i++) {
+    const elegido = elegidosConDatos[i];
     const guardado = await repositorioGanadores.insertar({
       sorteo: sorteoId,
       sorteo_premio: lineaId,
       premio: linea.premio || null,
       empleado: elegido.empleado,
-      asistencia: elegido.id,
+      asistencia: elegido.id || null,
       orden: (totalPrevio || 0) + i + 1,
       entregado_por: sesion.usuarioId || null,
       entregado: NO
@@ -300,8 +378,17 @@ async function sortearGanador({ req, res, sesion }) {
     });
   }
 
-  // Se descuenta el stock del catálogo. Si esto falla no se invalida la
-  // extracción: los ganadores ya quedaron registrados y eso es lo que importa.
+  // --- Limpiar preasignaciones consumidas --------------------------------
+  if (idsPreasignados.length > 0) {
+    await supabase
+      .from(TABLAS.preasignacionesSorteo)
+      .delete()
+      .eq('sorteo', sorteoId)
+      .eq('sorteo_premio', lineaId)
+      .in('empleado', idsPreasignados);
+  }
+
+  // Descontar stock del catálogo
   if (linea.premio) {
     try {
       const premio = await repositorioPremios.obtenerPorId(linea.premio, 'id, cantidad');
@@ -319,24 +406,18 @@ async function sortearGanador({ req, res, sesion }) {
   const quedanDeEstePremio = disponibles - nuevos.length;
   await sincronizarEstado(sorteoId);
 
-  /*
-   * Unos nombres para la animacion del sorteo.
-   *
-   * La pantalla hace girar nombres antes de mostrar al ganador, y necesita con
-   * cuales. Salen de aca porque la lista de elegibles ya esta en memoria: pedirla
-   * de nuevo desde el navegador seria una consulta mas para algo decorativo.
-   *
-   * Son nombres de asistentes que de verdad podian ganar, no relleno inventado:
-   * lo que gira es la gente que estaba en el sorteo.
-   *
-   * Se limita a cuarenta porque es mucho mas de lo que alcanza a leerse mientras
-   * gira, y mandar novecientos nombres para una animacion seria desperdiciar la
-   * respuesta.
-   */
-  const muestra = barajados
+  // Muestra para animación
+  const muestra = elegidosConDatos
     .slice(0, 40)
     .map((fila) => `${fila.empleados.nombres} ${fila.empleados.apellidos || ''}`.trim())
     .filter(Boolean);
+
+  // Calcular elegibles restantes
+  let elegiblesRestantes = 0;
+  if (participantes.length > 0) {
+    const idsGanadores = new Set(nuevos.map(n => n.empleado.id));
+    elegiblesRestantes = participantes.filter(p => !idsGanadores.has(p.empleado)).length;
+  }
 
   return responderOk(res, {
     ganadores: nuevos,
@@ -345,14 +426,84 @@ async function sortearGanador({ req, res, sesion }) {
     lineaId,
     pendientesDeEstePremio: quedanDeEstePremio,
     participantes: participantes.length,
-    elegiblesRestantes: elegibles.length - nuevos.length,
-    // Se avisa cuando se pidió más de lo que se pudo dar, para que quien locuta
-    // no se quede esperando un nombre que no va a salir.
+    elegiblesRestantes,
     seSortearonMenos: nuevos.length < pedidos,
     mensaje: nuevos.length === 1
       ? '¡Tenemos ganador!'
       : `¡${nuevos.length} ganadores!`
   });
+}
+
+/**
+ * Lista preasignaciones de un sorteo/premio.
+ * Solo administradores.
+ */
+async function listarPreasignaciones({ req, res }) {
+  const sorteoId = leerParametro(req, 'sorteoId');
+  const lineaId = leerParametro(req, 'lineaId');
+
+  let query = supabase
+    .from(TABLAS.preasignacionesSorteo)
+    .select('id, sorteo, sorteo_premio, empleado, created_at, empleados(id, nombres, apellidos, dui)')
+    .order('created_at', { ascending: true });
+
+  if (sorteoId) query = query.eq('sorteo', sorteoId);
+  if (lineaId) query = query.eq('sorteo_premio', lineaId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return responderOk(res, data || []);
+}
+
+/**
+ * Crea una preasignación.
+ * Solo administradores.
+ */
+async function crearPreasignacion({ req, res }) {
+  const cuerpo = await leerCuerpo(req);
+  const sorteoId = aTexto(cuerpo.sorteoId);
+  const lineaId = aTexto(cuerpo.lineaId);
+  const empleadoId = aTexto(cuerpo.empleadoId);
+
+  if (!sorteoId || !lineaId || !empleadoId) {
+    return responderSolicitudInvalida(res, 'Faltan datos: sorteoId, lineaId y empleadoId son obligatorios.');
+  }
+
+  const { data, error } = await supabase
+    .from(TABLAS.preasignacionesSorteo)
+    .upsert(
+      { sorteo: sorteoId, sorteo_premio: lineaId, empleado: empleadoId },
+      { onConflict: 'sorteo,sorteo_premio,empleado', ignoreDuplicates: true }
+    )
+    .select()
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return responderOk(res, { ok: true, preasignacion: data });
+}
+
+/**
+ * Elimina una preasignación.
+ * Solo administradores.
+ */
+async function eliminarPreasignacion({ req, res }) {
+  const cuerpo = await leerCuerpo(req);
+  const id = aTexto(cuerpo.id);
+
+  if (!id) {
+    return responderSolicitudInvalida(res, 'Falta el id de la preasignación.');
+  }
+
+  const { error } = await supabase
+    .from(TABLAS.preasignacionesSorteo)
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+
+  return responderOk(res, { ok: true });
 }
 
 /**
@@ -557,6 +708,9 @@ export const controladorPremios = crearControladorCatalogo({
     'POST sorteo': guardarSorteo,
     'PUT sorteo': guardarSorteo,
     'POST entregado': marcarEntregado,
-    'POST estado-sorteo': cambiarEstadoSorteo
+    'POST estado-sorteo': cambiarEstadoSorteo,
+    'GET preasignaciones': listarPreasignaciones,
+    'POST preasignaciones': crearPreasignacion,
+    'POST preasignacion-eliminar': eliminarPreasignacion
   }
 });

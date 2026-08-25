@@ -177,6 +177,21 @@ export const api = {
     /** Abre o cierra el sorteo. */
     cambiarEstado(id, abierto) {
       return http.enviar('premios', { id, abierto: abierto ? 'TRUE' : 'FALSE' }, { accion: 'estado-sorteo' });
+    },
+    /** Lista las preasignaciones de un sorteo/premio. Solo admin. */
+    listarPreasignaciones(sorteoId, lineaId) {
+      const params = { accion: 'preasignaciones' };
+      if (sorteoId) params.sorteoId = sorteoId;
+      if (lineaId) params.lineaId = lineaId;
+      return http.obtener('premios', params);
+    },
+    /** Crea una preasignación. Solo admin. */
+    crearPreasignacion(sorteoId, lineaId, empleadoId) {
+      return http.enviar('premios', { sorteoId, lineaId, empleadoId }, { accion: 'preasignaciones' });
+    },
+    /** Elimina una preasignación. Solo admin. */
+    eliminarPreasignacion(id) {
+      return http.enviar('premios', { id }, { accion: 'preasignacion-eliminar' });
     }
   },
 

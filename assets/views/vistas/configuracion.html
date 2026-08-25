@@ -1008,6 +1008,215 @@
           </div>
         </dl>
       </div>
-    </div>
-  </div>
+     </div>
+   </div>
+
+   <!-- Preasignaciones de sorteo -->
+   <!--
+     Permite registrar favorecidos que deben despacharse primero cuando se ejecuta
+     un sorteo específico (ej. boletos físicos prefijados en dinámicas presenciales).
+
+     La lista es "oculta": solo se gestiona desde esta pantalla. El sistema las
+     consume silenciosamente durante el sorteo sin mostrar indicadores especiales
+     en la interfaz de locución.
+   -->
+   <div v-show="pestanaConfig === 'preasignaciones'" class="tarjeta">
+     <div class="tarjeta-encabezado">
+       <div>
+         <h2 class="tarjeta-titulo">Preasignaciones de sorteo</h2>
+         <p class="tarjeta-subtitulo">Registre favorecidos para boletos físicos o dinámicas presenciales</p>
+       </div>
+     </div>
+
+     <div class="tarjeta-cuerpo">
+       <p v-if="!permisos.esAdministrador"
+          class="rounded-xl border border-gray-200 p-3 text-theme-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+         <i class="fa-solid fa-lock"></i>
+         Solo un administrador puede gestionar preasignaciones.
+       </p>
+
+       <template v-else>
+         <!-- Formulario para crear preasignación -->
+         <div class="mb-6 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+           <h3 class="mb-4 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+             <i class="fa-solid fa-plus text-brand-500"></i> Nueva preasignación
+           </h3>
+
+           <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+             <div>
+               <label for="preasignacion-sorteo" class="etiqueta">Sorteo</label>
+               <select id="preasignacion-sorteo"
+                       v-model="preasignaciones.formulario.sorteoId"
+                       @change="preasignaciones.cargarLista(preasignaciones.formulario.sorteoId, preasignaciones.formulario.lineaId)"
+                       class="campo campo-select">
+                 <option value="">Elige un sorteo…</option>
+                 <option v-for="sorteo in preasignaciones.sorteos" :key="sorteo.id" :value="sorteo.id">
+                   {{ sorteo.nombre }}
+                 </option>
+               </select>
+             </div>
+
+             <div>
+               <label for="preasignacion-premio" class="etiqueta">Premio (línea)</label>
+               <select id="preasignacion-premio"
+                       v-model="preasignaciones.formulario.lineaId"
+                       @change="preasignaciones.cargarLista(preasignaciones.formulario.sorteoId, preasignaciones.formulario.lineaId)"
+                       class="campo campo-select"
+                       :disabled="!preasignaciones.formulario.sorteoId">
+                 <option value="">Elige un premio…</option>
+                 <option v-for="premio in preasignaciones.premiosDeSorteo(preasignaciones.formulario.sorteoId)"
+                         :key="premio.id" :value="premio.id">
+                   {{ premio.premioNombre }} ({{ premio.pendientes }} pendientes)
+                 </option>
+               </select>
+             </div>
+
+              <div>
+                <label for="preasignacion-empleado-busqueda" class="etiqueta">Empleado</label>
+                <div class="relative" ref="preasignaciones.contenedorEmpleados">
+                  <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input id="preasignacion-empleado-busqueda"
+                         type="text"
+                         v-model="preasignaciones.busquedaEmpleado"
+                         placeholder="Buscar por nombre o DUI…"
+                         class="campo pl-10 pr-10"
+                         autocomplete="off" />
+                  <button v-if="preasignaciones.busquedaEmpleado"
+                          type="button"
+                          @click="preasignaciones.limpiarBusqueda()"
+                          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <!-- Lista desplegable de empleados -->
+                <div v-if="preasignaciones.busquedaEmpleado && preasignaciones.empleadosFiltrados.length > 0"
+                     class="relative z-10 mt-1 max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                  <button v-for="empleado in preasignaciones.empleadosFiltrados"
+                          :key="empleado.id"
+                          type="button"
+                          @click="preasignaciones.formulario.empleadoId = empleado.id; preasignaciones.busquedaEmpleado = ''"
+                          class="flex w-full items-center justify-between px-4 py-2 text-left text-theme-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+                          :class="preasignaciones.formulario.empleadoId === empleado.id ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400' : 'text-gray-700 dark:text-gray-300'">
+                    <span class="truncate">{{ empleado.nombres }} {{ empleado.apellidos }}</span>
+                    <span v-if="empleado.dui" class="ml-2 shrink-0 text-theme-xs text-gray-500 dark:text-gray-400">{{ empleado.dui }}</span>
+                  </button>
+                </div>
+
+                <!-- Mensaje cuando no hay resultados -->
+                <div v-else-if="preasignaciones.busquedaEmpleado && preasignaciones.empleadosFiltrados.length === 0"
+                     class="mt-1 rounded-lg border border-gray-200 bg-white p-4 text-center text-theme-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                  <i class="fa-solid fa-user-slash"></i> No se encontraron empleados
+                </div>
+
+                <!-- Empleado seleccionado -->
+                <div v-if="preasignaciones.formulario.empleadoId"
+                     class="mt-2 flex items-center gap-2 rounded-lg border border-success-200 bg-success-50 px-3 py-2 dark:border-success-500/30 dark:bg-success-500/10">
+                  <i class="fa-solid fa-user-check text-success-600 dark:text-success-400"></i>
+                  <span class="text-theme-sm text-success-700 dark:text-success-400">
+                    {{ preasignaciones.empleados.find(e => e.id === preasignaciones.formulario.empleadoId)?.nombres }}
+                    {{ preasignaciones.empleados.find(e => e.id === preasignaciones.formulario.empleadoId)?.apellidos }}
+                  </span>
+                  <button type="button"
+                          @click="preasignaciones.formulario.empleadoId = ''"
+                          class="ml-auto text-gray-400 hover:text-gray-600">
+                    <i class="fa-solid fa-xmark"></i>
+                  </button>
+                </div>
+
+                <p class="texto-ayuda">
+                  Escribe para buscar por nombre o DUI · {{ preasignaciones.empleados.length }} empleados disponibles
+                </p>
+              </div>
+           </div>
+
+           <div class="mt-4 flex items-center gap-3">
+             <button type="button"
+                     @click="preasignaciones.crear()"
+                     class="boton boton-primario"
+                     :disabled="preasignaciones.guardando">
+               <i v-if="preasignaciones.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
+               <i v-else class="fa-solid fa-plus"></i>
+               {{ preasignaciones.guardando ? 'Creando…' : 'Crear preasignación' }}
+             </button>
+             <button type="button"
+                     @click="preasignaciones.cargarSorteos(); preasignaciones.cargarEmpleados()"
+                     class="boton boton-secundario">
+               <i class="fa-solid fa-rotate"></i> Cargar listas
+             </button>
+           </div>
+         </div>
+
+         <!-- Lista de preasignaciones -->
+         <div>
+           <h3 class="mb-3 text-theme-sm font-semibold text-gray-800 dark:text-white/90">
+             <i class="fa-solid fa-list text-brand-500"></i> Preasignaciones registradas
+             <span class="insignia insignia-marca">{{ preasignaciones.lista.length }}</span>
+           </h3>
+
+           <div v-if="preasignaciones.cargando" class="py-8 text-center text-theme-sm text-gray-400">
+             <i class="fa-solid fa-circle-notch animar-girar"></i> Cargando…
+           </div>
+
+           <div v-else-if="preasignaciones.error" class="rounded-xl border border-error-200 bg-error-50 p-4 text-theme-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+             <i class="fa-solid fa-circle-exclamation"></i> {{ preasignaciones.error }}
+           </div>
+
+           <div v-else-if="preasignaciones.lista.length === 0" class="rounded-xl border border-dashed border-gray-300 p-8 text-center text-theme-sm text-gray-400 dark:border-gray-700">
+             <i class="fa-solid fa-inbox text-2xl"></i>
+             <p class="mt-2">No hay preasignaciones registradas.</p>
+           </div>
+
+           <div v-else class="overflow-x-auto">
+             <table class="w-full text-left text-theme-sm">
+               <thead class="border-b border-gray-200 text-theme-xs uppercase tracking-wide text-gray-500 dark:border-gray-800">
+                 <tr>
+                   <th class="px-4 py-3">Empleado</th>
+                   <th class="px-4 py-3">DUI</th>
+                   <th class="px-4 py-3">Fecha de registro</th>
+                   <th class="px-4 py-3 text-right">Acciones</th>
+                 </tr>
+               </thead>
+               <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
+                 <tr v-for="item in preasignaciones.lista" :key="item.id"
+                     class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                   <td class="px-4 py-3 font-medium text-gray-800 dark:text-white/90">
+                     {{ item.empleados?.nombres || '' }} {{ item.empleados?.apellidos || '' }}
+                   </td>
+                   <td class="px-4 py-3 text-gray-500 dark:text-gray-400">
+                     {{ item.empleados?.dui || '—' }}
+                   </td>
+                   <td class="px-4 py-3 text-gray-500 dark:text-gray-400">
+                      {{ preasignaciones.formatearFechaHora(item.created_at) }}
+                    </td>
+                   <td class="px-4 py-3 text-right">
+                     <button type="button"
+                             @click="preasignaciones.eliminar(item.id)"
+                             class="boton boton-peligro boton-sm"
+                             title="Eliminar preasignación">
+                       <i class="fa-solid fa-trash"></i>
+                     </button>
+                   </td>
+                 </tr>
+               </tbody>
+             </table>
+           </div>
+         </div>
+
+         <!-- Ayuda -->
+         <div class="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-500/30 dark:bg-blue-500/10">
+           <h4 class="text-theme-sm font-semibold text-blue-700 dark:text-blue-400">
+             <i class="fa-solid fa-circle-info"></i> ¿Cómo funciona?
+           </h4>
+           <ul class="mt-2 list-inside list-disc space-y-1 text-theme-xs text-blue-600 dark:text-blue-400">
+             <li>Las preasignaciones se consumen automáticamente al presionar "Sacar ganador".</li>
+             <li>Se despachan en orden de registro (FIFO) antes que los aleatorios.</li>
+             <li>Si hay más cupos que preasignados, se completa con selección aleatoria.</li>
+             <li>No aparece ningún indicador especial en la pantalla de locución.</li>
+             <li>Las preasignaciones consumidas se eliminan silenciosamente.</li>
+           </ul>
+         </div>
+       </template>
+     </div>
+   </div>
 </section>
