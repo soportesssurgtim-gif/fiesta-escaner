@@ -34,6 +34,15 @@
  * qué se dice y de qué color; dónde cae cada cosa lo resuelve cada pintor.
  */
 
+/*
+ * El tope de la plantilla HTML sale de plantillaHtml.js y no se repite acá.
+ *
+ * El servidor rechaza por encima de ese número y esto recorta al normalizar. Con
+ * dos constantes, una tarde cualquiera quedarían en números distintos y la
+ * plantilla se guardaría recortada sin que nadie avisara.
+ */
+import { LARGO_MAXIMO as LARGO_HTML } from './plantillaHtml.js';
+
 /** Los colores del diseño original, para cuando un evento no elige otros. */
 const MARCA = '#465fff';
 const MARCA_CLARA = '#c2d6ff';
@@ -53,8 +62,26 @@ export const DISPOSICIONES = {
   'tarjeta-compacta': 'Compacta, sin franja'
 };
 
+/**
+ * Las dos maneras de diseñar la invitación.
+ *
+ * `guiado` es lo de siempre: cuatro colores y unas casillas, que cualquiera de
+ * Recursos Humanos puede tocar sin romper nada.
+ *
+ * `html` deja escribir la invitación entera a mano, con marcadores como
+ * {nombre}. Da control total del maquetado y por eso mismo es de administrador:
+ * lo que se escriba ahí lo ve cualquiera que entre al portal público.
+ *
+ * Conviven a propósito. Un evento con `guiado` sigue funcionando exactamente
+ * como antes de que esto existiera, y es lo que se usa mientras nadie elija
+ * otra cosa.
+ */
+export const MODOS = { guiado: 'Diseño guiado', html: 'Plantilla HTML' };
+
 /** Lo que se usa cuando el evento no configuró nada. Es el diseño de siempre. */
 export const POR_DEFECTO = Object.freeze({
+  modo: 'guiado',
+  html: '',
   disposicion: 'tarjeta-vertical',
   colorFranja: MARCA,
   colorFondo: FONDO,
@@ -94,6 +121,25 @@ export function esColor(valor) {
 export function normalizar(config) {
   const entrada = (config && typeof config === 'object') ? config : {};
   const salida = { ...POR_DEFECTO };
+
+  if (MODOS[entrada.modo]) salida.modo = entrada.modo;
+
+  /*
+   * La plantilla se guarda tal como se escribió y no se limpia acá.
+   *
+   * Limpiarla al normalizar la cambiaria también al abrir el editor, y quien la
+   * escribió veria su HTML mutilado sin entender por qué. Se limpia al
+   * mostrarla, con `sanear` de plantillaHtml.js, que es donde importa.
+   */
+  if (typeof entrada.html === 'string') salida.html = entrada.html.slice(0, LARGO_HTML);
+
+  /*
+   * Un modo `html` sin plantilla vuelve a `guiado`.
+   *
+   * Si no, un evento quedaria mostrando una invitación en blanco, que es la
+   * peor forma de fallar: el empleado llega a la puerta con una pantalla vacía.
+   */
+  if (salida.modo === 'html' && salida.html.trim() === '') salida.modo = 'guiado';
 
   if (DISPOSICIONES[entrada.disposicion]) salida.disposicion = entrada.disposicion;
 

@@ -34,8 +34,12 @@ import { usarConfeti } from './composables/usarConfeti.js';
 import { usarRuleta, CIRCUNFERENCIA } from './composables/usarRuleta.js';
 import {
   construirModelo, bloquesDe, normalizar as normalizarDiseno,
-  esLaDeSiempre, POR_DEFECTO, DISPOSICIONES
+  esLaDeSiempre, POR_DEFECTO, DISPOSICIONES, MODOS
 } from './nucleo/disenoInvitacion.js';
+import {
+  MARCADORES, PLANTILLA_POR_DEFECTO, LARGO_MAXIMO as LARGO_PLANTILLA,
+  rellenar, sanear, motivoDeRechazo, datosDeEjemplo
+} from './nucleo/plantillaHtml.js';
 import { usarInstalacionPwa } from './composables/usarInstalacionPwa.js';
 import { usarPendientes } from './composables/usarPendientes.js';
 import { usarSincronizacion } from './composables/usarSincronizacion.js';
@@ -453,8 +457,79 @@ async function iniciar() {
        * la base «este evento no tiene diseño propio» de «tiene uno que resultó
        * ser el de siempre». Lo segundo no le sirve a nadie y ocupa lugar.
        */
+      /**
+       * La vista previa de la plantilla, con datos de mentira.
+       *
+       * Pasa por el mismo `rellenar` y el mismo `sanear` que el portal, así que
+       * lo que se ve acá es literalmente lo que va a ver el empleado. Si el
+       * saneado le quita algo, se nota en el editor y no en la puerta del
+       * evento.
+       */
+      const vistaPreviaHtml = computed(() => (
+        sanear(rellenar(disenoInvitacion.config.html || '', datosDeEjemplo()))
+      ));
+
+      /**
+       * Lo que impediría guardar, o cadena vacía.
+       *
+       * Es la misma comprobación que hace el servidor. Repetirla acá no la
+       * reemplaza —quien guarda de verdad es el servidor— pero explica el
+       * problema mientras se escribe, en lugar de después de pulsar guardar.
+       */
+      const errorPlantilla = computed(() => (
+        disenoInvitacion.config.modo === 'html'
+          ? motivoDeRechazo(disenoInvitacion.config.html || '')
+          : ''
+      ));
+
+      /** Mete un marcador donde está el cursor del editor. */
+      function insertarMarcador(clave) {
+        const campo = document.getElementById('plantilla-html');
+        const texto = `{${clave}}`;
+
+        if (!campo) {
+          disenoInvitacion.config.html = (disenoInvitacion.config.html || '') + texto;
+          return;
+        }
+
+        const desde = campo.selectionStart ?? campo.value.length;
+        const hasta = campo.selectionEnd ?? desde;
+        const actual = disenoInvitacion.config.html || '';
+
+        disenoInvitacion.config.html = actual.slice(0, desde) + texto + actual.slice(hasta);
+
+        /*
+         * El cursor vuelve detrás del marcador recién puesto.
+         *
+         * Sin esto salta al final del texto y hay que buscar el lugar otra vez
+         * a cada marcador, que en una plantilla de cien líneas es insufrible.
+         * Va en `nextTick` porque Vue todavía no reescribió el campo.
+         */
+        nextTick(() => {
+          campo.focus();
+          campo.setSelectionRange(desde + texto.length, desde + texto.length);
+        });
+      }
+
+      /** Vuelve a la plantilla de arranque, que reproduce el diseño de siempre. */
+      function restaurarPlantilla() {
+        disenoInvitacion.config.html = PLANTILLA_POR_DEFECTO;
+        disenoInvitacion.aviso = '';
+      }
+
       async function guardarDisenoInvitacion() {
         if (!disenoInvitacion.evento) return;
+
+        /*
+         * No se manda una plantilla que el servidor va a rechazar.
+         *
+         * El servidor la rechaza igual —es él quien decide— pero avisar acá
+         * ahorra el viaje y deja el motivo a la vista del que está escribiendo.
+         */
+        if (errorPlantilla.value) {
+          notificarError(errorPlantilla.value);
+          return;
+        }
 
         disenoInvitacion.guardando = true;
         disenoInvitacion.aviso = '';
@@ -2233,19 +2308,70 @@ async function iniciar() {
        * Sin resultado devuelve el modelo por defecto en lugar de null: así la
        * plantilla no tiene que preguntar si existe antes de leer un color.
        */
-      const diseno = computed(() => {
+      /**
+       * Los datos de la persona, listos para cualquiera de los dos diseños.
+       *
+       * Los usan el modelo guiado, la plantilla HTML y la imagen que se
+       * descarga. Que salgan de un solo lugar es lo que impide que la pantalla
+       * diga una cosa y el archivo otra.
+       */
+      const datosDeLaInvitacion = computed(() => {
         const resultado = invitacion.resultado;
-        if (!resultado) return construirModelo(null, {});
+        if (!resultado) return {};
 
-        return construirModelo(resultado.invitacionConfig, {
+        return {
           evento: resultado.evento,
           fecha: resultado.fechaEvento ? formato.formatearFechaLarga(resultado.fechaEvento) : '',
           ubicacion: resultado.ubicacion || '',
           nombre: formato.nombreCompleto(resultado.empleado),
           dui: formato.formatearDui(resultado.empleado.dui),
           urlQr: resultado.empleado.qr_url
-        });
+        };
       });
+
+      const diseno = computed(() => {
+        const resultado = invitacion.resultado;
+        if (!resultado) return construirModelo(null, {});
+        return construirModelo(resultado.invitacionConfig, datosDeLaInvitacion.value);
+      });
+
+      /** El nodo con la plantilla dibujada, que es lo que se rasteriza. */
+      const nodoInvitacion = ref(null);
+
+      /**
+       * La invitación en HTML, rellenada y limpia.
+       *
+       * Vacía cuando el evento usa el diseño guiado, y esa cadena vacía es la
+       * que decide qué rama del portal se dibuja.
+       *
+       * El saneado va acá y no al guardar: así una plantilla que se guardó
+       * antes de que existiera esta limpieza tampoco puede ejecutar nada.
+       */
+      const invitacionHtml = computed(() => {
+        const resultado = invitacion.resultado;
+        if (!resultado) return '';
+
+        const config = normalizarDiseno(resultado.invitacionConfig);
+        if (config.modo !== 'html') return '';
+
+        return sanear(rellenar(config.html, datosDeLaInvitacion.value));
+      });
+
+      /**
+       * Agranda el QR si lo que se tocó fue el QR.
+       *
+       * En la plantilla HTML el código lo pone quien la diseñó, así que no hay
+       * un botón nuestro del que colgarse. Se mira lo tocado: si es una imagen
+       * y su dirección es la del QR, se abre a pantalla completa. Hace falta en
+       * la puerta del evento, con sol de frente.
+       */
+      function ampliarSiEsElQr(evento) {
+        const tocado = evento.target;
+        if (!tocado || tocado.tagName !== 'IMG') return;
+        if (!invitacion.resultado) return;
+        if (tocado.getAttribute('src') !== invitacion.resultado.empleado.qr_url) return;
+        qrAmpliado.value = true;
+      }
 
       const bloquesDelEvento = computed(() => bloquesDe(diseno.value, 'evento'));
       const muestraDui = computed(() => diseno.value.bloques.some((b) => b.papel === 'dui'));
@@ -2269,18 +2395,16 @@ async function iniciar() {
         invitacion.avisoGuardado = '';
 
         try {
-          const persona = invitacion.resultado.empleado;
           const resultado = await servicioInvitacion.descargar({
-            evento: invitacion.resultado.evento,
-            fecha: invitacion.resultado.fechaEvento
-              ? formato.formatearFechaLarga(invitacion.resultado.fechaEvento)
-              : '',
-            ubicacion: invitacion.resultado.ubicacion || '',
-            nombre: formato.nombreCompleto(persona),
-            dui: formato.formatearDui(persona.dui),
-            urlQr: persona.qr_url,
+            ...datosDeLaInvitacion.value,
             // El mismo diseño que se está viendo en pantalla.
-            config: invitacion.resultado.invitacionConfig
+            config: invitacion.resultado.invitacionConfig,
+            /*
+             * Con plantilla HTML se rasteriza lo que hay en pantalla: el dibujo
+             * a mano no sabría qué maquetó el administrador. Sin plantilla va
+             * en null y se dibuja el diseño guiado como siempre.
+             */
+            nodo: invitacionHtml.value ? nodoInvitacion.value : null
           });
 
           invitacion.avisoGuardado = resultado.descargada
@@ -2583,6 +2707,9 @@ async function iniciar() {
         // Portal público
         invitacion, consultarInvitacion, guardarInvitacion, desafio,
         diseno, bloquesDelEvento, muestraDui, textoDelPie, qrAmpliado,
+        invitacionHtml, nodoInvitacion, ampliarSiEsElQr,
+        MODOS, MARCADORES, LARGO_PLANTILLA,
+        vistaPreviaHtml, errorPlantilla, insertarMarcador, restaurarPlantilla,
 
         // Utilidades de formato disponibles en las plantillas
         ...formato

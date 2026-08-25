@@ -136,9 +136,38 @@
             </p>
           </div>
 
+          <!--
+            Guiado o plantilla.
+
+            El guiado es para Recursos Humanos: cuatro colores y unas casillas,
+            sin forma de romper nada. La plantilla es para quien sabe HTML y
+            quiere mover las cosas de lugar.
+
+            Se elige por evento y no una vez para todo, porque cada fiesta puede
+            querer una cosa distinta y porque asi un experimento con la
+            plantilla no toca la invitacion del evento que esta en curso.
+          -->
+          <div v-if="disenoInvitacion.evento" class="mb-5">
+            <span class="etiqueta">¿Cómo se diseña?</span>
+            <div class="mt-1 flex flex-wrap gap-4">
+              <label v-for="(etiqueta, clave) in MODOS" :key="clave"
+                     class="flex items-center gap-2 text-theme-sm text-gray-600 dark:text-gray-400">
+                <input type="radio" :value="clave" v-model="disenoInvitacion.config.modo" />
+                {{ etiqueta }}
+              </label>
+            </div>
+            <p v-if="disenoInvitacion.config.modo === 'html'" class="texto-ayuda">
+              La plantilla se muestra a cualquiera que consulte su invitación. No admite
+              scripts, formularios ni marcos. Los estilos van en línea, con el atributo
+              <code>style</code>: un bloque <code>&lt;style&gt;</code> se aplicaría a toda
+              la página del portal.
+            </p>
+          </div>
+
           <div v-if="disenoInvitacion.evento" class="grid gap-5 lg:grid-cols-2">
             <!-- Los controles -->
             <div class="space-y-4">
+              <template v-if="disenoInvitacion.config.modo === 'guiado'">
               <div>
                 <label for="disposicion-invitacion" class="etiqueta text-theme-xs">Disposición</label>
                 <select id="disposicion-invitacion"
@@ -194,6 +223,76 @@
                   <input type="checkbox" v-model="disenoInvitacion.config.muestraDui" /> DUI
                 </label>
               </div>
+              </template>
+
+              <!-- El editor de plantilla -->
+              <template v-else>
+                <!--
+                  Los marcadores.
+
+                  Se pulsan y se meten donde esta el cursor. Escribirlos a mano
+                  funciona igual, pero asi no hay que acordarse de como se
+                  llamaba cada uno ni descubrir por un error de dedo que
+                  {nombre_completo} no existe.
+                -->
+                <div>
+                  <span class="etiqueta text-theme-xs">Marcadores</span>
+                  <div class="mt-1 flex flex-wrap gap-2">
+                    <button v-for="marcador in MARCADORES" :key="marcador.clave"
+                            type="button" @click="insertarMarcador(marcador.clave)"
+                            class="rounded-lg border border-gray-200 px-2 py-1 text-theme-xs
+                                   text-gray-600 hover:border-brand-500 hover:text-brand-500
+                                   dark:border-gray-800 dark:text-gray-400"
+                            :title="marcador.etiqueta">
+                      {{ '{' + marcador.clave + '}' }}
+                    </button>
+                  </div>
+                  <p class="texto-ayuda">
+                    Se reemplazan por los datos de cada persona.
+                    <template v-for="marcador in MARCADORES" :key="marcador.clave">
+                      <template v-if="marcador.enAtributo">
+                        {{ '{' + marcador.clave + '}' }} va dentro de un src.
+                      </template>
+                    </template>
+                  </p>
+                </div>
+
+                <div>
+                  <label for="plantilla-html" class="etiqueta text-theme-xs">
+                    HTML de la invitación
+                  </label>
+                  <textarea id="plantilla-html" rows="16" spellcheck="false"
+                            v-model="disenoInvitacion.config.html"
+                            :maxlength="LARGO_PLANTILLA"
+                            class="campo font-mono text-theme-xs"
+                            placeholder="&lt;div&gt;…&lt;/div&gt;"></textarea>
+
+                  <!--
+                    La tipografia.
+
+                    La imagen que se descarga se dibuja metiendo este HTML en un
+                    SVG, y ahi dentro no llegan las fuentes de la pagina: es un
+                    documento aparte. Una fuente web se pierde y sale la del
+                    sistema. Conviene saberlo antes y no al abrir el PNG.
+                  -->
+                  <p class="texto-ayuda">
+                    Usa tipografías del sistema. Una fuente web se verá bien en pantalla
+                    pero no en la imagen que el empleado descarga.
+                  </p>
+                </div>
+
+                <p v-if="errorPlantilla"
+                   class="rounded-xl border border-error-200 bg-error-50 p-3 text-theme-sm
+                          text-error-700 dark:border-error-500/30 dark:bg-error-500/10
+                          dark:text-error-400">
+                  <i class="fa-solid fa-circle-exclamation"></i> {{ errorPlantilla }}
+                </p>
+
+                <button type="button" @click="restaurarPlantilla()"
+                        class="boton boton-secundario w-full">
+                  <i class="fa-solid fa-rotate-left"></i> Empezar de la plantilla de siempre
+                </button>
+              </template>
 
               <!--
                 Copiar de otro evento reemplaza a un catálogo de plantillas: con
@@ -214,7 +313,7 @@
 
               <button type="button" @click="guardarDisenoInvitacion()"
                       class="boton boton-primario w-full"
-                      :disabled="disenoInvitacion.guardando">
+                      :disabled="disenoInvitacion.guardando || errorPlantilla !== ''">
                 <i v-if="disenoInvitacion.guardando" class="fa-solid fa-circle-notch animar-girar"></i>
                 <i v-else class="fa-solid fa-floppy-disk"></i>
                 {{ disenoInvitacion.guardando ? 'Guardando…' : 'Guardar diseño' }}
@@ -233,12 +332,23 @@
               empleado.
             -->
             <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800"
-                 :style="{ backgroundColor: vistaPreviaInvitacion.colores.fondo }">
+                 :style="{ backgroundColor: disenoInvitacion.config.modo === 'html'
+                           ? '#f9fafb' : vistaPreviaInvitacion.colores.fondo }">
               <p class="mb-3 text-center text-theme-xs uppercase tracking-widest text-gray-400">
                 Vista previa
               </p>
 
-              <div class="mx-auto max-w-xs overflow-hidden rounded-xl bg-white shadow-theme-sm">
+              <!--
+                La previa de la plantilla.
+
+                Pasa por el mismo rellenado y el mismo saneado que el portal, con
+                datos de mentira. Lo que el saneado le quite se nota aca y no en
+                la puerta del evento.
+              -->
+              <div v-if="disenoInvitacion.config.modo === 'html'"
+                   class="overflow-x-auto" v-html="vistaPreviaHtml"></div>
+
+              <div v-else class="mx-auto max-w-xs overflow-hidden rounded-xl bg-white shadow-theme-sm">
                 <div class="px-4 py-4 text-center"
                      :style="{ backgroundColor: vistaPreviaInvitacion.conFranja
                                ? vistaPreviaInvitacion.colores.franja : '#ffffff' }">

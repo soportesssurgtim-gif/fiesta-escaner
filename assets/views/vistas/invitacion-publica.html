@@ -68,6 +68,57 @@
       </div>
     </div>
 
+    <!--
+      Resultado con una plantilla HTML.
+
+      El evento tiene una plantilla escrita a mano por un administrador y esto
+      la muestra tal cual. `v-html` inserta HTML sin interpretarlo como
+      plantilla de Vue; lo que entra ya pasó por `sanear`, que le saca los
+      scripts, los manejadores de eventos y las direcciones javascript:.
+
+      Va antes que la tarjeta del diseño guiado, y esa queda intacta: un evento
+      que no configuró plantilla se ve exactamente como antes.
+    -->
+    <div v-else-if="invitacionHtml" class="animar-aparecer">
+      <!--
+        Toda la invitación es de quien la diseñó, incluido el QR, así que el
+        toque para agrandarlo no se puede colgar de un botón nuestro: se
+        escucha en el contenedor y se mira si lo tocado fue el código.
+      -->
+      <div ref="nodoInvitacion"
+           @click="ampliarSiEsElQr($event)"
+           v-html="invitacionHtml"></div>
+
+      <!--
+        Los mismos dos botones que la tarjeta guiada.
+
+        Están escritos dos veces a propósito: la alternativa era sacarlos de
+        adentro de la tarjeta, y eso cambiaba el diseño que ya funciona por una
+        conveniencia de quien escribe el código.
+      -->
+      <div class="mt-6 flex flex-col gap-2">
+        <button type="button"
+                @click="guardarInvitacion()"
+                class="boton boton-primario w-full"
+                :disabled="invitacion.guardando">
+          <i class="fa-solid"
+             :class="invitacion.guardando ? 'fa-circle-notch animar-girar' : 'fa-download'"></i>
+          {{ invitacion.guardando ? 'Generando…' : 'Guardar mi invitación' }}
+        </button>
+
+        <p v-if="invitacion.avisoGuardado"
+           class="text-center text-theme-xs text-gray-500 dark:text-gray-400">
+          {{ invitacion.avisoGuardado }}
+        </p>
+
+        <button type="button"
+                @click="invitacion.resultado = null; invitacion.dui = ''; invitacion.reserva = ''; invitacion.avisoGuardado = ''"
+                class="boton boton-secundario w-full">
+          Consultar otro DUI
+        </button>
+      </div>
+    </div>
+
     <!-- Resultado con el QR -->
     <div v-else class="animar-aparecer tarjeta overflow-hidden">
       <!--

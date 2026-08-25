@@ -19,6 +19,18 @@ import {
 } from '../respuestas.js';
 import { crearControladorCatalogo } from './catalogo.js';
 
+/*
+ * La misma comprobacion que hace el navegador, importada y no copiada.
+ *
+ * Es el unico sitio donde el servidor toma algo de `assets/`. Vale la pena: son
+ * las reglas de lo que puede llevar una plantilla que despues se muestra en una
+ * pagina publica, y dos copias de esas reglas se separan en la primera prisa.
+ *
+ * El modulo no toca el DOM al cargarse —`sanear` lo usa adentro de la funcion,
+ * y aca no se llama— asi que corre igual en una funcion sin navegador.
+ */
+import { motivoDeRechazo, LARGO_MAXIMO as LARGO_PLANTILLA } from '../../../assets/js/nucleo/plantillaHtml.js';
+
 export const repositorioEventos = new Repositorio(TABLAS.eventos, {
   ordenarPor: 'created_at',
   ascendente: false
@@ -167,9 +179,36 @@ async function guardarDiseno({ req, res, sesion }) {
 
   if (!id) return responderSolicitudInvalida(res, 'Falta el evento.');
 
+  const configuracion = aObjeto(cuerpo.invitacionConfig);
+
+  /*
+   * La plantilla HTML se rechaza, no se limpia.
+   *
+   * Se guarda una vez y se muestra despues a cualquiera que consulte su
+   * invitacion, sin sesion. Guardar a medias lo que alguien escribio es peor
+   * que decirle que no: creeria que quedo como lo dejo.
+   *
+   * Que solo un administrador llegue hasta aca protege de un extrano, no de un
+   * descuido ni de una sesion prestada. El navegador ademas limpia al mostrar,
+   * asi que una plantilla vieja guardada antes de esto tampoco puede ejecutar
+   * nada.
+   */
+  const plantilla = configuracion && typeof configuracion.html === 'string'
+    ? configuracion.html
+    : '';
+
+  if (plantilla.length > LARGO_PLANTILLA) {
+    return responderSolicitudInvalida(
+      res, `La plantilla no puede pasar de ${LARGO_PLANTILLA} caracteres.`
+    );
+  }
+
+  const motivo = motivoDeRechazo(plantilla);
+  if (motivo) return responderSolicitudInvalida(res, motivo);
+
   const { data, error } = await supabase
     .from(TABLAS.eventos)
-    .update({ invitacion_config: aObjeto(cuerpo.invitacionConfig) })
+    .update({ invitacion_config: configuracion })
     .eq('id', id)
     .select()
     .single();
