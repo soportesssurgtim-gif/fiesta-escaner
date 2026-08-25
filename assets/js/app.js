@@ -488,35 +488,6 @@ async function iniciar() {
         esAngosto: () => esMovil.value
       });
 
-      /*
-       * El confeti del cartel de ganadores.
-       *
-       * Se lanza al aparecer un ganador y se corta al cerrar el cartel. Si no
-       * se cortara, seguiria corriendo detras de la pantalla siguiente: son
-       * cuadros de animacion gastados en algo que ya nadie ve, y en la maquina
-       * del proyector eso se nota.
-       */
-      const confeti = usarConfeti();
-
-      /** Cierra el cartel y corta el confeti. */
-      function cerrarCartel() {
-        confeti.detener();
-        sorteos.limpiarCartel();
-      }
-
-      /*
-       * Al aparecer un ganador cae el confeti.
-       *
-       * Se espera a `nextTick` porque el lienzo entra con el modal: antes de
-       * que Vue lo dibuje, `getElementById` no encuentra nada y el confeti no
-       * saldria nunca.
-       */
-      watch(() => sorteos.ultimaExtraccion, async (extraccion) => {
-        if (!extraccion) { confeti.detener(); return; }
-        await nextTick();
-        confeti.lanzar('confeti-ganador');
-      });
-
       const lectura = usarLectura();
       const opcionesVozAbiertas = ref(false);
       // En pantalla angosta el índice ocupa toda la altura, así que aparece
@@ -1478,6 +1449,39 @@ async function iniciar() {
         // Al extraer cambia el stock de los premios, así que el catálogo que
         // está en pantalla queda desactualizado.
         alCambiar: recargarCatalogos
+      });
+
+      /*
+       * El confeti del cartel de ganadores.
+       *
+       * Va acá, después de `sorteos`, y no arriba con los demás composables.
+       * El `watch` lee `sorteos.ultimaExtraccion` en cuanto se crea, y `sorteos`
+       * es un `const`: leerlo antes de su declaración es un ReferenceError que
+       * tumba la pantalla entera al arrancar. No lo ve `node --check` —el
+       * archivo es válido— ni se nota hasta que alguien abre la aplicación.
+       *
+       * Se lanza al aparecer un ganador y se corta al cerrar el cartel. Si no se
+       * cortara, seguiría corriendo detrás de la pantalla siguiente: cuadros de
+       * animación gastados en algo que ya nadie mira, y en la máquina del
+       * proyector eso se nota.
+       */
+      const confeti = usarConfeti();
+
+      /** Cierra el cartel y corta el confeti. */
+      function cerrarCartel() {
+        confeti.detener();
+        sorteos.limpiarCartel();
+      }
+
+      /*
+       * Se espera a `nextTick` porque el lienzo entra con el modal: antes de que
+       * Vue lo dibuje, `getElementById` no encuentra nada y el confeti no
+       * saldría nunca.
+       */
+      watch(() => sorteos.ultimaExtraccion, async (extraccion) => {
+        if (!extraccion) { confeti.detener(); return; }
+        await nextTick();
+        confeti.lanzar('confeti-ganador');
       });
 
       const editorSorteo = reactive({
