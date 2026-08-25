@@ -90,6 +90,24 @@
            v-html="invitacionHtml"></div>
 
       <!--
+        Cómo llegar.
+
+        Está en la tarjeta guiada y tiene que estar acá también: la plantilla
+        maqueta la invitación, no reemplaza a lo que el sistema sabe hacer. El
+        evento tiene coordenadas o no las tiene, y eso no depende del diseño.
+
+        Se me pasó al agregar esta rama y desapareció el botón para los eventos
+        con plantilla.
+      -->
+      <a v-if="enlaceComoLlegar(invitacion.resultado.latitud, invitacion.resultado.longitud)"
+         :href="enlaceComoLlegar(invitacion.resultado.latitud, invitacion.resultado.longitud)"
+         target="_blank" rel="noopener"
+         class="boton boton-secundario mt-4 w-full">
+        <i class="fa-solid fa-diamond-turn-right"></i>
+        Ir al lugar del evento
+      </a>
+
+      <!--
         Los mismos dos botones que la tarjeta guiada.
 
         Están escritos dos veces a propósito: la alternativa era sacarlos de

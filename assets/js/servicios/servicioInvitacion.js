@@ -370,19 +370,73 @@ function contarLineas(ctx, texto, anchoMaximo) {
  * la plantilla de arranque usa una pila de fuentes del sistema, y el editor lo
  * dice.
  */
+/*
+ * El reajuste de estilos que la pagina tiene y el SVG no.
+ *
+ * Dentro del `<foreignObject>` hay un documento aparte: no llegan ni las hojas
+ * de estilo de la pagina ni su reajuste. Sin esto, cada `<p>` recupera el
+ * margen que trae el navegador de fabrica —cerca de un renglon arriba y otro
+ * abajo— y la invitacion crece varios centimetros respecto de lo que se midio.
+ * Eso es lo que empujaba el texto del pie fuera de la imagen.
+ *
+ * Reproduce lo que hace el reajuste de Tailwind en la pagina, para que lo que
+ * se descarga sea lo mismo que se ve.
+ */
+const REAJUSTE_SVG = [
+  '*,*::before,*::after{box-sizing:border-box}',
+  'h1,h2,h3,h4,h5,h6,p,figure,blockquote,dl,dd,pre,hr{margin:0}',
+  'ul,ol{margin:0;padding:0;list-style:none}',
+  'img,svg,video{display:block;vertical-align:middle;max-width:100%;height:auto}',
+  'table{border-collapse:collapse}'
+].join('');
+
+/**
+ * Cuanto mas alto se dibuja antes de recortar.
+ *
+ * El alto se mide en la pagina, pero quien maqueta dentro del SVG es el
+ * navegador y siempre puede salirle un poco distinto: otra tipografia de
+ * respaldo, otro redondeo de renglon. Se dibuja con aire de sobra y despues se
+ * recorta a lo que de verdad se pinto, que es lo unico que no se puede
+ * equivocar.
+ */
+const SOBRANTE = 1.8;
+
+/**
+ * La ultima fila del lienzo que tiene algo pintado.
+ *
+ * Lo que sobra del `<foreignObject>` queda transparente, asi que la tinta se
+ * reconoce por el canal alfa. No hace falta un color centinela: cualquier
+ * pixel de la invitacion, aunque sea blanco, es opaco.
+ *
+ * Se exporta para poder probarla sola. Es la pieza donde un error de uno no se
+ * ve en el codigo pero si en la imagen: recorta el ultimo renglon del pie.
+ */
+export function ultimaFilaConTinta(ctx, ancho, alto) {
+  const pixeles = ctx.getImageData(0, 0, ancho, alto).data;
+
+  for (let y = alto - 1; y >= 0; y--) {
+    const arranque = y * ancho * 4;
+    for (let x = 0; x < ancho; x++) {
+      if (pixeles[arranque + x * 4 + 3] !== 0) return y;
+    }
+  }
+  return -1;
+}
+
 async function rasterizarNodo(contenedor) {
   /*
    * Se dibuja la tarjeta, no la caja que la contiene.
    *
    * El contenedor ocupa todo el ancho disponible y la plantilla suele traer un
-   * `max-width` con margen automático. Rasterizando el contenedor, en una
+   * `max-width` con margen automatico. Rasterizando el contenedor, en una
    * pantalla ancha el PNG sale con dos franjas blancas a los lados. Con un solo
    * hijo —el caso normal— se rasteriza ese y la imagen queda al talle.
    */
   const nodo = contenedor.children.length === 1 ? contenedor.children[0] : contenedor;
 
-  const ancho = Math.ceil(nodo.offsetWidth);
-  const alto = Math.ceil(nodo.offsetHeight);
+  const medida = nodo.getBoundingClientRect();
+  const ancho = Math.ceil(medida.width);
+  const alto = Math.ceil(medida.height);
   if (!ancho || !alto) throw new Error('La invitación no está visible.');
 
   const copia = nodo.cloneNode(true);
@@ -391,31 +445,48 @@ async function rasterizarNodo(contenedor) {
   await incrustarImagenes(copia);
 
   /*
-   * El SVG es XML, no HTML: una etiqueta sin cerrar que el navegador perdonaría
+   * El SVG es XML, no HTML: una etiqueta sin cerrar que el navegador perdonaria
    * acá tira el dibujo entero. `XMLSerializer` devuelve XML bien formado y le
    * pone el espacio de nombres de XHTML al elemento.
    */
   const serializado = new XMLSerializer().serializeToString(copia);
 
+  // Con aire de sobra: lo que no se use queda transparente y se recorta luego.
+  const altoDibujo = Math.ceil(alto * SOBRANTE) + 240;
+
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${alto}">` +
-    `<foreignObject x="0" y="0" width="100%" height="100%">${serializado}</foreignObject>` +
-    '</svg>';
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altoDibujo}">` +
+    '<foreignObject x="0" y="0" width="100%" height="100%">' +
+    '<div xmlns="http://www.w3.org/1999/xhtml">' +
+    `<style>${REAJUSTE_SVG}</style>` +
+    serializado +
+    '</div>' +
+    '</foreignObject></svg>';
 
   const imagen = await cargarImagen(
     `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
   );
 
+  // Primero sobre transparente, que es lo que deja distinguir dónde termina.
+  const bruto = document.createElement('canvas');
+  bruto.width = ancho * ESCALA;
+  bruto.height = altoDibujo * ESCALA;
+  const ctxBruto = bruto.getContext('2d');
+  ctxBruto.drawImage(imagen, 0, 0, bruto.width, bruto.height);
+
+  const ultima = ultimaFilaConTinta(ctxBruto, bruto.width, bruto.height);
+  if (ultima < 0) throw new Error('La invitación salió en blanco.');
+
   const lienzo = document.createElement('canvas');
-  lienzo.width = ancho * ESCALA;
-  lienzo.height = alto * ESCALA;
+  lienzo.width = bruto.width;
+  lienzo.height = ultima + 1;
 
   const ctx = lienzo.getContext('2d');
-  // Fondo blanco: una plantilla con el fondo transparente quedaría negra en la
-  // galería del teléfono.
+  // Fondo blanco: una plantilla con el fondo transparente quedaria negra en la
+  // galeria del telefono.
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, lienzo.width, lienzo.height);
-  ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+  ctx.drawImage(bruto, 0, 0);
 
   return lienzo;
 }
