@@ -20,7 +20,7 @@ import * as formato from './nucleo/formato.js';
 import { api } from './servicios/servicioApi.js';
 import { servicioInvitacion } from './servicios/servicioInvitacion.js';
 import { descargarXlsx } from './servicios/servicioExcel.js';
-import { urlQr, descargarQr, enlaceInvitacion } from './nucleo/qr.js';
+import { urlQr, descargarQr, enlaceInvitacion, enlacePortal } from './nucleo/qr.js';
 
 import { usarNotificaciones } from './composables/usarNotificaciones.js';
 import { usarCatalogo } from './composables/usarCatalogo.js';
@@ -1491,7 +1491,7 @@ async function iniciar() {
       const enlaceCopiado = ref(false);
 
       async function compartirInvitacion() {
-        const enlace = new URL('/?invitacion=1', window.location.origin).href;
+        const enlace = enlacePortal();
         const texto = eventoActivo.value
           ? `Consulta tu invitación para ${eventoActivo.value.nombre}`
           : 'Consulta tu invitación';
@@ -2682,7 +2682,7 @@ async function iniciar() {
 
         // Sorteos
         sorteos,
-        confeti, ruleta, claseFoco, CIRCUNFERENCIA, cerrarCartel, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
+        confeti, ruleta, claseFoco, CIRCUNFERENCIA, cerrarCartel, enlacePortal, sorteosCatalogo, editorSorteo, totalUnidadesSorteo,
         abrirSorteo, cerrarSorteo, guardarSorteo,
         agregarPremioAlSorteo, quitarPremioDelSorteo,
 

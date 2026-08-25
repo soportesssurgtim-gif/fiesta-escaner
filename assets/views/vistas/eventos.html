@@ -30,7 +30,6 @@
                  :class="esVerdadero(evento.activo)
                          ? 'border-success-300 bg-success-25 dark:border-success-500/40 dark:bg-success-500/5'
                          : 'border-gray-200 dark:border-gray-800'">
-
           <div class="mb-3 flex items-start justify-between gap-3">
             <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                  :class="esVerdadero(evento.activo)
@@ -38,7 +37,6 @@
                          : 'bg-gray-100 text-gray-400 dark:bg-gray-800'">
               <i class="fa-solid fa-calendar-day"></i>
             </div>
-
             <span v-if="esVerdadero(evento.activo)" class="insignia-exito">
               <span class="h-1.5 w-1.5 rounded-full bg-success-500"></span> Activo
             </span>
@@ -85,6 +83,26 @@
                   class="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success-100 py-2.5 text-theme-xs font-medium text-success-700 dark:bg-success-500/15 dark:text-success-400">
               <i class="fa-solid fa-check"></i> En curso
             </span>
+
+            <!--
+              Abrir el portal de invitaciones.
+
+              Solo en el que está en curso, y no por prudencia: el portal
+              siempre resuelve el evento activo, así que abrirlo desde una
+              fiesta vieja mostraría la invitación de otra. Sin ninguno activo
+              responde que todavía no hay evento.
+
+              Va como enlace y no como botón para que se pueda abrir en otra
+              pestaña, copiar la dirección o mandarla por donde sea. El botón de
+              la barra lateral comparte el mismo enlace; este es para verlo.
+            -->
+            <a v-if="esVerdadero(evento.activo)"
+               :href="enlacePortal()" target="_blank" rel="noopener"
+               class="boton boton-secundario"
+               title="Abrir el portal donde los empleados consultan su invitación"
+               aria-label="Abrir el portal de invitaciones">
+              <i class="fa-solid fa-up-right-from-square"></i>
+            </a>
 
             <button v-if="permisos.tienePermiso('eventos', 'Editar')"
                     type="button" @click="eventos.abrir(evento)"

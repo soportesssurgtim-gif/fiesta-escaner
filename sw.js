@@ -27,7 +27,7 @@
  * que junto con el recargador de index.html deja la versión nueva corriendo sin
  * que nadie tenga que tocar nada.
  */
-const VERSION_CACHE = 'v3.19.1';
+const VERSION_CACHE = 'v3.20.0';
 const NOMBRE_CACHE = `asistencia-sssur-${VERSION_CACHE}`;
 
 /**

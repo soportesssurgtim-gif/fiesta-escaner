@@ -22,6 +22,19 @@
  */
 const LOGO_MUNICIPAL = 'https://sansalvadorsur.gob.sv/images/logo-circulo-blanco.png';
 
+/**
+ * Enlace del portal público, sin nadie en particular.
+ *
+ * Es el que se reparte: quien lo abre escribe su DUI y ve su invitación. No
+ * lleva el evento en la dirección porque el portal siempre resuelve el que está
+ * activo —lo hace `obtenerEventoActivo` en el servidor— y sin ninguno activo
+ * responde que todavía no hay fiesta. Por eso el mismo enlace sirve todo el año
+ * y solo tiene sentido ofrecerlo mientras hay un evento en curso.
+ */
+export function enlacePortal() {
+  return new URL('/?invitacion=1', window.location.origin).href;
+}
+
 /** Enlace del portal público con el DUI ya precargado en el formulario. */
 export function enlaceInvitacion(empleado) {
   return `${window.location.origin}/?invitacion=1&dui=${(empleado && empleado.dui) || ''}`;
