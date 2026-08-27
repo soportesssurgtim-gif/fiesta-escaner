@@ -287,6 +287,7 @@ async function contarDependencias(idEmpleado) {
 }
 
 export const controladorEmpleados = crearControladorCatalogo({
+  modulo: 'empleados',
   repositorio: repositorioEmpleados,
 
   mapearFormulario: (cuerpo) => ({

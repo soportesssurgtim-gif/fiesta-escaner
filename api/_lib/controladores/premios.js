@@ -701,6 +701,7 @@ async function sincronizarPremios(sorteoId, pedidas) {
 }
 
 export const controladorPremios = crearControladorCatalogo({
+  modulo: 'premios',
   repositorio: repositorioPremios,
 
   mapearFormulario: (cuerpo) => ({

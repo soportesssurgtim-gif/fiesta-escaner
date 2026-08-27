@@ -39,6 +39,7 @@ const importarCsv = crearImportadorCsv({
 });
 
 export const controladorDepartamentos = crearControladorCatalogo({
+  modulo: 'departamentos',
   repositorio: repositorioDepartamentos,
 
   mapearFormulario: (cuerpo) => ({

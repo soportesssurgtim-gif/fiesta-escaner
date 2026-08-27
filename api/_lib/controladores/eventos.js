@@ -52,8 +52,16 @@ export async function obtenerEventoActivo() {
  * que si la segunda falla quede cero activos (estado seguro) y no dos.
  */
 async function activarEvento({ req, res, sesion }) {
-  if (!esAdministrador(sesion.rol)) {
-    return responderSinPermiso(res, 'No tienes permisos de administrador.');
+  /*
+   * El mismo permiso que para apagarlo.
+   *
+   * `desactivarEvento` pedia el permiso de editar del modulo y esto exigia ser
+   * administrador, con los dos botones uno al lado del otro en el card y los
+   * dos mostrandose con la misma condicion. Quedaba que apagar un evento se
+   * podia y prenderlo no.
+   */
+  if (!(await puedeEnModulo(sesion, 'eventos', 'editar'))) {
+    return responderSinPermiso(res, 'No tienes permiso para cambiar el evento activo.');
   }
 
   const cuerpo = await leerCuerpo(req);
@@ -279,6 +287,7 @@ async function eliminarEvento({ req, res, sesion }) {
 }
 
 export const controladorEventos = crearControladorCatalogo({
+  modulo: 'eventos',
   repositorio: repositorioEventos,
 
   mapearFormulario: (cuerpo, contexto) => {
