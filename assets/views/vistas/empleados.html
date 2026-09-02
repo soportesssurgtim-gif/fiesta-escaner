@@ -371,6 +371,24 @@
             </select>
           </div>
 
+          <!--
+            El género.
+
+            «Sin especificar» es una opción de verdad y es la que tienen hoy casi
+            todas las fichas: la columna se agregó después de cargar el padrón.
+            Obligar a elegir haría que alguien ponga cualquier cosa con tal de
+            guardar, y el reporte quedaría peor que con el dato ausente.
+          -->
+          <div>
+            <label class="etiqueta">Género</label>
+            <select v-model="empleados.formulario.genero" class="campo campo-select">
+              <option value="">Sin especificar</option>
+              <option v-for="genero in GENEROS" :key="genero.valor" :value="genero.valor">
+                {{ genero.etiqueta }}
+              </option>
+            </select>
+          </div>
+
           <div>
             <label class="etiqueta">Fecha de nacimiento</label>
             <input v-model="empleados.formulario.fechaNacimiento" type="date" class="campo" />

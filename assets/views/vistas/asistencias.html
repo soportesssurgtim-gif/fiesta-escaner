@@ -1,4 +1,15 @@
-<!-- Listado de quienes ya marcaron asistencia en el evento activo. -->
+<!--
+  Registro de asistencias.
+
+  Antes esta pantalla mostraba las últimas mil asistencias de todos los eventos
+  juntas, y las tres métricas de arriba se calculaban sobre ese montón: el
+  «nivel de asistencia» sumaba la fiesta del año pasado con la de este y daba un
+  número que no describía nada.
+
+  Ahora hay filtros y arranca mirando el evento en curso. Los filtros viajan al
+  servidor —el listado llega acotado— así que lo que se ve es de verdad lo que
+  se pidió, y no un recorte de todo filtrado después.
+-->
 <section v-show="vista === 'asistentes'" class="animar-aparecer">
 
   <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -10,11 +21,18 @@
       <p class="metrica-etiqueta">Personas presentes</p>
     </div>
 
+    <!--
+      Convocados se mueve con los filtros de persona.
+
+      Mirando un departamento, el denominador es la gente de ese departamento.
+      Comparar contra la municipalidad entera daba siempre un porcentaje
+      bajísimo que no significaba nada.
+    -->
     <div class="tarjeta p-5">
       <div class="metrica-icono bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
         <i class="fa-solid fa-users"></i>
       </div>
-      <p class="metrica-valor">{{ empleados.lista.length }}</p>
+      <p class="metrica-valor">{{ resumen.convocados }}</p>
       <p class="metrica-etiqueta">Convocados</p>
     </div>
 
@@ -23,9 +41,97 @@
         <i class="fa-solid fa-chart-simple"></i>
       </div>
       <p class="metrica-valor">
-        {{ empleados.lista.length ? Math.round((resumen.total / empleados.lista.length) * 100) : 0 }}%
+        {{ resumen.convocados ? Math.round((resumen.total / resumen.convocados) * 100) : 0 }}%
       </p>
       <p class="metrica-etiqueta">Nivel de asistencia</p>
+    </div>
+  </div>
+
+  <!-- Los filtros -->
+  <div class="tarjeta mb-4">
+    <div class="tarjeta-encabezado">
+      <div>
+        <h2 class="tarjeta-titulo">Filtros</h2>
+        <p class="tarjeta-subtitulo">Lo que se filtre acá es lo que se exporta</p>
+      </div>
+      <button v-if="hayFiltrosDeAsistencia || busquedaAsistencias"
+              type="button" @click="limpiarFiltrosAsistencia()"
+              class="boton boton-secundario">
+        <i class="fa-solid fa-filter-circle-xmark"></i> Limpiar
+      </button>
+    </div>
+
+    <div class="tarjeta-cuerpo">
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <label for="filtro-evento" class="etiqueta text-theme-xs">Evento</label>
+          <select id="filtro-evento" v-model="filtrosAsistencia.evento" class="campo campo-select">
+            <option value="">Todos los eventos</option>
+            <option v-for="evento in eventos.lista" :key="evento.id" :value="evento.id">
+              {{ evento.nombre }}
+              <template v-if="esVerdadero(evento.activo)"> · en curso</template>
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-dpto" class="etiqueta text-theme-xs">Departamento</label>
+          <select id="filtro-dpto" v-model="filtrosAsistencia.departamento" class="campo campo-select">
+            <option value="">Todos</option>
+            <option v-for="dpto in departamentos.lista" :key="dpto.id" :value="dpto.id">
+              {{ dpto.nombre_dpto }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-distrito" class="etiqueta text-theme-xs">Distrito</label>
+          <select id="filtro-distrito" v-model="filtrosAsistencia.distrito" class="campo campo-select">
+            <option value="">Todos</option>
+            <option v-for="distrito in DISTRITOS" :key="distrito" :value="distrito">
+              {{ distrito }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-genero" class="etiqueta text-theme-xs">Género</label>
+          <select id="filtro-genero" v-model="filtrosAsistencia.genero" class="campo campo-select">
+            <option value="">Todos</option>
+            <option v-for="genero in GENEROS" :key="genero.valor" :value="genero.valor">
+              {{ genero.etiqueta }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-origen" class="etiqueta text-theme-xs">Origen</label>
+          <select id="filtro-origen" v-model="filtrosAsistencia.origen" class="campo campo-select">
+            <option value="">Escaneo y manual</option>
+            <option value="qr">Solo escaneo</option>
+            <option value="manual">Solo manual</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="filtro-desde" class="etiqueta text-theme-xs">Desde</label>
+          <input id="filtro-desde" v-model="filtrosAsistencia.desde" type="date" class="campo" />
+        </div>
+
+        <div>
+          <label for="filtro-hasta" class="etiqueta text-theme-xs">Hasta</label>
+          <input id="filtro-hasta" v-model="filtrosAsistencia.hasta" type="date" class="campo" />
+        </div>
+
+        <div>
+          <label for="filtro-busqueda" class="etiqueta text-theme-xs">Nombre o DUI</label>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
+            <input id="filtro-busqueda" v-model="busquedaAsistencias" type="search"
+                   class="campo pl-10" placeholder="Buscar" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -34,7 +140,10 @@
       <div>
         <h2 class="tarjeta-titulo">Registro de asistencias</h2>
         <p class="tarjeta-subtitulo">
-          {{ eventoActivo ? eventoActivo.nombre : 'Sin evento activo' }}
+          {{ filtrosAsistencia.evento
+             ? (eventos.lista.find((e) => e.id === filtrosAsistencia.evento) || {}).nombre
+             : 'Todos los eventos' }}
+          · {{ asistenciasFiltradas.length }} en pantalla
         </p>
       </div>
 
@@ -45,16 +154,25 @@
         importa tanto como la lista misma: un número quieto puede significar que
         no entró nadie o que hace rato que no se habla con el servidor, y son
         cosas muy distintas.
+
+        Con la vista filtrada el refresco se apaga —lo que llega son escaneos del
+        evento en curso y no cumplirían el filtro— así que acá se dice, en lugar
+        de dejar creer que sigue en vivo.
       -->
       <button type="button"
-              @click="sincronizacion.sincronizarAhora()"
+              @click="asistenciaEnVivo ? sincronizacion.sincronizarAhora() : recargarAsistencias()"
               class="flex shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-theme-xs transition hover:bg-gray-100 dark:hover:bg-white/5"
-              :class="sincronizacion.estado.hayProblema
-                      ? 'text-warning-600 dark:text-warning-400'
-                      : 'text-gray-500 dark:text-gray-400'"
+              :class="!asistenciaEnVivo
+                      ? 'text-gray-500 dark:text-gray-400'
+                      : (sincronizacion.estado.hayProblema
+                         ? 'text-warning-600 dark:text-warning-400'
+                         : 'text-gray-500 dark:text-gray-400')"
               title="Actualizar ahora">
-        <span v-if="sincronizacion.estado.consultando">
+        <span v-if="cargandoAsistencias || sincronizacion.estado.consultando">
           <i class="fa-solid fa-circle-notch animar-girar"></i>
+        </span>
+        <span v-else-if="!asistenciaEnVivo">
+          <i class="fa-solid fa-filter"></i>
         </span>
         <span v-else-if="sincronizacion.estado.hayProblema">
           <i class="fa-solid fa-triangle-exclamation"></i>
@@ -64,16 +182,12 @@
           <span class="relative inline-flex h-2 w-2 rounded-full bg-success-500"></span>
         </span>
 
-        {{ sincronizacion.estado.hayProblema ? 'Sin actualizar' : 'En vivo' }}
+        {{ !asistenciaEnVivo
+           ? 'Vista filtrada'
+           : (sincronizacion.estado.hayProblema ? 'Sin actualizar' : 'En vivo') }}
       </button>
 
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div class="relative">
-          <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-theme-sm text-gray-400"></i>
-          <input v-model="busquedaAsistencias" type="search"
-                 class="campo w-full pl-10 sm:w-64" placeholder="Buscar por nombre o DUI" />
-        </div>
-
         <button v-if="escaner.estadoRed.pendientes > 0"
                 type="button"
                 @click="escaner.sincronizarPendientes()"
@@ -83,17 +197,33 @@
           Subir {{ escaner.estadoRed.pendientes }} pendientes
         </button>
 
-        <button type="button" @click="recargarCatalogos()" class="boton boton-secundario">
+        <button type="button" @click="exportar('asistencias')" class="boton boton-secundario">
+          <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+        </button>
+
+        <button type="button" @click="recargarAsistencias()" class="boton boton-secundario"
+                :disabled="cargandoAsistencias">
           <i class="fa-solid fa-arrows-rotate"></i> Actualizar
         </button>
       </div>
     </div>
 
+    <!--
+      El listado llega acotado. Decirlo importa: sin este aviso, un total de
+      mil se lee como «hay mil» y no como «hay más de mil y estas son las
+      últimas».
+    -->
+    <p v-if="asistenciasRecortadas"
+       class="mx-5 mb-4 rounded-xl border border-warning-200 bg-warning-50 p-3 text-theme-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+      <i class="fa-solid fa-circle-info"></i>
+      Se muestran los primeros registros. Acotá con un filtro para verlos todos.
+    </p>
+
     <div v-if="asistenciasFiltradas.length === 0">
       <estado-vacio icono="fa-clipboard-check"
-                    titulo="Todavía no hay asistencias registradas"
-                    descripcion="Los registros aparecerán aquí conforme se escaneen los códigos QR."
-                    :buscando="busquedaAsistencias.length > 0"></estado-vacio>
+                    titulo="No hay asistencias con estos filtros"
+                    descripcion="Cambiá los filtros o esperá a que se escaneen los códigos QR."
+                    :buscando="busquedaAsistencias.length > 0 || hayFiltrosDeAsistencia"></estado-vacio>
     </div>
 
     <div v-else class="tabla-contenedor">
@@ -102,6 +232,8 @@
           <tr>
             <th>Persona</th>
             <th>DUI</th>
+            <th v-if="!filtrosAsistencia.evento">Evento</th>
+            <th>Departamento</th>
             <th>Hora de ingreso</th>
             <th>Origen</th>
           </tr>
@@ -113,10 +245,17 @@
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                   {{ iniciales(fila.empleadoNombre) }}
                 </span>
-                <span class="tabla-celda-principal">{{ aNombrePropio(fila.empleadoNombre) }}</span>
+                <div>
+                  <span class="tabla-celda-principal">{{ aNombrePropio(fila.empleadoNombre) }}</span>
+                  <span v-if="fila.cargo" class="block text-theme-xs text-gray-500 dark:text-gray-400">
+                    {{ aNombrePropio(fila.cargo) }}
+                  </span>
+                </div>
               </div>
             </td>
             <td class="whitespace-nowrap">{{ formatearDui(fila.dui) }}</td>
+            <td v-if="!filtrosAsistencia.evento">{{ fila.eventoNombre }}</td>
+            <td>{{ nombreDeDepartamento(fila.departamento) }}</td>
             <td class="whitespace-nowrap">{{ formatearFechaHora(fila.fechaHora) }}</td>
             <td>
               <span class="insignia-neutra">

@@ -52,6 +52,19 @@ export const MENU = [
  * Se usan en la ficha del empleado. Están fijos porque son los que define la
  * ley de reorganización territorial, no un catálogo que se edite día a día.
  */
+/**
+ * Los géneros que el sistema reconoce, para los desplegables.
+ *
+ * Vacío también es válido y es lo que tienen hoy casi todas las filas: la
+ * columna se agregó después de cargar el padrón. Los reportes lo muestran como
+ * «Sin especificar» en vez de esconderlo, porque un total que no cuadra con la
+ * suma de sus partes hace dudar del reporte entero.
+ */
+export const GENEROS = [
+  { valor: 'F', etiqueta: 'Femenino' },
+  { valor: 'M', etiqueta: 'Masculino' }
+];
+
 export const DISTRITOS = [
   'Panchimalco',
   'Rosario de Mora',

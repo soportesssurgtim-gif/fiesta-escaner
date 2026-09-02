@@ -24,9 +24,29 @@ import { crearImportadorCsv } from './importacionCsv.js';
 import { repositorioDepartamentos } from './departamentos.js';
 
 const COLUMNAS_CSV = [
-  'id', 'distrito', 'dpto', 'cargo', 'nombres', 'apellidos',
+  'id', 'distrito', 'dpto', 'cargo', 'nombres', 'apellidos', 'genero',
   'fecha_nacimiento', 'telefono', 'correo', 'dui', 'codigo', 'activo'
 ];
+
+/**
+ * Los géneros que el sistema reconoce.
+ *
+ * Vacío también es válido y es lo que tienen hoy todas las filas: la columna se
+ * agregó después de cargar el padrón. Cualquier otra cosa se guarda vacía en
+ * lugar de rechazarse, porque una importación de novecientas filas no puede
+ * caerse entera por una celda con "Femenino" en vez de "F".
+ */
+const GENEROS = ['F', 'M'];
+
+function aGenero(valor) {
+  const limpio = aTexto(valor).trim().toUpperCase();
+  if (limpio === '') return '';
+  // Se acepta la palabra entera además de la inicial: es lo que sale de los
+  // padrones de Recursos Humanos y de cualquiera que llene la plantilla a mano.
+  if (limpio.startsWith('F')) return 'F';
+  if (limpio.startsWith('M')) return 'M';
+  return '';
+}
 
 export const repositorioEmpleados = new Repositorio(TABLAS.empleados, {
   ordenarPor: 'apellidos',
@@ -152,6 +172,9 @@ const importarCsv = crearImportadorCsv({
       cargo: aTexto(fila.cargo),
       nombres: aTexto(fila.nombres),
       apellidos: aTexto(fila.apellidos),
+      // Acepta «F», «Femenino» o vacío: `aGenero` se queda con la inicial y lo
+      // que no reconoce lo deja vacío en vez de tumbar la fila entera.
+      genero: aGenero(fila.genero ?? fila.sexo),
       // Se normaliza a ISO: a la importación llega en dd/mm/yyyy, en ISO, o
       // como el número de días de Excel.
       fecha_nacimiento: aFechaIso(fila.fecha_nacimiento),
@@ -296,6 +319,7 @@ export const controladorEmpleados = crearControladorCatalogo({
     cargo: aTexto(cuerpo.cargo),
     nombres: aTexto(cuerpo.nombres),
     apellidos: aTexto(cuerpo.apellidos),
+    genero: aGenero(cuerpo.genero),
     fecha_nacimiento: aFechaIso(cuerpo.fechaNacimiento || cuerpo.fecha_nacimiento),
     telefono: aTexto(cuerpo.telefono),
     correo: aTexto(cuerpo.correo),

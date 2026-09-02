@@ -50,7 +50,7 @@ import { usarPreasignaciones } from './composables/usarPreasignaciones.js';
 import { animarDiagrama, cargarAnime } from './composables/usarAnimacionDiagrama.js';
 import { usarLectura } from './composables/usarLectura.js';
 
-import { MENU, DISTRITOS } from './contenido/menu.js';
+import { MENU, DISTRITOS, GENEROS } from './contenido/menu.js';
 import { registrarComponentes } from './componentes/comunes.js';
 
 const { createApp, ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
@@ -159,11 +159,77 @@ async function iniciar() {
       const asistencias = ref([]);
       const permisosCargados = ref([]);
       const eventoActivo = ref(null);
-      const resumen = reactive({ total: 0 });
+      /*
+       * `convocados` es el denominador del porcentaje, y se mueve con los
+       * filtros.
+       *
+       * Antes la pantalla dividía por el total de empleados cargados, así que
+       * al mirar un departamento el porcentaje seguía comparando contra la
+       * municipalidad entera y daba siempre bajísimo.
+       */
+      const resumen = reactive({ total: 0, convocados: 0 });
 
       // Las asistencias no usan usarCatalogo porque son de solo lectura: no
-      // tienen formulario ni modal, solo listado y búsqueda.
+      // tienen formulario ni modal, solo listado, filtros y búsqueda.
       const busquedaAsistencias = ref('');
+
+      /*
+       * Los filtros del listado.
+       *
+       * Viajan al servidor. Filtrar en el navegador sería más simple pero
+       * mentiría: el listado llega acotado a mil filas, así que se estaría
+       * filtrando un recorte de todos los eventos en vez de pedir el evento que
+       * se quiere ver.
+       */
+      const filtrosAsistencia = reactive({
+        evento: '', departamento: '', distrito: '', genero: '',
+        origen: '', desde: '', hasta: ''
+      });
+
+      /**
+       * El género en palabras.
+       *
+       * Vacío no se muestra vacío: dice «Sin especificar». Casi todas las filas
+       * lo tienen así porque la columna se agregó después de cargar el padrón, y
+       * una celda en blanco en un reporte se lee como un error del reporte.
+       */
+      function etiquetaDeGenero(valor) {
+        if (!valor) return 'Sin especificar';
+        const encontrado = GENEROS.find((g) => g.valor === valor);
+        return encontrado ? encontrado.etiqueta : valor;
+      }
+
+      const cargandoAsistencias = ref(false);
+
+      /** El servidor tuvo más filas de las que entran en una respuesta. */
+      const asistenciasRecortadas = ref(false);
+
+      const hayFiltrosDeAsistencia = computed(() =>
+        Object.values(filtrosAsistencia).some(Boolean)
+      );
+
+      /**
+       * ¿Lo que se está mirando incluye lo que se está escaneando ahora?
+       *
+       * Los escaneos que llegan por el refresco automático son siempre del
+       * evento activo y de este momento. Inyectarlos en una vista filtrada por
+       * otro evento —o por un departamento al que esa persona no pertenece—
+       * mostraría filas que no cumplen el filtro, y pisaría el total con el del
+       * servidor sin filtrar.
+       *
+       * Así que el refresco en vivo solo corre cuando la vista es la del evento
+       * en curso sin más recortes. Con cualquier otro filtro la lista se queda
+       * quieta y se actualiza con el botón, que es lo honesto.
+       */
+      const asistenciaEnVivo = computed(() => {
+        const f = filtrosAsistencia;
+        if (f.departamento || f.distrito || f.genero || f.origen || f.desde || f.hasta) {
+          return false;
+        }
+        if (!f.evento) return true;
+        return Boolean(eventoActivo.value && f.evento === eventoActivo.value.id);
+      });
+
       const asistenciasFiltradas = computed(() => {
         const termino = busquedaAsistencias.value.trim();
         if (!termino) return asistencias.value;
@@ -257,7 +323,8 @@ async function iniciar() {
         alGuardar: (datos) => api.empleados.guardar(datos),
         formularioVacio: {
           id: null, distrito: '', dpto: '', cargo: '', nombres: '', apellidos: '',
-          fechaNacimiento: '', telefono: '', correo: '', dui: '', codigo: '', activo: 'TRUE'
+          genero: '', fechaNacimiento: '', telefono: '', correo: '', dui: '',
+          codigo: '', activo: 'TRUE'
         },
         alAbrir: (registro) => ({
           id: registro.id,
@@ -266,6 +333,7 @@ async function iniciar() {
           cargo: registro.cargo || '',
           nombres: registro.nombres || '',
           apellidos: registro.apellidos || '',
+          genero: registro.genero || '',
           fechaNacimiento: formato.aFechaIso(registro.fecha_nacimiento),
           telefono: registro.telefono || '',
           correo: registro.correo || '',
@@ -831,10 +899,24 @@ async function iniciar() {
           (bundle.eventos || []).find((evento) => formato.esVerdadero(evento.activo)) ||
           null;
         resumen.total = bundle.resumen?.total ?? asistencias.value.length;
+        resumen.convocados = empleados.lista.length;
 
         // La lista viene entera y al día, así que el sincronizador arranca
         // desde la asistencia más reciente que acaba de llegar.
         sincronizacion.reiniciar(asistencias.value[0]?.fechaHora || null);
+
+        /*
+         * La pantalla arranca mirando el evento en curso.
+         *
+         * El paquete inicial trae las asistencias de todos los eventos, que es
+         * lo que hacía que el porcentaje mezclara fiestas pasadas. Al poner el
+         * filtro, el `watch` vuelve a pedir el listado ya acotado. Es una
+         * consulta más al entrar, y a cambio lo primero que se ve es lo que se
+         * quiere ver.
+         */
+        if (eventoActivo.value && !filtrosAsistencia.evento) {
+          filtrosAsistencia.evento = eventoActivo.value.id;
+        }
 
         permisos.seleccionarPrimerRol();
       }
@@ -1102,6 +1184,45 @@ async function iniciar() {
         alRecibir: fusionarNovedades
       });
 
+      /*
+       * Esto va acá abajo y no junto al resto del estado de asistencias.
+       *
+       * `recargarAsistencias` usa `sincronizacion`, que se declara justo arriba.
+       * Escrito más arriba funcionaba igual —la llamada llega mucho después de
+       * que setup() termine— pero el orden de lectura mentía sobre el orden de
+       * inicialización, y en este archivo eso ya costó un `Cannot access antes
+       * de la inicialización` que se llevó puesto todo el setup.
+       */
+      /** Pide el listado con los filtros puestos. */
+      async function recargarAsistencias() {
+        if (!sesion.token) return;
+
+        cargandoAsistencias.value = true;
+        try {
+          const datos = await api.asistencias.listar({ ...filtrosAsistencia });
+          asistencias.value = datos.asistencias || [];
+          asistenciasRecortadas.value = Boolean(datos.limitado);
+          resumen.total = datos.resumen?.total ?? asistencias.value.length;
+          resumen.convocados = datos.resumen?.convocados ?? 0;
+
+          // El sincronizador arranca desde la más reciente que acaba de llegar.
+          sincronizacion.reiniciar(asistencias.value[0]?.fechaHora || null);
+        } catch (fallo) {
+          console.error('[asistencias]', fallo);
+          notificarError(fallo.message || 'No se pudo cargar el listado.');
+        } finally {
+          cargandoAsistencias.value = false;
+        }
+      }
+
+      function limpiarFiltrosAsistencia() {
+        for (const clave of Object.keys(filtrosAsistencia)) filtrosAsistencia[clave] = '';
+        busquedaAsistencias.value = '';
+      }
+
+      watch(filtrosAsistencia, () => { recargarAsistencias(); });
+
+
       /**
        * Mete lo que llegó del servidor en la lista que ya está en pantalla.
        *
@@ -1116,6 +1237,16 @@ async function iniciar() {
        * DUI. El total siempre viene del servidor, que es quien sabe.
        */
       function fusionarNovedades({ total, nuevas }) {
+        /*
+         * Con la vista filtrada, el refresco en vivo no toca nada.
+         *
+         * Lo que llega son escaneos del evento en curso, de este momento. En
+         * una vista de otro evento aparecerían filas que no cumplen el filtro,
+         * y `total` es el del servidor sin filtrar, así que pisaría el contador
+         * con un número de otra cosa.
+         */
+        if (!asistenciaEnVivo.value) return;
+
         resumen.total = total;
         if (nuevas.length === 0) return;
 
@@ -1250,11 +1381,12 @@ async function iniciar() {
           hoja: 'Empleados',
           encabezados: [
             'nombres', 'apellidos', 'dui', 'codigo', 'departamento',
-            'cargo', 'distrito', 'fecha_nacimiento', 'telefono', 'correo', 'activo'
+            'cargo', 'distrito', 'genero', 'fecha_nacimiento', 'telefono', 'correo', 'activo'
           ],
           ejemplo: [
             'Ana María', 'López Portillo', '01234567-8', 'EMP-001', 'Obras Públicas',
-            'Analista', 'Panchimalco', '24/03/1990', '70001234', 'ana.lopez@ejemplo.sv', 'TRUE'
+            'Analista', 'Panchimalco', 'F', '24/03/1990', '70001234',
+            'ana.lopez@ejemplo.sv', 'TRUE'
           ],
           /**
            * Columnas que se eligen de un desplegable en vez de escribirse.
@@ -1270,6 +1402,9 @@ async function iniciar() {
            */
           listas: () => [
             { columna: 'distrito', titulo: 'Distrito', valores: [...DISTRITOS] },
+            // Con la lista, nadie escribe «Femenino», «femenino» ni «FEM» y el
+            // importador no tiene que adivinar cuál de las tres es cuál.
+            { columna: 'genero', titulo: 'Género', valores: GENEROS.map((g) => g.valor) },
             {
               columna: 'departamento',
               titulo: 'Departamento',
@@ -1289,10 +1424,48 @@ async function iniciar() {
             nombreDeDepartamento(persona.dpto),
             persona.cargo || '',
             persona.distrito || '',
+            persona.genero || '',
             formato.formatearFechaCorta(persona.fecha_nacimiento),
             persona.telefono || '',
             persona.correo || '',
             formato.esVerdadero(persona.activo) ? 'TRUE' : 'FALSE'
+          ])
+        },
+
+        /*
+         * Las asistencias salen tal como se están viendo.
+         *
+         * `filas` lee `asistenciasFiltradas`, que ya tiene aplicados los
+         * filtros y la búsqueda. Es lo que hace que el archivo coincida con la
+         * pantalla: exportar el listado completo mientras arriba dice
+         * «Recursos Humanos» produce un Excel que nadie puede explicar en una
+         * reunión.
+         *
+         * No hay plantilla ni importación: las asistencias las crea el escáner,
+         * no se cargan de un archivo.
+         */
+        asistencias: {
+          nombreArchivo: 'asistencias',
+          hoja: 'Asistencias',
+          encabezados: [
+            'evento', 'nombres_apellidos', 'dui', 'cargo', 'departamento',
+            'distrito', 'genero', 'fecha_hora', 'origen'
+          ],
+          ejemplo: [
+            'Fiesta de fin de año', 'Ana María López Portillo', '01234567-8',
+            'Analista', 'Obras Públicas', 'Panchimalco', 'F',
+            '19/12/2026 18:04', 'Escaneo'
+          ],
+          filas: () => asistenciasFiltradas.value.map((fila) => [
+            fila.eventoNombre || '',
+            formato.aNombrePropio(fila.empleadoNombre),
+            formato.formatearDui(fila.dui),
+            formato.aNombrePropio(fila.cargo || ''),
+            nombreDeDepartamento(fila.departamento),
+            fila.distrito || '',
+            etiquetaDeGenero(fila.genero),
+            formato.formatearFechaHora(fila.fechaHora),
+            fila.fuente === 'qr' ? 'Escaneo' : 'Manual'
           ])
         },
 
@@ -2675,6 +2848,9 @@ async function iniciar() {
         PESTANAS_CONFIG, pestanaConfig,
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
+        filtrosAsistencia, cargandoAsistencias, asistenciasRecortadas,
+        hayFiltrosDeAsistencia, asistenciaEnVivo, limpiarFiltrosAsistencia,
+        recargarAsistencias, etiquetaDeGenero, GENEROS,
         recargarCatalogos, DISTRITOS,
 
         // Permisos

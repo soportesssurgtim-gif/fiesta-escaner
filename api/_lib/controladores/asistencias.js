@@ -188,14 +188,82 @@ async function sincronizarPendientes({ req, res, sesion }) {
   return responderOk(res, resultado);
 }
 
-/** Listado para la pantalla de asistencias. */
-async function listarAsistencias({ res }) {
-  const { data, error } = await supabase
-    .from(TABLAS.asistencias)
-    .select('id, fecha_hora_asistencia, fuente, empleados!inner(nombres, apellidos, dui), eventos(nombre)')
-    .order('fecha_hora_asistencia', { ascending: false })
-    .limit(1000);
+/**
+ * El huso de El Salvador, escrito a mano.
+ *
+ * Los campos de fecha de la pantalla mandan un dia suelto —2026-12-19— y la
+ * columna guarda un instante con huso. Sin decir de que huso es ese dia, el
+ * servidor lo lee como UTC y el filtro se corre seis horas: las asistencias de
+ * la noche del 19 caen fuera del 19 y aparecen al dia siguiente.
+ *
+ * Va fijo y no por `Intl` porque tiene que viajar dentro de la consulta como
+ * texto. El Salvador no cambia de hora en verano, asi que no se mueve.
+ */
+const HUSO = '-06:00';
 
+/**
+ * Los filtros del listado.
+ *
+ * Todos son opcionales y se combinan. Van al servidor y no al navegador porque
+ * el listado esta acotado a mil filas: filtrando aca, esas mil son mil del
+ * evento que se esta mirando; filtrando en el navegador serian las mil ultimas
+ * de todos los eventos, recortadas despues.
+ */
+function leerFiltros(req) {
+  return {
+    evento: aTexto(leerParametro(req, 'evento')),
+    departamento: aTexto(leerParametro(req, 'departamento')),
+    distrito: aTexto(leerParametro(req, 'distrito')),
+    genero: aTexto(leerParametro(req, 'genero')),
+    origen: aTexto(leerParametro(req, 'origen')),
+    desde: aTexto(leerParametro(req, 'desde')),
+    hasta: aTexto(leerParametro(req, 'hasta'))
+  };
+}
+
+/** Los que hablan de la persona y no del registro. */
+function aplicarFiltrosDePersona(consulta, filtros, prefijo) {
+  if (filtros.departamento) consulta = consulta.eq(`${prefijo}dpto`, filtros.departamento);
+  if (filtros.distrito) consulta = consulta.eq(`${prefijo}distrito`, filtros.distrito);
+  if (filtros.genero) consulta = consulta.eq(`${prefijo}genero`, filtros.genero);
+  return consulta;
+}
+
+function aplicarFiltros(consulta, filtros) {
+  if (filtros.evento) consulta = consulta.eq('evento', filtros.evento);
+  if (filtros.origen) consulta = consulta.eq('fuente', filtros.origen);
+  if (filtros.desde) {
+    consulta = consulta.gte('fecha_hora_asistencia', `${filtros.desde}T00:00:00${HUSO}`);
+  }
+  if (filtros.hasta) {
+    consulta = consulta.lte('fecha_hora_asistencia', `${filtros.hasta}T23:59:59${HUSO}`);
+  }
+  return aplicarFiltrosDePersona(consulta, filtros, 'empleados.');
+}
+
+/** Cuántas filas trae el listado como mucho. */
+const TOPE = 1000;
+
+/** Listado para la pantalla de asistencias. */
+async function listarAsistencias({ req, res }) {
+  const filtros = leerFiltros(req);
+
+  /*
+   * `empleados!inner` no es decoración: sin el `!inner` no se puede filtrar por
+   * una columna de la tabla enlazada, y el filtro por departamento devolvería
+   * la lista entera sin decir nada.
+   */
+  const consulta = supabase
+    .from(TABLAS.asistencias)
+    .select(
+      'id, fecha_hora_asistencia, fuente, evento, ' +
+      'empleados!inner(nombres, apellidos, dui, cargo, distrito, genero, dpto), ' +
+      'eventos(nombre)'
+    )
+    .order('fecha_hora_asistencia', { ascending: false })
+    .limit(TOPE);
+
+  const { data, error } = await aplicarFiltros(consulta, filtros);
   if (error) throw error;
 
   const asistencias = (data || []).map((fila) => ({
@@ -205,22 +273,76 @@ async function listarAsistencias({ res }) {
       ? `${fila.empleados.nombres} ${fila.empleados.apellidos}`.trim()
       : 'Desconocido',
     dui: fila.empleados?.dui || 'N/D',
+    cargo: fila.empleados?.cargo || '',
+    distrito: fila.empleados?.distrito || '',
+    genero: fila.empleados?.genero || '',
+    departamento: fila.empleados?.dpto || '',
     fuente: fila.fuente || 'qr',
+    eventoId: fila.evento || '',
     eventoNombre: fila.eventos?.nombre || ''
   }));
 
-  // El total sale de un COUNT y no de asistencias.length: el listado está
-  // limitado a 1000 filas, así que pasadas las mil el contador se quedaba
-  // clavado en 1000 y nadie entendía por qué dejaba de subir.
-  return responderOk(res, { asistencias, resumen: { total: await contarAsistencias() } });
+  /*
+   * El total sale de un COUNT y no de `asistencias.length`.
+   *
+   * El listado esta acotado, asi que pasadas las mil el contador se quedaba
+   * clavado en mil y nadie entendia por que dejaba de subir. `limitado` avisa
+   * en pantalla que lo que se ve es un recorte, en vez de dejar creer que eso
+   * es todo.
+   */
+  return responderOk(res, {
+    asistencias,
+    limitado: asistencias.length >= TOPE,
+    resumen: {
+      total: await contarAsistencias(filtros),
+      convocados: await contarConvocados(filtros)
+    }
+  });
 }
 
-/** Cuántas asistencias hay, sin traerse ninguna. */
-async function contarAsistencias() {
-  const { count, error } = await supabase
-    .from(TABLAS.asistencias)
-    .select('id', { count: 'exact', head: true });
+/** Cuántas asistencias hay con estos filtros, sin traerse ninguna. */
+async function contarAsistencias(filtros = {}) {
+  /*
+   * El enlace con empleados solo se pide si hace falta.
+   *
+   * `!inner` deja fuera las asistencias cuyo empleado ya no esté, asi que
+   * ponerlo siempre cambiaria en silencio el contador en vivo que sondea la
+   * pantalla durante el evento. Sin filtros de persona, esta cuenta es la misma
+   * de siempre.
+   */
+  const porPersona = Boolean(filtros.departamento || filtros.distrito || filtros.genero);
 
+  const consulta = supabase
+    .from(TABLAS.asistencias)
+    .select(
+      porPersona ? 'id, empleados!inner(dpto, distrito, genero)' : 'id',
+      { count: 'exact', head: true }
+    );
+
+  const { count, error } = await aplicarFiltros(consulta, filtros);
+  if (error) throw error;
+  return count || 0;
+}
+
+/**
+ * Cuánta gente estaba convocada, con los mismos filtros de persona.
+ *
+ * Antes la pantalla dividia por el total de empleados cargados, asi que al
+ * filtrar por un departamento el porcentaje seguia comparando contra la
+ * municipalidad entera y daba siempre bajisimo. El denominador tiene que
+ * moverse con el numerador.
+ *
+ * Los filtros de fecha y de origen no cuentan acá: hablan del registro, no de
+ * la persona. Quien estaba convocado lo estaba independientemente de a qué hora
+ * llegó o de si lo escanearon o lo cargaron a mano.
+ */
+async function contarConvocados(filtros = {}) {
+  const consulta = supabase
+    .from(TABLAS.empleados)
+    .select('id', { count: 'exact', head: true })
+    .eq('activo', SI);
+
+  const { count, error } = await aplicarFiltrosDePersona(consulta, filtros, '');
   if (error) throw error;
   return count || 0;
 }

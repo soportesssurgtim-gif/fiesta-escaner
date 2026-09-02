@@ -35,8 +35,23 @@ export const api = {
 
   /** Registro de asistencias y sincronización offline. */
   asistencias: {
-    listar() {
-      return http.obtener('asistencias');
+    /**
+     * El listado, con los filtros que tenga puestos la pantalla.
+     *
+     * Los filtros van al servidor y no se aplican en el navegador porque el
+     * listado está acotado a mil filas: filtrando allá, esas mil son mil del
+     * evento que se está mirando; filtrando acá serían las mil últimas de
+     * todos los eventos, recortadas después.
+     *
+     * Los vacíos no se mandan, para que la dirección diga solo lo que de
+     * verdad se está pidiendo.
+     */
+    listar(filtros = {}) {
+      const parametros = {};
+      for (const [clave, valor] of Object.entries(filtros)) {
+        if (valor) parametros[clave] = valor;
+      }
+      return http.obtener('asistencias', parametros);
     },
     registrar(identificador, dispositivo) {
       return http.enviar('asistencias', { dui: identificador, dispositivo }, { accion: 'registrar' });
