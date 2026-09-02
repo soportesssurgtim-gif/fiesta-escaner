@@ -143,7 +143,7 @@
           {{ filtrosAsistencia.evento
              ? (eventos.lista.find((e) => e.id === filtrosAsistencia.evento) || {}).nombre
              : 'Todos los eventos' }}
-          · {{ asistenciasFiltradas.length }} en pantalla
+          · {{ asistenciasPaginadas.length }} de {{ asistenciasFiltradas.length }}
         </p>
       </div>
 
@@ -239,7 +239,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="fila in asistenciasFiltradas" :key="fila.id">
+          <tr v-for="fila in asistenciasPaginadas" :key="fila.id">
             <td>
               <div class="flex items-center gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-50 text-theme-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
@@ -266,6 +266,54 @@
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!--
+      La paginación.
+
+      Sale solo si hay más de una página: unos controles que no llevan a
+      ninguna parte ocupan lugar y hacen dudar de si se está viendo todo.
+
+      El botón de exportar baja TODO lo filtrado y no solo esta página, y por
+      eso se dice acá: es la pregunta que se hace cualquiera antes de mandar el
+      archivo a su jefe.
+    -->
+    <div v-if="asistenciasFiltradas.length > 0"
+         class="flex flex-col gap-3 border-t border-gray-200 px-5 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center gap-2 text-theme-sm text-gray-500 dark:text-gray-400">
+        <label for="por-pagina" class="whitespace-nowrap">Mostrar</label>
+        <select id="por-pagina" v-model.number="porPaginaAsistencias"
+                class="campo campo-select w-auto py-1.5 text-theme-sm">
+          <option v-for="tamano in TAMANOS_DE_PAGINA" :key="tamano" :value="tamano">
+            {{ tamano }}
+          </option>
+        </select>
+        <span class="whitespace-nowrap">por página</span>
+      </div>
+
+      <p class="text-theme-xs text-gray-400">
+        Exportar baja las {{ asistenciasFiltradas.length }} filas, no solo esta página.
+      </p>
+
+      <div v-if="totalPaginasAsistencias > 1" class="flex items-center gap-2">
+        <button type="button" @click="irAPaginaAsistencias(paginaAsistencias - 1)"
+                :disabled="paginaAsistencias <= 1"
+                class="boton boton-secundario px-3 py-1.5 text-theme-sm"
+                aria-label="Página anterior">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+
+        <span class="whitespace-nowrap text-theme-sm text-gray-600 dark:text-gray-400">
+          {{ paginaAsistencias }} de {{ totalPaginasAsistencias }}
+        </span>
+
+        <button type="button" @click="irAPaginaAsistencias(paginaAsistencias + 1)"
+                :disabled="paginaAsistencias >= totalPaginasAsistencias"
+                class="boton boton-secundario px-3 py-1.5 text-theme-sm"
+                aria-label="Página siguiente">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
     </div>
   </div>
 </section>

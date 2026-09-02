@@ -240,6 +240,51 @@ async function iniciar() {
         );
       });
 
+      /*
+       * La paginación es del navegador, no del servidor.
+       *
+       * El listado ya viene acotado y filtrado, así que las filas están todas
+       * acá: paginar de este lado es instantáneo al cambiar de página y no
+       * gasta una consulta por cada clic. Si algún día el tope de mil dejara de
+       * alcanzar, esto es lo primero que habría que mover al servidor.
+       *
+       * Arranca en diez porque en la puerta del evento se mira el teléfono, y
+       * cuarenta filas ahí no son una tabla, son un scroll.
+       */
+      const paginaAsistencias = ref(1);
+      const porPaginaAsistencias = ref(10);
+      const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
+
+      const totalPaginasAsistencias = computed(() => Math.max(
+        1, Math.ceil(asistenciasFiltradas.value.length / porPaginaAsistencias.value)
+      ));
+
+      const asistenciasPaginadas = computed(() => {
+        const desde = (paginaAsistencias.value - 1) * porPaginaAsistencias.value;
+        return asistenciasFiltradas.value.slice(desde, desde + porPaginaAsistencias.value);
+      });
+
+      function irAPaginaAsistencias(numero) {
+        paginaAsistencias.value = Math.min(
+          Math.max(1, numero), totalPaginasAsistencias.value
+        );
+      }
+
+      /*
+       * Al cambiar lo que se está mirando se vuelve a la primera página.
+       *
+       * Sin esto, filtrar estando en la página siete deja la tabla vacía: hay
+       * resultados, pero no en esa página. Se lee como «no hay nada».
+       *
+       * Se miran los filtros y la búsqueda, no la lista: la lista también
+       * cambia cuando entra un escaneo nuevo, y ahí saltar a la primera página
+       * sería quitarle la vista de las manos a quien está leyendo.
+       */
+      watch(
+        [() => busquedaAsistencias.value, filtrosAsistencia, porPaginaAsistencias],
+        () => { paginaAsistencias.value = 1; }
+      );
+
       // ---- Sesión ----
       const formularioLogin = reactive({ usuario: '', password: '' });
       const errorLogin = ref('');
@@ -2849,8 +2894,10 @@ async function iniciar() {
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
         filtrosAsistencia, cargandoAsistencias, asistenciasRecortadas,
+        asistenciasPaginadas, paginaAsistencias, porPaginaAsistencias,
+        totalPaginasAsistencias, irAPaginaAsistencias, TAMANOS_DE_PAGINA,
         hayFiltrosDeAsistencia, asistenciaEnVivo, limpiarFiltrosAsistencia,
-        recargarAsistencias, etiquetaDeGenero, GENEROS,
+        recargarAsistencias, etiquetaDeGenero, GENEROS, nombreDeDepartamento,
         recargarCatalogos, DISTRITOS,
 
         // Permisos

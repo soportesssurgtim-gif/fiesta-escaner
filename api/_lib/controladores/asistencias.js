@@ -337,14 +337,25 @@ async function contarAsistencias(filtros = {}) {
  * llegó o de si lo escanearon o lo cargaron a mano.
  */
 async function contarConvocados(filtros = {}) {
-  const consulta = supabase
-    .from(TABLAS.empleados)
-    .select('id', { count: 'exact', head: true })
-    .eq('activo', SI);
+  /*
+   * Va por el repositorio y no por una consulta directa.
+   *
+   * `activo` es texto y en la base conviven «TRUE» y «true»: la carga inicial
+   * dejó ochocientos veintiséis en minúscula. Una comparación exacta contra
+   * «TRUE» encuentra dieciséis, y el porcentaje de asistencia sale por las
+   * nubes —trescientos setenta y uno sobre dieciséis— sin que nada falle.
+   *
+   * `_filtrar` del repositorio ya lo resuelve con `ilike`, y ese arreglo está
+   * ahí porque este mismo problema ya dejó a casi todo el padrón invisible una
+   * vez. Consultar Supabase directo salteaba esa capa y volvía a caer en lo
+   * mismo. Eso hice, y volvió a pasar.
+   */
+  const deLaPersona = { activo: SI };
+  if (filtros.departamento) deLaPersona.dpto = filtros.departamento;
+  if (filtros.distrito) deLaPersona.distrito = filtros.distrito;
+  if (filtros.genero) deLaPersona.genero = filtros.genero;
 
-  const { count, error } = await aplicarFiltrosDePersona(consulta, filtros, '');
-  if (error) throw error;
-  return count || 0;
+  return repositorioEmpleados.contar(deLaPersona);
 }
 
 /**

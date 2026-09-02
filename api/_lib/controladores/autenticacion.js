@@ -151,7 +151,16 @@ async function iniciarSesion({ req, res }) {
     .from(TABLAS.usuarios)
     .select('*, roles(id, nombre_rol), empleado(id, nombres, apellidos)')
     .or(`usuario.ilike.${identificador},correo.ilike.${identificador}`)
-    .eq('activo', SI)
+    /*
+     * `ilike` y no `eq`, como en el repositorio.
+     *
+     * `activo` es texto y en la base conviven «TRUE» y «true». Hoy todas las
+     * cuentas están en mayúscula y esto funciona, pero el día que una quede en
+     * minúscula —una carga a mano, un script— esa persona no puede entrar y el
+     * mensaje dice «usuario o contraseña incorrectos», que manda a buscar el
+     * problema al lugar equivocado. Ya pasó con los empleados.
+     */
+    .ilike('activo', SI)
     .limit(1);
 
   if (error) throw error;
