@@ -39,7 +39,11 @@
       <div class="metrica-icono bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
         <i class="fa-solid fa-users"></i>
       </div>
-      <p class="metrica-valor">{{ empleados.lista.length }}</p>
+      <!--
+        Los que pueden entrar, no todas las fichas cargadas: una persona dada de
+        baja sigue en la lista de empleados y no viene a la fiesta.
+      -->
+      <p class="metrica-valor">{{ resumen.convocados }}</p>
       <p class="metrica-etiqueta">En el padrón</p>
     </div>
 

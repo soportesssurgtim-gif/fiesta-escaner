@@ -159,15 +159,29 @@ async function iniciar() {
       const asistencias = ref([]);
       const permisosCargados = ref([]);
       const eventoActivo = ref(null);
-      /*
-       * `convocados` es el denominador del porcentaje, y se mueve con los
-       * filtros.
+      /**
+       * El pulso del evento en curso.
        *
-       * Antes la pantalla dividía por el total de empleados cargados, así que
-       * al mirar un departamento el porcentaje seguía comparando contra la
-       * municipalidad entera y daba siempre bajísimo.
+       * Es lo que se ve en el escáner —en la puerta, mientras entra la gente— y
+       * lo que dice «participan N» en los sorteos. Siempre del evento activo:
+       * contando todos los eventos, en la puerta parecía que ya habían entrado
+       * trescientas personas antes de escanear a nadie, y el sorteo contaba
+       * como participante a gente de la fiesta del año pasado.
+       *
+       * Sin evento activo queda en cero, que es lo que hay: no se puede
+       * registrar a nadie.
        */
       const resumen = reactive({ total: 0, convocados: 0 });
+
+      /**
+       * Lo que muestra la pantalla de Asistencias, que es otra cosa.
+       *
+       * Ahí se puede estar mirando una fiesta pasada o un departamento suelto,
+       * y los números tienen que seguir a esos filtros. Va aparte de `resumen`
+       * a propósito: compartirlo hacía que elegir un evento viejo en Asistencias
+       * cambiara el contador del escáner y el «participan N» del sorteo.
+       */
+      const resumenAsistencias = reactive({ total: 0, convocados: 0 });
 
       // Las asistencias no usan usarCatalogo porque son de solo lectura: no
       // tienen formulario ni modal, solo listado, filtros y búsqueda.
@@ -943,8 +957,17 @@ async function iniciar() {
           bundle.eventoActivo ||
           (bundle.eventos || []).find((evento) => formato.esVerdadero(evento.activo)) ||
           null;
-        resumen.total = bundle.resumen?.total ?? asistencias.value.length;
-        resumen.convocados = empleados.lista.length;
+        /*
+         * El total del paquete es de todos los eventos; acá hace falta el del
+         * activo. Las filas ya traen su `evento`, así que se cuenta sin pedir
+         * nada más. Sin evento activo, cero.
+         */
+        resumen.total = eventoActivo.value
+          ? asistencias.value.filter((fila) => fila.evento === eventoActivo.value.id).length
+          : 0;
+        resumen.convocados = empleados.lista.filter(
+          (persona) => formato.esVerdadero(persona.activo)
+        ).length;
 
         // La lista viene entera y al día, así que el sincronizador arranca
         // desde la asistencia más reciente que acaba de llegar.
@@ -1247,8 +1270,8 @@ async function iniciar() {
           const datos = await api.asistencias.listar({ ...filtrosAsistencia });
           asistencias.value = datos.asistencias || [];
           asistenciasRecortadas.value = Boolean(datos.limitado);
-          resumen.total = datos.resumen?.total ?? asistencias.value.length;
-          resumen.convocados = datos.resumen?.convocados ?? 0;
+          resumenAsistencias.total = datos.resumen?.total ?? asistencias.value.length;
+          resumenAsistencias.convocados = datos.resumen?.convocados ?? 0;
 
           // El sincronizador arranca desde la más reciente que acaba de llegar.
           sincronizacion.reiniciar(asistencias.value[0]?.fechaHora || null);
@@ -1283,16 +1306,32 @@ async function iniciar() {
        */
       function fusionarNovedades({ total, nuevas }) {
         /*
-         * Con la vista filtrada, el refresco en vivo no toca nada.
+         * El contador del evento en curso se actualiza siempre.
          *
-         * Lo que llega son escaneos del evento en curso, de este momento. En
-         * una vista de otro evento aparecerían filas que no cumplen el filtro,
-         * y `total` es el del servidor sin filtrar, así que pisaría el contador
-         * con un número de otra cosa.
+         * Es el que se ve en el escáner y en los sorteos, y no tiene nada que
+         * ver con lo que se esté filtrando en Asistencias. Atarlo al filtro
+         * hacía que mirar una fiesta pasada congelara el contador de la puerta,
+         * justo mientras entraba la gente.
+         */
+        resumen.total = total;
+
+        /*
+         * La lista, en cambio, sí respeta el filtro.
+         *
+         * Lo que llega son escaneos del evento en curso. En una vista de otro
+         * evento —o de un departamento al que esa persona no pertenece—
+         * aparecerían filas que no cumplen el filtro.
          */
         if (!asistenciaEnVivo.value) return;
 
-        resumen.total = total;
+        /*
+         * Acá la vista es la del evento en curso, así que su contador y el del
+         * escáner son el mismo número. Sin esto, «Personas presentes» se
+         * quedaba clavado en el valor de la última recarga mientras la fila de
+         * abajo seguía creciendo.
+         */
+        resumenAsistencias.total = total;
+
         if (nuevas.length === 0) return;
 
         const conocidas = new Set(asistencias.value.map((fila) => fila.id));
@@ -2893,6 +2932,7 @@ async function iniciar() {
         PESTANAS_CONFIG, pestanaConfig,
         asistencias, busquedaAsistencias, asistenciasFiltradas,
         permisosCargados, eventoActivo, resumen,
+        resumenAsistencias,
         filtrosAsistencia, cargandoAsistencias, asistenciasRecortadas,
         asistenciasPaginadas, paginaAsistencias, porPaginaAsistencias,
         totalPaginasAsistencias, irAPaginaAsistencias, TAMANOS_DE_PAGINA,

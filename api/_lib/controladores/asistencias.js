@@ -374,7 +374,25 @@ async function contarConvocados(filtros = {}) {
  */
 async function listarNovedades({ req, res }) {
   const desde = aTexto(leerParametro(req, 'desde'));
-  const total = await contarAsistencias();
+
+  /*
+   * Todo esto es del evento activo, y no de la historia entera.
+   *
+   * Este contador es el que se ve en el escáner, en la puerta, y el que dice
+   * «participan N» en los sorteos. Contando todos los eventos mostraba la suma
+   * de todas las fiestas: en la puerta parecía que ya habían entrado
+   * trescientas personas antes de escanear a nadie, y el sorteo decía que
+   * participaba gente de la fiesta del año pasado.
+   *
+   * Sin evento activo no hay nada que contar ni que sondear: no se puede
+   * registrar una asistencia, así que tampoco puede llegar ninguna.
+   */
+  const evento = await obtenerEventoActivo();
+  if (!evento) {
+    return responderOk(res, { total: 0, nuevas: [], desde: new Date().toISOString() });
+  }
+
+  const total = await contarAsistencias({ evento: evento.id });
 
   if (!desde) {
     return responderOk(res, { total, nuevas: [], desde: new Date().toISOString() });
@@ -383,6 +401,7 @@ async function listarNovedades({ req, res }) {
   const { data, error } = await supabase
     .from(TABLAS.asistencias)
     .select('id, fecha_hora_asistencia, fuente, empleados!inner(nombres, apellidos, dui), eventos(nombre)')
+    .eq('evento', evento.id)
     .gt('fecha_hora_asistencia', desde)
     .order('fecha_hora_asistencia', { ascending: false })
     .limit(200);

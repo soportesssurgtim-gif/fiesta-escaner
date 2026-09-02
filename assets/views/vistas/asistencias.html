@@ -17,7 +17,7 @@
       <div class="metrica-icono bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400">
         <i class="fa-solid fa-user-check"></i>
       </div>
-      <p class="metrica-valor">{{ resumen.total }}</p>
+      <p class="metrica-valor">{{ resumenAsistencias.total }}</p>
       <p class="metrica-etiqueta">Personas presentes</p>
     </div>
 
@@ -32,7 +32,7 @@
       <div class="metrica-icono bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
         <i class="fa-solid fa-users"></i>
       </div>
-      <p class="metrica-valor">{{ resumen.convocados }}</p>
+      <p class="metrica-valor">{{ resumenAsistencias.convocados }}</p>
       <p class="metrica-etiqueta">Convocados</p>
     </div>
 
@@ -41,7 +41,7 @@
         <i class="fa-solid fa-chart-simple"></i>
       </div>
       <p class="metrica-valor">
-        {{ resumen.convocados ? Math.round((resumen.total / resumen.convocados) * 100) : 0 }}%
+        {{ resumenAsistencias.convocados ? Math.round((resumenAsistencias.total / resumenAsistencias.convocados) * 100) : 0 }}%
       </p>
       <p class="metrica-etiqueta">Nivel de asistencia</p>
     </div>
